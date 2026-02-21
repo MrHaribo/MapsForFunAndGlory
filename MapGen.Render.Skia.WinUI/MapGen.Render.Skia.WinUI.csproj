@@ -42,6 +42,9 @@
     <PackageReference Include="SharpVoronoiLib" Version="1.1.0" />
     <PackageReference Include="SkiaSharp.Views.Uno.WinUI" Version="3.119.2" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MapGen.Core\MapGen.Core.csproj" />
+  </ItemGroup>
 
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
