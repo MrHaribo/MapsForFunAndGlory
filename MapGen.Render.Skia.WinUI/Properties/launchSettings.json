@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MapGen.Render.Skia.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "MapGen.Render.Skia.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
