@@ -2,6 +2,7 @@
 using Microsoft.UI.Xaml;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
+using System;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -24,7 +25,8 @@ namespace MapGen.Render.Skia.WinUI
         {
             var options = new GenerationOptions
             {
-                Seed = "azgaar",
+                Seed = "42",
+                //Seed = "azgaar",
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 9975,
@@ -48,62 +50,60 @@ namespace MapGen.Render.Skia.WinUI
 
         private void DrawVoronoi(SKCanvas canvas)
         {
-            if (_map == null) return;
+            if (_map == null || _map.H == null) return;
 
-            // Paints for the different elements
-            using var cellStroke = new SKPaint
+            using var strokePaint = new SKPaint
             {
-                Color = new SKColor(100, 100, 100, 80), // Semi-transparent gray
+                Color = new SKColor(0, 0, 0, 30), // Very faint edges
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1,
+                StrokeWidth = 0.5f,
                 IsAntialias = true
             };
 
-            using var borderStroke = new SKPaint
-            {
-                Color = SKColors.Red.WithAlpha(120),
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1.5f,
-                IsAntialias = true
-            };
-
-            using var sitePaint = new SKPaint
-            {
-                Color = SKColors.SteelBlue,
-                Style = SKPaintStyle.Fill,
-                IsAntialias = true
-            };
-
-            // Iterate through only the playable cells (PointsCount)
             for (int i = 0; i < _map.PointsCount; i++)
             {
                 var vertexIndices = _map.Cells.V[i];
-
-                // Safety check: Azgaar's cells usually have 3-8 vertices
                 if (vertexIndices == null || vertexIndices.Count < 3) continue;
 
-                using var cellPath = new SKPath();
+                // Determine Color based on Height
+                byte h = _map.H[i];
+                SKColor fillColor;
 
-                // Move to the first vertex of the cell
-                var firstVertex = _map.Vertices.P[vertexIndices[0]];
-                cellPath.MoveTo((float)firstVertex.X, (float)firstVertex.Y);
-
-                // Draw lines to the remaining vertices
-                for (int j = 1; j < vertexIndices.Count; j++)
+                if (h < 20)
                 {
-                    var vertex = _map.Vertices.P[vertexIndices[j]];
-                    cellPath.LineTo((float)vertex.X, (float)vertex.Y);
+                    // Ocean: Dark blue to light blue
+                    // Scale 0-19 to a blue range
+                    byte blueDepth = (byte)(100 + (h * 5));
+                    fillColor = new SKColor(30, 60, blueDepth);
+                }
+                else
+                {
+                    // Land: Grayscale (or you could do Green/Brown)
+                    // Scale 20-100 to 50-250 for better visibility
+                    byte landBrightness = (byte)Math.Clamp((h - 20) * 3 + 50, 0, 255);
+                    fillColor = new SKColor(landBrightness, landBrightness, landBrightness);
                 }
 
-                cellPath.Close();
+                using var fillPaint = new SKPaint
+                {
+                    Color = fillColor,
+                    Style = SKPaintStyle.Fill,
+                    IsAntialias = true
+                };
 
-                // Use a different color if the cell is on the map boundary
-                bool isBorder = _map.Cells.B[i] == 1;
-                canvas.DrawPath(cellPath, isBorder ? borderStroke : cellStroke);
+                using var path = new SKPath();
+                var v0 = _map.Vertices.P[vertexIndices[0]];
+                path.MoveTo((float)v0.X, (float)v0.Y);
 
-                // Optional: Draw a tiny dot at the cell's center (site)
-                // Helps visualize the "jitter" we worked so hard to sync
-                canvas.DrawCircle((float)_map.X[i], (float)_map.Y[i], 1.0f, sitePaint);
+                for (int j = 1; j < vertexIndices.Count; j++)
+                {
+                    var v = _map.Vertices.P[vertexIndices[j]];
+                    path.LineTo((float)v.X, (float)v.Y);
+                }
+                path.Close();
+
+                canvas.DrawPath(path, fillPaint);
+                // canvas.DrawPath(path, strokePaint); // Optional: toggle for grid visibility
             }
         }
     }

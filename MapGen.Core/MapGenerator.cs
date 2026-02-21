@@ -32,7 +32,7 @@ namespace MapGen.Core
             VoronoiGenerator.CalculateVoronoi(_data);
 
             // 6. Heightmap Generation (Line 647)
-            //HeightmapGenerator.Generate(Data, options);
+            HeightmapGenerator.Generate(_data, HeightmapTemplate.HighIsland, _rng);
 
             // 7. Mark Features (Islands/Lakes) (Line 651)
             //MarkFeatures();

@@ -23,9 +23,7 @@ namespace MapGen.Core
         public VertexData Vertices { get; set; }
 
         // The "Cells" (The simulation data / "Pack")
-        public float[] Heights;     // elevation
-        public float[] Precipitation;
-        public int[] Features;       // 0: ocean, 1: land, 2+: lakes/islands
+        public byte[] H { get; set; } // Heights
 
         public MapData(int count, int width, int height)
         {
@@ -35,9 +33,6 @@ namespace MapGen.Core
 
             X = new double[count];
             Y = new double[count];
-            Heights = new float[count];
-            Precipitation = new float[count];
-            Features = new int[count];
         }
     }
 
