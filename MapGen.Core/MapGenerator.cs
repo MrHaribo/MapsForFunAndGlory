@@ -29,7 +29,7 @@ namespace MapGen.Core
             GridGenerator.PlaceBoundaryPoints(_data, _options.Width, _options.Height);
 
             // 5. Mesh Calculation
-            CalculateMesh();
+            VoronoiGenerator.CalculateVoronoi(_data);
 
             // 6. Heightmap Generation (Line 647)
             //HeightmapGenerator.Generate(Data, options);
@@ -44,11 +44,6 @@ namespace MapGen.Core
             // 9. Cultures & States (Line 665+)
             //PlaceCultures();
             //DefineStates();
-        }
-
-        private void CalculateMesh()
-        {
-            // Integration with DelaunaySharp happens here
         }
     }
 }

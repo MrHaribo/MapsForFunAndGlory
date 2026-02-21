@@ -1,4 +1,7 @@
-﻿namespace MapGen.Core
+﻿using DelaunatorSharp;
+using System.Collections.Generic;
+
+namespace MapGen.Core
 {
     public class MapData
     {
@@ -8,12 +11,16 @@
         public int PointsCount { get; set; }
         public double Spacing { get; set; }
 
-        public float[] BoundaryX { get; set; }
-        public float[] BoundaryY { get; set; }
+        public double[] BoundaryX { get; set; }
+        public double[] BoundaryY { get; set; }
 
         // Raw Coordinates (The "Grid")
-        public float[] X;
-        public float[] Y;
+        public double[] X;
+        public double[] Y;
+
+        // Voronoi Data
+        public CellData Cells { get; set; }
+        public VertexData Vertices { get; set; }
 
         // The "Cells" (The simulation data / "Pack")
         public float[] Heights;     // elevation
@@ -26,11 +33,25 @@
             Width = width;
             Height = height;
 
-            X = new float[count];
-            Y = new float[count];
+            X = new double[count];
+            Y = new double[count];
             Heights = new float[count];
             Precipitation = new float[count];
             Features = new int[count];
         }
+    }
+
+    public class CellData
+    {
+        public List<int>[] V { get; set; } // Cell vertices
+        public List<int>[] C { get; set; } // Neighbor cells
+        public byte[] B { get; set; }      // Border flag
+    }
+
+    public class VertexData
+    {
+        public IPoint[] P { get; set; }    // Vertex coordinates
+        public List<int>[] V { get; set; } // Neighbor vertices
+        public List<int>[] C { get; set; } // Adjacent cells
     }
 }

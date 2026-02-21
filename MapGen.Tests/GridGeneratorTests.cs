@@ -102,7 +102,7 @@ namespace MapGen.Tests
             generator.Generate(options);
 
             // 2. Flatten points to [x0, y0, x1, y1...] to match JS [...grid.points].flat()
-            var flatPoints = new List<float>();
+            var flatPoints = new List<double>();
             for (int i = 0; i < generator.Data.PointsCount; i++)
             {
                 flatPoints.Add(generator.Data.X[i]);

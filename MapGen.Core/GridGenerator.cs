@@ -34,8 +34,8 @@ public static class GridGenerator
                 double xj = Math.Min(Rn(xBase + (rng.Next() * doubleJittering - jittering), 2), (double)options.Width);
                 double yj = Math.Min(Rn(yBase + (rng.Next() * doubleJittering - jittering), 2), (double)options.Height);
 
-                data.X[index] = (float)xj;
-                data.Y[index] = (float)yj;
+                data.X[index] = xj;
+                data.Y[index] = yj;
                 index++;
             }
         }
@@ -57,22 +57,22 @@ public static class GridGenerator
         int numberX = (int)Math.Ceiling(w / bSpacing) - 1;
         int numberY = (int)Math.Ceiling(h / bSpacing) - 1;
 
-        var bX = new List<float>();
-        var bY = new List<float>();
+        var bX = new List<double>();
+        var bY = new List<double>();
 
         for (double i = 0.5; i < numberX; i++)
         {
             // Use double math for the division to avoid truncation before Ceiling
-            float x = (float)Math.Ceiling((w * i) / (double)numberX + offset);
-            bX.Add(x); bY.Add((float)offset);
-            bX.Add(x); bY.Add((float)(h + offset));
+            double x = Math.Ceiling((w * i) / (double)numberX + offset);
+            bX.Add(x); bY.Add(offset);
+            bX.Add(x); bY.Add(h + offset);
         }
 
         for (double i = 0.5; i < numberY; i++)
         {
-            float y = (float)Math.Ceiling((h * i) / (double)numberY + offset);
-            bX.Add((float)offset); bY.Add(y);
-            bX.Add((float)(w + offset)); bY.Add(y);
+            double y = Math.Ceiling((h * i) / (double)numberY + offset);
+            bX.Add(offset); bY.Add(y);
+            bX.Add(w + offset); bY.Add(y);
         }
 
         data.BoundaryX = bX.ToArray();
