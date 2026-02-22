@@ -1,4 +1,5 @@
 ﻿using DelaunatorSharp;
+using System;
 
 namespace MapGen.Core
 {
@@ -6,27 +7,35 @@ namespace MapGen.Core
     {
         public static void CalculateVoronoi(MapData data)
         {
-            // 1. Combine Playable and Boundary points
-            int playableCount = data.PointsCount;
-            int boundaryCount = data.BoundaryX.Length;
+            // 1. Combine Playable and Boundary points into our domain array
+            int playableCount = data.Points.Length;
+            int boundaryCount = data.BoundaryPoints.Length;
             int totalCount = playableCount + boundaryCount;
 
-            IPoint[] points = new IPoint[totalCount];
-            for (int i = 0; i < playableCount; i++)
-                points[i] = new Point(data.X[i], data.Y[i]);
+            MapPoint[] allPoints = new MapPoint[totalCount];
+            Array.Copy(data.Points, 0, allPoints, 0, playableCount);
+            Array.Copy(data.BoundaryPoints, 0, allPoints, playableCount, boundaryCount);
 
-            for (int i = 0; i < boundaryCount; i++)
-                points[i + playableCount] = new Point(data.BoundaryX[i], data.BoundaryY[i]);
+            // 2. Project MapPoints to the library's expected Point type
+            // This keeps the IPoint dependency local to this method
+            IPoint[] libraryPoints = new IPoint[totalCount];
+            for (int i = 0; i < totalCount; i++)
+            {
+                libraryPoints[i] = new Point(allPoints[i].X, allPoints[i].Y);
+            }
 
-            // 2. Run Delaunator
-            var delaunator = new Delaunator(points);
+            // 3. Run Delaunator using the projected library points
+            var delaunator = new Delaunator(libraryPoints);
 
-            // 3. Create the Voronoi Wrapper
-            var voronoi = new Voronoi(delaunator, points, playableCount);
+            // 4. Create the Voronoi Wrapper 
+            // We pass our clean MapPoint[] domain array so the Voronoi class 
+            // doesn't have to deal with library-specific types.
+            var voronoi = new Voronoi(delaunator, allPoints, playableCount);
 
-            // 4. Store the results in _data (to be implemented)
+            // 5. Store the results in MapData
             data.Cells = voronoi.Cells;
             data.Vertices = voronoi.Vertices;
+            data.CellsCount = voronoi.Cells.Length;
         }
     }
 }

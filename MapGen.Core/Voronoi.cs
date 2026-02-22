@@ -8,54 +8,66 @@ namespace MapGen.Core
     public class Voronoi
     {
         public Delaunator Delaunay { get; }
-        public IPoint[] Points { get; }
+        public MapPoint[] Points { get; }
         public int PointsN { get; }
 
-        public CellData Cells { get; } = new CellData();
-        public VertexData Vertices { get; } = new VertexData();
+        // Now matching your MapData structure
+        public MapCell[] Cells { get; }
+        public MapVertex[] Vertices { get; }
 
-        public Voronoi(Delaunator delaunay, IPoint[] points, int pointsN)
+        public Voronoi(Delaunator delaunay, MapPoint[] points, int pointsN)
         {
             Delaunay = delaunay;
             Points = points;
             PointsN = pointsN;
 
-            // Initialize collections
-            Cells.V = new List<int>[PointsN];
-            Cells.C = new List<int>[PointsN];
-            Cells.B = new byte[PointsN];
+            // 1. Initialize the Object Arrays
+            Cells = new MapCell[PointsN];
+            for (int i = 0; i < PointsN; i++) Cells[i] = new MapCell { Index = i };
 
-            // The number of triangles determines the number of Voronoi vertices
             int triangleCount = Delaunay.Triangles.Length / 3;
-            Vertices.P = new IPoint[triangleCount];
-            Vertices.V = new List<int>[triangleCount];
-            Vertices.C = new List<int>[triangleCount];
+            Vertices = new MapVertex[triangleCount];
+            for (int i = 0; i < triangleCount; i++) Vertices[i] = new MapVertex { Index = i };
 
+            // 2. Populate Data
             for (int e = 0; e < Delaunay.Triangles.Length; e++)
             {
                 // Point ID where the half-edge starts
                 int p = Delaunay.Triangles[NextHalfedge(e)];
 
-                if (p < PointsN && Cells.C[p] == null)
+                // Fill Cell Data (Adjacency and Vertices)
+                if (p < PointsN && Cells[p].C.Count == 0)
                 {
                     var edges = EdgesAroundPoint(e);
-                    Cells.V[p] = edges.Select(ex => TriangleOfEdge(ex)).ToList();
-                    Cells.C[p] = edges.Select(ex => Delaunay.Triangles[ex]).Where(c => c < PointsN).ToList();
-                    Cells.B[p] = (byte)(edges.Count > Cells.C[p].Count ? 1 : 0);
+
+                    // MapCell.V = Indices of triangles (Voronoi vertices)
+                    Cells[p].V = edges.Select(ex => TriangleOfEdge(ex)).ToList();
+
+                    // MapCell.C = Indices of neighbor points (Voronoi neighbors)
+                    Cells[p].C = edges.Select(ex => Delaunay.Triangles[ex])
+                                      .Where(c => c < PointsN).ToList();
+
+                    // MapCell.B = Border flag
+                    Cells[p].B = (byte)(edges.Count > Cells[p].C.Count ? 1 : 0);
                 }
 
+                // Fill Vertex Data (Circumcenters and Relationships)
                 int t = TriangleOfEdge(e);
-                if (Vertices.P[t] == null)
+                if (Vertices[t].P.X == 0 && Vertices[t].P.Y == 0) // Check if uninitialized
                 {
-                    Vertices.P[t] = GetTriangleCenter(t);
-                    Vertices.V[t] = TrianglesAdjacentToTriangle(t);
-                    Vertices.C[t] = PointsOfTriangle(t).ToList();
+                    Vertices[t].P = GetTriangleCenter(t);
+
+                    // MapVertex.V = Neighboring triangles
+                    Vertices[t].V = TrianglesAdjacentToTriangle(t);
+
+                    // MapVertex.C = Points forming the triangle
+                    Vertices[t].C = PointsOfTriangle(t).ToList();
                 }
             }
         }
 
         private int NextHalfedge(int e) => (e % 3 == 2) ? e - 2 : e + 1;
-        private int TriangleOfEdge(int e) => (int)Math.Floor(e / 3.0);
+        private int TriangleOfEdge(int e) => e / 3;
 
         private List<int> EdgesAroundPoint(int start)
         {
@@ -70,7 +82,7 @@ namespace MapGen.Core
             return result;
         }
 
-        private IPoint GetTriangleCenter(int t)
+        private MapPoint GetTriangleCenter(int t)
         {
             var pIdx = PointsOfTriangle(t);
             return Circumcenter(Points[pIdx[0]], Points[pIdx[1]], Points[pIdx[2]]);
@@ -94,7 +106,7 @@ namespace MapGen.Core
             return adjacent;
         }
 
-        private IPoint Circumcenter(IPoint a, IPoint b, IPoint c)
+        private MapPoint Circumcenter(MapPoint a, MapPoint b, MapPoint c)
         {
             double ax = a.X, ay = a.Y;
             double bx = b.X, by = b.Y;
@@ -104,8 +116,8 @@ namespace MapGen.Core
             double cd = cx * cx + cy * cy;
             double D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
 
-            // Match Azgaar's Math.floor snapping
-            return new Point(
+            // Using your MapPoint struct with Math.Floor snapping
+            return new MapPoint(
                 Math.Floor(1 / D * (ad * (by - cy) + bd * (cy - ay) + cd * (ay - by))),
                 Math.Floor(1 / D * (ad * (cx - bx) + bd * (ax - cx) + cd * (bx - ax)))
             );

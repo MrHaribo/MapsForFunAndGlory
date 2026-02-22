@@ -11,24 +11,16 @@ namespace MapGen.Core
         public int PointsCount { get; set; }
         public double Spacing { get; set; }
 
-        public double[] BoundaryX { get; set; }
-        public double[] BoundaryY { get; set; }
-
         // Raw Coordinates (The "Grid")
-        public double[] X { get; set; }
-        public double[] Y { get; set; }
-
+        public MapPoint[] Points { get; set; }
+        public MapPoint[] BoundaryPoints { get; set; }
         public int CellsCountX { get; set; }
         public int CellsCountY { get; set; }
         public int CellsCount { get; set; }
 
         // Voronoi Data
-        public CellData Cells { get; set; }
-        public VertexData Vertices { get; set; }
-
-        // The "Cells" (The simulation data / "Pack")
-        public byte[] H { get; set; } // Heights
-
+        public MapCell[] Cells { get; set; }
+        public MapVertex[] Vertices { get; set; }
 
         public MapData(int count, int width, int height)
         {
@@ -38,17 +30,35 @@ namespace MapGen.Core
         }
     }
 
-    public class CellData
+    public class MapCell
     {
-        public List<int>[] V { get; set; } // Cell vertices
-        public List<int>[] C { get; set; } // Neighbor cells
-        public byte[] B { get; set; }      // Border flag
+        public int Index { get; set; }
+        public List<int> V { get; set; } = new List<int>(); // Indices of vertices forming this cell
+        public List<int> C { get; set; } = new List<int>(); // Indices of neighboring cells (Adjacency)
+        public byte B { get; set; }               // Border flag (1 if it touches the edge)
+        public byte H { get; set; }               // Height value
     }
 
-    public class VertexData
+    public class MapVertex
     {
-        public IPoint[] P { get; set; }    // Vertex coordinates
-        public List<int>[] V { get; set; } // Neighbor vertices
-        public List<int>[] C { get; set; } // Adjacent cells
+        public int Index { get; set; }
+        public MapPoint P { get; set; }           // The actual coordinate [x, y]
+        public List<int> V { get; set; } = new List<int>(); // Neighboring vertex indices
+        public List<int> C { get; set; } = new List<int>(); // Adjacent cell indices
+    }
+
+    public readonly struct MapPoint
+    {
+        public readonly double X;
+        public readonly double Y;
+
+        public MapPoint(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        // Handy for debugging or matching JS output exactly
+        public override string ToString() => $"[{X}, {Y}]";
     }
 }

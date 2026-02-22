@@ -13,27 +13,29 @@ namespace MapGen.Tests
     {
         public class VoronoiRegressionData
         {
+            public string Seed { get; set; }
+            public int Width { get; set; }
+            public int Height { get; set; }
             public int CellsCount { get; set; }
-            public List<int>[] Neighbors { get; set; } // Matches grid.cells.c
+            public int[][] Neighbors { get; set; } // JS: grid.cells.c
+            public double[][] Vertices { get; set; } // JS: grid.vertices.p (nested [[x,y]])
             public int VertexCount { get; set; }
-            public float[] Vertices { get; set; }      // Flattened [x, y, x, y...]
         }
 
         [Fact]
         public void VoronoiGenerator_Graph_MatchesJsOutput()
         {
             // 1. Load the JS dump
-            var json = File.ReadAllText("regression_voronoi_azgaar.json");
+            var json = File.ReadAllText("regression_voronoi.json");
             var expected = JsonConvert.DeserializeObject<VoronoiRegressionData>(json);
 
             // 2. Run the full pipeline
             var options = new GenerationOptions
             {
-                Seed = "azgaar",
+                Seed = "42",
                 Width = 1920,
                 Height = 1080,
-                PointsCount = 9975,
-                Jitter = 0.8
+                PointsCount = 2000
             };
 
             var generator = new MapGenerator();
@@ -41,20 +43,30 @@ namespace MapGen.Tests
             var data = generator.Data;
 
             // 3. Verify Cell Neighbor Parity (Topology)
-            Assert.Equal(expected.CellsCount, data.Cells.C.Length);
+            // Check total length of the Cells array
+            Assert.Equal(expected.CellsCount, data.Cells.Length);
+
             for (int i = 0; i < expected.CellsCount; i++)
             {
-                // Assert.Equal on Lists compares sequence content
-                Assert.Equal(expected.Neighbors[i], data.Cells.C[i]);
+                // Accessing neighbor list via the MapCell object
+                // expected.Neighbors[i] is int[], data.Cells[i].C is List<int>
+                Assert.Equal(expected.Neighbors[i], data.Cells[i].C);
             }
 
             // 4. Verify Vertex Geometry (Circumcenters)
-            Assert.Equal(expected.VertexCount, data.Vertices.P.Length);
+            // Check total length of the Vertices array
+            Assert.Equal(expected.VertexCount, data.Vertices.Length);
+
+
             for (int i = 0; i < expected.VertexCount; i++)
             {
-                // Using precision 0 because of Azgaar's Math.floor()
-                Assert.Equal(expected.Vertices[i * 2], (float)data.Vertices.P[i].X, 0);
-                Assert.Equal(expected.Vertices[i * 2 + 1], (float)data.Vertices.P[i].Y, 0);
+                // Accessing coordinate via the MapVertex object
+                var actualVertex = data.Vertices[i].P;
+
+                // expected.Vertices[i][0] is X, expected.Vertices[i][1] is Y
+                // Using precision 0 to account for Azgaar's Math.floor snapping
+                Assert.Equal(expected.Vertices[i][0], actualVertex.X, 0);
+                Assert.Equal(expected.Vertices[i][1], actualVertex.Y, 0);
             }
         }
     }
