@@ -31,7 +31,7 @@
     <None Update="regression_heights_highisland.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="regression_points_azgaar.json">
+    <None Update="regression_points.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="regression_voronoi_azgaar.json">

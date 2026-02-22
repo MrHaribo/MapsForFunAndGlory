@@ -15,8 +15,12 @@ namespace MapGen.Core
         public double[] BoundaryY { get; set; }
 
         // Raw Coordinates (The "Grid")
-        public double[] X;
-        public double[] Y;
+        public double[] X { get; set; }
+        public double[] Y { get; set; }
+
+        public int CellsCountX { get; set; }
+        public int CellsCountY { get; set; }
+        public int CellsCount { get; set; }
 
         // Voronoi Data
         public CellData Cells { get; set; }
@@ -25,14 +29,12 @@ namespace MapGen.Core
         // The "Cells" (The simulation data / "Pack")
         public byte[] H { get; set; } // Heights
 
+
         public MapData(int count, int width, int height)
         {
             PointsCount = count;
             Width = width;
             Height = height;
-
-            X = new double[count];
-            Y = new double[count];
         }
     }
 

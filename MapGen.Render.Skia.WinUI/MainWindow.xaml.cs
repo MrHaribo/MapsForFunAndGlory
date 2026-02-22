@@ -29,8 +29,7 @@ namespace MapGen.Render.Skia.WinUI
                 //Seed = "azgaar",
                 Width = 1920,
                 Height = 1080,
-                PointsCount = 9975,
-                FixedSpacing = 14.4,
+                PointsCount = 2000,
                 Jitter = 0.8
             };
 

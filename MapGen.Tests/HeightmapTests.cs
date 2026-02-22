@@ -28,7 +28,6 @@ namespace MapGen.Tests
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 9975,
-                FixedSpacing = 14.4,
                 Jitter = 0.8
             };
 

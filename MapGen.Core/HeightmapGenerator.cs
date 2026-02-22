@@ -8,7 +8,8 @@ namespace MapGen.Core
     {
         HighIsland,
         Volcano,
-        MountainRange // New one for testing later
+        MountainRange, // New one for testing later
+        Test
     }
 
     public enum HeightmapTool
@@ -57,6 +58,8 @@ namespace MapGen.Core
                     "Range 1.5 30-40 15-85 30-40\n" +
                     "Range 1.5 30-40 15-85 60-70\n" +
                     "Pit 3-5 10-30 15-85 20-80",
+                HeightmapTemplate.Test =>
+                    "Hill 1 90-100 44-56 40-60",
                 _ => ""
             };
 
