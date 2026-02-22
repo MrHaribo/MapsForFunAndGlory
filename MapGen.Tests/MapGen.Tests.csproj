@@ -28,7 +28,7 @@
     <None Update="regression_boundary.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="regression_heights_highisland.json">
+    <None Update="regression_heightmap_hill.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="regression_points.json">

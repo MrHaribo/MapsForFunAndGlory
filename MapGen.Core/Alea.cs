@@ -27,6 +27,7 @@ namespace MapGen.Core
             c = 1;
         }
 
+        // Standard NextDouble (0.0 to 1.0)
         public double Next()
         {
             double t = 2091639 * s0 + c * 2.3283064365386963e-10; // 2^-32
@@ -35,6 +36,18 @@ namespace MapGen.Core
             c = (uint)t;
             s2 = t - c;
             return s2;
+        }
+
+        // Range for Integers (inclusive min, exclusive max to match JS logic)
+        public int Next(int min, int max)
+        {
+            return (int)Math.Floor(Next() * (max - min) + min);
+        }
+
+        // Range for Doubles
+        public double Next(double min, double max)
+        {
+            return Next() * (max - min) + min;
         }
 
         private class Mash

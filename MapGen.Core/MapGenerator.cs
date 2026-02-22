@@ -14,15 +14,18 @@ namespace MapGen.Core
 
         public void Generate(GenerationOptions options)
         {
+            Generate(options, new Alea(options.Seed));
+        }
+
+        public void Generate(GenerationOptions options, IRandom rng)
+        {
             _options = options;
+            _rng = rng;
 
-            // 1. Initialize RNG with seed
-            _rng = new Alea(_options.Seed);
-
-            // 2. Initialize Data Container
+            // 1. Initialize Data Container
             _data = new MapData(_options.PointsCount, _options.Width, _options.Height);
 
-            // 3. Place Points (Grid Generation)
+            // 2. Place Points (Grid Generation)
             GridGenerator.PlacePoints(_data, _options, _rng);
 
             // 3. Step 2: Edge Boundary Points (automatically uses the same spacing)

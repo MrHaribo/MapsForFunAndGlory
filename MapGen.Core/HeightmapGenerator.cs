@@ -1,379 +1,384 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
-//namespace MapGen.Core
-//{
-//    public enum HeightmapTemplate
-//    {
-//        HighIsland,
-//        Volcano,
-//        MountainRange, // New one for testing later
-//        Test
-//    }
+namespace MapGen.Core
+{
+    public enum HeightmapTemplate { HighIsland, Volcano, MountainRange, Archipelago, Test }
+    public enum HeightmapTool { Hill, Pit, Range, Trough, Strait, Mask, Invert, Add, Multiply, Smooth }
+    public enum HeightmapRangeType { All, Land, Water, Range }
 
-//    public enum HeightmapTool
-//    {
-//        Hill,
-//        Pit,
-//        Range,
-//        Trough,
-//        Strait,
-//        Mask,
-//        Invert,
-//        Add,
-//        Multiply,
-//        Smooth
-//    }
+    public static class HeightmapGenerator
+    {
+        private const double BlobPower = 0.98;
+        private const double LinePower = 0.81;
 
-//    public enum HeightmapRangeType
-//    {
-//        All, Land, Custom
-//    }
+        // Overload 1: Standard Enum-based generation
+        public static void Generate(MapData data, HeightmapTemplate template, IRandom rng)
+        {
+            string recipe = HeightmapTemplates.GetRecipe(template);
+            Generate(data, recipe, rng);
+        }
 
-//    public static class HeightmapGenerator
-//    {
-//        private const double BlobPower = 0.98;
-//        private const double LinePower = 0.81;
+        // Overload 2: Direct string-based generation (for Regression/Isolated tests)
+        public static void Generate(MapData data, string recipe, IRandom rng)
+        {
+            // Reset heights to 0 before applying tools
+            foreach (var cell in data.Cells) cell.H = 0;
 
-//        public static void Generate(MapData data, HeightmapTemplate template, IRandom rng)
-//        {
-//            data.H = new byte[data.PointsCount];
+            var lines = recipe.Split(new[] { "\n", "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                // Trim() handles the leading whitespace from the JS template blocks
+                var args = line.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (args.Length > 0 && Enum.TryParse<HeightmapTool>(args[0], true, out var tool))
+                {
+                    ApplyTool(data, tool, args, rng);
+                }
+            }
+        }
 
-//            // This matches the "Default" sequence you found in JS
-//            string recipe = template switch
-//            {
-//                HeightmapTemplate.HighIsland =>
-//                    "Hill 1 90-100 65-75 47-53\n" +
-//                    "Add 7 all\n" +
-//                    "Hill 5-6 20-30 25-55 45-55\n" +
-//                    "Range 1 40-50 45-55 45-55\n" +
-//                    "Multiply 0.8 land\n" +
-//                    "Mask 3\n" +
-//                    "Smooth 2\n" +
-//                    "Trough 2-3 20-30 20-30 20-30\n" +
-//                    "Trough 2-3 20-30 60-80 70-80\n" +
-//                    "Hill 1 10-15 60-60 50-50\n" +
-//                    "Hill 1.5 13-16 15-20 20-75\n" +
-//                    "Range 1.5 30-40 15-85 30-40\n" +
-//                    "Range 1.5 30-40 15-85 60-70\n" +
-//                    "Pit 3-5 10-30 15-85 20-80",
-//                HeightmapTemplate.Test =>
-//                    "Hill 1 90-100 44-56 40-60",
-//                _ => ""
-//            };
+        private static void ApplyTool(MapData data, HeightmapTool tool, string[] args, IRandom rng)
+        {
+            switch (tool)
+            {
+                case HeightmapTool.Hill: AddHill(data, rng, args[1], args[2], args[3], args[4]); break;
+                case HeightmapTool.Pit: AddPit(data, rng, args[1], args[2], args[3], args[4]); break;
+                case HeightmapTool.Range: AddRange(data, rng, args[1], args[2], args[3], args[4]); break;
+                case HeightmapTool.Trough: AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
+                case HeightmapTool.Strait: AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical"); break;
+                case HeightmapTool.Add: Modify(data, ToolRange.Parse(args[2]), double.Parse(args[1]), 1); break;
+                case HeightmapTool.Multiply: Modify(data, ToolRange.Parse(args[2]), 0, double.Parse(args[1])); break;
+                case HeightmapTool.Smooth: Smooth(data, double.Parse(args[1])); break;
+                case HeightmapTool.Mask: Mask(data, double.Parse(args[1])); break;
+            }
+        }
 
-//            foreach (var line in recipe.Split('\n'))
-//            {
-//                var args = line.Trim().Split(' ');
-//                if (Enum.TryParse<HeightmapTool>(args[0], true, out var tool))
-//                    ApplyTool(data, tool, args, rng);
-//            }
-//        }
+        private static void AddHill(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
+        {
+            int count = ToolRange.Parse(countArg).GetNumber(rng);
+            double blobPower = 0.98;
 
-//        private static void ApplyTool(MapData data, HeightmapTool tool, string[] args, IRandom rng)
-//        {
-//            switch (tool)
-//            {
-//                case HeightmapTool.Hill: AddHill(data, rng, args[1], args[2], args[3], args[4]); break;
-//                case HeightmapTool.Pit: AddPit(data, rng, args[1], args[2], args[3], args[4]); break;
-//                case HeightmapTool.Range: AddRange(data, rng, args[1], args[2], args[3], args[4]); break;
-//                case HeightmapTool.Trough: AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
-//                case HeightmapTool.Strait: AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical"); break;
-//                case HeightmapTool.Add: Modify(data, ToolRange.Parse(args[2]), double.Parse(args[1]), 1); break;
-//                case HeightmapTool.Multiply: Modify(data, ToolRange.Parse(args[2]), 0, double.Parse(args[1])); break;
-//                case HeightmapTool.Smooth: Smooth(data, double.Parse(args[1])); break;
-//                case HeightmapTool.Mask: Mask(data, double.Parse(args[1])); break;
-//            }
-//        }
+            while (count > 0)
+            {
+                byte[] change = new byte[data.Cells.Length];
+                int limit = 0;
+                int start;
+                int h = Math.Clamp(ToolRange.Parse(heightArg).GetNumber(rng), 0, 100);
 
-//        private static void AddHill(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
-//        {
-//            int count = GetNumberInRange(countStr, rng);
-//            for (int i = 0; i < count; i++)
-//            {
-//                double h = GetNumberInRange(heightStr, rng);
-//                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                do
+                {
+                    // Use the new GetPoint method to handle the 0-100 to pixel conversion
+                    double x = ToolRange.Parse(rangeX).GetPoint(data.Width, rng);
+                    double y = ToolRange.Parse(rangeY).GetPoint(data.Height, rng);
 
-//                var change = new double[data.H.Length];
-//                change[start] = h;
-//                var queue = new Queue<int>();
-//                queue.Enqueue(start);
+                    // Renamed to match your likely method name
+                    start = FindNearestCell(data, x, y);
+                    limit++;
+                } while (data.Cells[start].H + h > 90 && limit < 50);
 
-//                while (queue.Count > 0)
-//                {
-//                    int q = queue.Dequeue();
-//                    foreach (int n in data.Cells.C[q])
-//                    {
-//                        if (change[n] > 0) continue;
-//                        double decay = Math.Pow(change[q], BlobPower) * (rng.Next() * 0.2 + 0.9);
-//                        if (decay > 1) { change[n] = decay; queue.Enqueue(n); }
-//                    }
-//                }
-//                for (int j = 0; j < data.H.Length; j++) data.H[j] = Lim(data.H[j] + change[j]);
-//            }
-//        }
+                change[start] = (byte)h;
+                var queue = new Queue<int>();
+                queue.Enqueue(start);
 
-//        private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
-//        {
-//            int count = GetNumberInRange(countStr, rng);
-//            for (int i = 0; i < count; i++)
-//            {
-//                double h = GetNumberInRange(heightStr, rng);
-//                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                while (queue.Count > 0)
+                {
+                    int q = queue.Dequeue();
+                    foreach (int n in data.Cells[q].C)
+                    {
+                        if (change[n] > 0) continue;
 
-//                double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
-//                double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
-//                int end = FindNearestCell(data, endX, endY);
+                        // Precision: Using NextDouble to match Math.random()
+                        double newValue = Math.Pow(change[q], blobPower) * (rng.Next() * 0.2 + 0.9);
+                        change[n] = (byte)newValue;
 
-//                var ridge = GetRangePath(data, start, end, rng);
-//                ExpandRange(data, ridge, h, rng, LinePower);
-//            }
-//        }
+                        if (change[n] > 1) queue.Enqueue(n);
+                    }
+                }
 
-//        private static List<int> GetRangePath(MapData data, int cur, int end, IRandom rng)
-//        {
-//            var path = new List<int> { cur };
-//            var used = new HashSet<int> { cur };
+                for (int i = 0; i < data.Cells.Length; i++)
+                {
+                    data.Cells[i].H = (byte)Math.Clamp(data.Cells[i].H + change[i], 0, 100);
+                }
+                count--;
+            }
+        }
 
-//            // Cache the target point for performance
-//            var target = data.Points[end];
+        private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
+        {
+            int count = GetNumberInRange(countStr, rng);
+            for (int i = 0; i < count; i++)
+            {
+                double h = GetNumberInRange(heightStr, rng);
+                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
 
-//            while (cur != end)
-//            {
-//                int best = -1;
-//                double minD = double.MaxValue;
+                double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
+                double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
+                int end = FindNearestCell(data, endX, endY);
 
-//                foreach (int n in data.Cells.C[cur])
-//                {
-//                    if (used.Contains(n)) continue;
+                var ridge = GetRangePath(data, start, end, rng);
+                ExpandRange(data, ridge, h, rng, LinePower);
+            }
+        }
 
-//                    var neighbor = data.Points[n];
-//                    // Squared distance calculation using struct properties
-//                    double d = Math.Pow(target.X - neighbor.X, 2) + Math.Pow(target.Y - neighbor.Y, 2);
+        private static void ExpandRange(MapData data, List<int> range, double h, IRandom rng, double power)
+        {
+            var used = new HashSet<int>(range);
+            var queue = new Queue<int>(range);
+            while (queue.Count > 0)
+            {
+                int levelSize = queue.Count;
+                for (int j = 0; j < levelSize; j++)
+                {
+                    int q = queue.Dequeue();
+                    data.Cells[q].H = Lim(data.Cells[q].H + h * (rng.Next() * 0.3 + 0.85));
+                    foreach (int n in data.Cells[q].C)
+                        if (used.Add(n)) queue.Enqueue(n);
+                }
+                h = Math.Pow(h, power) - 1;
+                if (h < 2) break;
+            }
+        }
 
-//                    // FMG "jitter" to make mountain ranges look less like straight lines
-//                    if (rng.Next() > 0.85) d /= 2;
+        private static void AddPit(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
+        {
+            int count = GetNumberInRange(countStr, rng);
+            for (int i = 0; i < count; i++)
+            {
+                double h = GetNumberInRange(heightStr, rng);
+                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                var queue = new Queue<int>(); queue.Enqueue(start);
+                var used = new HashSet<int> { start };
+                while (queue.Count > 0)
+                {
+                    int q = queue.Dequeue();
+                    h = Math.Pow(h, BlobPower) * (rng.Next() * 0.2 + 0.9);
+                    if (h < 1) break;
+                    foreach (int n in data.Cells[q].C)
+                    {
+                        if (used.Add(n))
+                        {
+                            data.Cells[n].H = Lim(data.Cells[n].H - h * (rng.Next() * 0.2 + 0.9));
+                            queue.Enqueue(n);
+                        }
+                    }
+                }
+            }
+        }
 
-//                    if (d < minD)
-//                    {
-//                        minD = d;
-//                        best = n;
-//                    }
-//                }
+        private static void AddTrough(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
+        {
+            int count = GetNumberInRange(countStr, rng);
+            for (int i = 0; i < count; i++)
+            {
+                double h = GetNumberInRange(heightStr, rng);
+                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                int end = FindNearestCell(data, rng.Next() * data.Width, rng.Next() * data.Height);
+                var ridge = GetRangePath(data, start, end, rng);
 
-//                if (best == -1) break;
+                var used = new HashSet<int>(ridge);
+                var queue = new Queue<int>(ridge);
+                while (queue.Count > 0 && h > 2)
+                {
+                    int levelSize = queue.Count;
+                    for (int j = 0; j < levelSize; j++)
+                    {
+                        int q = queue.Dequeue();
+                        data.Cells[q].H = Lim(data.Cells[q].H - h * (rng.Next() * 0.3 + 0.85));
+                        foreach (int n in data.Cells[q].C) if (used.Add(n)) queue.Enqueue(n);
+                    }
+                    h = Math.Pow(h, LinePower) - 1;
+                }
+            }
+        }
 
-//                cur = best;
-//                path.Add(cur);
-//                used.Add(cur);
-//            }
-//            return path;
-//        }
+        private static void AddStrait(MapData data, IRandom rng, string widthStr, string direction = "vertical")
+        {
+            int width = GetNumberInRange(widthStr, rng);
+            bool vert = direction.Equals("vertical", StringComparison.OrdinalIgnoreCase);
 
-//        private static void ExpandRange(MapData data, List<int> range, double h, IRandom rng, double power)
-//        {
-//            var used = new HashSet<int>(range);
-//            var queue = new Queue<int>(range);
-//            while (queue.Count > 0)
-//            {
-//                int levelSize = queue.Count;
-//                // Changed 'i' to 'j'
-//                for (int j = 0; j < levelSize; j++)
-//                {
-//                    int q = queue.Dequeue();
-//                    data.H[q] = Lim(data.H[q] + h * (rng.Next() * 0.3 + 0.85));
-//                    foreach (int n in data.Cells.C[q])
-//                        if (used.Add(n)) queue.Enqueue(n);
-//                }
-//                h = Math.Pow(h, power) - 1;
-//                if (h < 2) break;
-//            }
-//        }
+            double startX = vert ? rng.Next() * data.Width * 0.4 + data.Width * 0.3 : 5;
+            double startY = vert ? 5 : rng.Next() * data.Height * 0.4 + data.Height * 0.3;
+            double endX = vert ? data.Width - startX : data.Width - 5;
+            double endY = vert ? data.Height - 5 : data.Height - startY;
 
-//        private static void AddPit(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
-//        {
-//            int count = GetNumberInRange(countStr, rng);
-//            for (int i = 0; i < count; i++)
-//            {
-//                double h = GetNumberInRange(heightStr, rng);
-//                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-//                var queue = new Queue<int>(); queue.Enqueue(start);
-//                var used = new HashSet<int> { start };
-//                while (queue.Count > 0)
-//                {
-//                    int q = queue.Dequeue();
-//                    h = Math.Pow(h, BlobPower) * (rng.Next() * 0.2 + 0.9);
-//                    if (h < 1) break;
-//                    foreach (int n in data.Cells.C[q])
-//                        if (used.Add(n)) { data.H[n] = Lim(data.H[n] - h * (rng.Next() * 0.2 + 0.9)); queue.Enqueue(n); }
-//                }
-//            }
-//        }
+            int startCell = FindNearestCell(data, startX, startY);
+            int endCell = FindNearestCell(data, endX, endY);
 
-//        private static void AddTrough(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
-//        {
-//            int count = GetNumberInRange(countStr, rng);
-//            for (int i = 0; i < count; i++)
-//            {
-//                double h = GetNumberInRange(heightStr, rng);
-//                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-//                int end = FindNearestCell(data, rng.Next() * data.Width, rng.Next() * data.Height);
-//                var ridge = GetRangePath(data, start, end, rng);
+            var path = GetRangePath(data, startCell, endCell, rng);
+            var used = new HashSet<int>();
+            var query = new List<int>();
 
-//                var used = new HashSet<int>(ridge);
-//                var queue = new Queue<int>(ridge);
-//                while (queue.Count > 0 && h > 2)
-//                {
-//                    int levelSize = queue.Count;
-//                    for (int j = 0; j < levelSize; j++)
-//                    {
-//                        int q = queue.Dequeue();
-//                        data.H[q] = Lim(data.H[q] - h * (rng.Next() * 0.3 + 0.85));
-//                        foreach (int n in data.Cells.C[q]) if (used.Add(n)) queue.Enqueue(n);
-//                    }
-//                    h = Math.Pow(h, LinePower) - 1;
-//                }
-//            }
-//        }
+            double step = 0.1 / width;
+            while (width > 0)
+            {
+                double exp = 0.9 - step * width;
+                foreach (int r in path)
+                {
+                    foreach (int e in data.Cells[r].C)
+                    {
+                        if (used.Add(e))
+                        {
+                            query.Add(e);
+                            double h = Math.Pow(data.Cells[e].H, exp);
+                            data.Cells[e].H = (h > 100) ? (byte)5 : Lim(h);
+                        }
+                    }
+                }
+                path = new List<int>(query);
+                query.Clear();
+                width--;
+            }
+        }
 
-//        private static void AddStrait(MapData data, IRandom rng, string widthStr, string direction = "vertical")
-//        {
-//            int width = GetNumberInRange(widthStr, rng);
-//            bool vert = direction.Equals("vertical", StringComparison.OrdinalIgnoreCase);
+        private static void Modify(MapData data, ToolRange range, double add, double mult)
+        {
+            foreach (var cell in data.Cells)
+            {
+                if (cell.H < range.Min || cell.H > range.Max) continue;
+                double h = cell.H;
+                if (add != 0) h = (range.Type == HeightmapRangeType.Land) ? Math.Max(h + add, 20) : h + add;
+                if (mult != 1) h = (range.Type == HeightmapRangeType.Land) ? (h - 20) * mult + 20 : h * mult;
+                cell.H = Lim(h);
+            }
+        }
 
-//            // Pick start/end points on opposite edges
-//            double startX = vert ? rng.Next() * data.Width * 0.4 + data.Width * 0.3 : 5;
-//            double startY = vert ? 5 : rng.Next() * data.Height * 0.4 + data.Height * 0.3;
+        private static void Smooth(MapData data, double fr)
+        {
+            byte[] result = new byte[data.Cells.Length];
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                double sum = data.Cells[i].H;
+                foreach (var n in data.Cells[i].C) sum += data.Cells[n].H;
+                result[i] = Lim((data.Cells[i].H * (fr - 1) + (sum / (data.Cells[i].C.Count + 1))) / fr);
+            }
+            for (int i = 0; i < data.Cells.Length; i++) data.Cells[i].H = result[i];
+        }
 
-//            double endX = vert ? data.Width - startX : data.Width - 5;
-//            double endY = vert ? data.Height - 5 : data.Height - startY;
+        private static void Mask(MapData data, double power)
+        {
+            double fr = power != 0 ? Math.Abs(power) : 1;
+            for (int i = 0; i < data.Points.Length; i++)
+            {
+                var p = data.Points[i];
+                double nx = (2 * p.X) / data.Width - 1;
+                double ny = (2 * p.Y) / data.Height - 1;
+                double dist = (1 - nx * nx) * (1 - ny * ny);
+                if (power < 0) dist = 1 - dist;
+                data.Cells[i].H = Lim((data.Cells[i].H * (fr - 1) + (data.Cells[i].H * dist)) / fr);
+            }
+        }
 
-//            int startCell = FindNearestCell(data, startX, startY);
-//            int endCell = FindNearestCell(data, endX, endY);
+        private static byte Lim(double val) => (byte)Math.Clamp(val, 0, 100);
 
-//            var path = GetRangePath(data, startCell, endCell, rng);
-//            var used = new HashSet<int>();
-//            var query = new List<int>();
+        // Utility and Pathing methods updated to object structure
+        private static List<int> GetRangePath(MapData data, int cur, int end, IRandom rng)
+        {
+            var path = new List<int> { cur };
+            var used = new HashSet<int> { cur };
+            var target = data.Points[end];
 
-//            double step = 0.1 / width;
-//            while (width > 0)
-//            {
-//                double exp = 0.9 - step * width;
-//                foreach (int r in path)
-//                {
-//                    foreach (int e in data.Cells.C[r])
-//                    {
-//                        if (used.Add(e))
-//                        {
-//                            query.Add(e);
-//                            // JS: heights[e] **= exp; if (heights[e] > 100) heights[e] = 5;
-//                            double h = Math.Pow(data.H[e], exp);
-//                            data.H[e] = (h > 100) ? (byte)5 : Lim(h);
-//                        }
-//                    }
-//                }
-//                path = new List<int>(query);
-//                query.Clear();
-//                width--;
-//            }
-//        }
+            while (cur != end)
+            {
+                int best = -1;
+                double minD = double.MaxValue;
+                foreach (int n in data.Cells[cur].C)
+                {
+                    if (used.Contains(n)) continue;
+                    var neighbor = data.Points[n];
+                    double d = Math.Pow(target.X - neighbor.X, 2) + Math.Pow(target.Y - neighbor.Y, 2);
+                    if (rng.Next() > 0.85) d /= 2;
+                    if (d < minD) { minD = d; best = n; }
+                }
+                if (best == -1) break;
+                cur = best; path.Add(cur); used.Add(cur);
+            }
+            return path;
+        }
 
-//        private static void Modify(MapData data, ToolRange range, double add, double mult)
-//        {
-//            for (int i = 0; i < data.PointsCount; i++)
-//            {
-//                if (data.H[i] < range.Min || data.H[i] > range.Max) continue;
-//                double h = data.H[i];
-//                if (add != 0) h = (range.Type == HeightmapRangeType.Land) ? Math.Max(h + add, 20) : h + add;
-//                if (mult != 1) h = (range.Type == HeightmapRangeType.Land) ? (h - 20) * mult + 20 : h * mult;
-//                data.H[i] = Lim(h);
-//            }
-//        }
+        private static int GetNumberInRange(string range, IRandom rng)
+        {
+            if (!range.Contains('-'))
+            {
+                double val = double.Parse(range, System.Globalization.CultureInfo.InvariantCulture);
+                int floor = (int)Math.Floor(val);
+                return rng.Next() < (val - floor) ? floor + 1 : floor;
+            }
+            var p = range.Split('-');
+            double min = double.Parse(p[0], System.Globalization.CultureInfo.InvariantCulture);
+            double max = double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
+            return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
+        }
 
-//        private static void Smooth(MapData data, double fr)
-//        {
-//            byte[] result = new byte[data.H.Length];
-//            for (int i = 0; i < data.H.Length; i++)
-//            {
-//                double sum = data.H[i];
-//                foreach (var n in data.Cells.C[i]) sum += data.H[n];
-//                result[i] = Lim((data.H[i] * (fr - 1) + (sum / (data.Cells.C[i].Count + 1))) / fr);
-//            }
-//            data.H = result;
-//        }
+        private static double GetPointInRange(string range, int length, IRandom rng)
+        {
+            var p = range.Split('-');
+            double min = double.Parse(p[0]) / 100.0, max = p.Length > 1 ? double.Parse(p[1]) / 100.0 : min;
+            return (min + (max - min) * rng.Next()) * length;
+        }
 
-//        private static void Mask(MapData data, double power)
-//        {
-//            double fr = power != 0 ? Math.Abs(power) : 1;
-//            for (int i = 0; i < data.PointsCount; i++)
-//            {
-//                var p = data.Points[i];
-//                double nx = (2 * p.X) / data.Width - 1;
-//                double ny = (2 * p.Y) / data.Height - 1;
-//                double dist = (1 - nx * nx) * (1 - ny * ny);
-//                if (power < 0) dist = 1 - dist;
-//                data.H[i] = Lim((data.H[i] * (fr - 1) + (data.H[i] * dist)) / fr);
-//            }
-//        }
+        // Ensure this method exists in your Generator class
+        private static int FindNearestCell(MapData data, double x, double y)
+        {
+            int nearest = 0;
+            double minDist = double.MaxValue;
 
-//        private static byte Lim(double val) => (byte)Math.Clamp(val, 0, 100);
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                // Accessing the point from the flat point array in MapData
+                var point = data.Points[i];
+                double dx = point.X - x;
+                double dy = point.Y - y;
+                double distSq = dx * dx + dy * dy;
 
-//        private static int GetNumberInRange(string range, IRandom rng)
-//        {
-//            if (!range.Contains('-'))
-//            {
-//                // Handle fractional numbers like "1.5"
-//                double val = double.Parse(range, System.Globalization.CultureInfo.InvariantCulture);
-//                int floor = (int)Math.Floor(val);
-//                return rng.Next() < (val - floor) ? floor + 1 : floor;
-//            }
+                if (distSq < minDist)
+                {
+                    minDist = distSq;
+                    nearest = i;
+                }
+            }
+            return nearest;
+        }
+    }
 
-//            var p = range.Split('-');
-//            double min = double.Parse(p[0], System.Globalization.CultureInfo.InvariantCulture);
-//            double max = double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
-//            // Standard Azgaar integer range logic: floor(rand * (max - min + 1) + min)
-//            return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
-//        }
+    public class ToolRange
+    {
+        public double Min { get; set; }
+        public double Max { get; set; }
+        public HeightmapRangeType Type { get; set; }
 
-//        private static double GetPointInRange(string range, int length, IRandom rng)
-//        {
-//            var p = range.Split('-');
-//            double min = double.Parse(p[0]) / 100.0, max = p.Length > 1 ? double.Parse(p[1]) / 100.0 : min;
-//            return (min + (max - min) * rng.Next()) * length;
-//        }
+        public static ToolRange Parse(string input)
+        {
+            var range = new ToolRange { Type = HeightmapRangeType.Range };
 
-//        private static int FindNearestCell(MapData data, double x, double y)
-//        {
-//            int best = 0;
-//            double minD = double.MaxValue;
-//            for (int i = 0; i < data.PointsCount; i++)
-//            {
-//                var p = data.Points[i];
-//                double d = Math.Pow(x - p.X, 2) + Math.Pow(y - p.Y, 2);
-//                if (d < minD) { minD = d; best = i; }
-//            }
-//            return best;
-//        }
-//    }
+            if (input == "all") { range.Type = HeightmapRangeType.All; range.Min = 0; range.Max = 100; }
+            else if (input == "land") { range.Type = HeightmapRangeType.Land; range.Min = 20; range.Max = 100; }
+            else if (input == "water") { range.Type = HeightmapRangeType.Water; range.Min = 0; range.Max = 19; }
+            else if (input.Contains("-"))
+            {
+                var parts = input.Split('-');
+                range.Min = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+                range.Max = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                var val = double.Parse(input, System.Globalization.CultureInfo.InvariantCulture);
+                range.Min = val; range.Max = val;
+            }
+            return range;
+        }
 
-//    public struct ToolRange
-//    {
-//        public HeightmapRangeType Type;
-//        public int Min;
-//        public int Max;
+        // Fixed: Added the missing GetNumber method
+        public int GetNumber(IRandom rng)
+        {
+            return (int)Math.Floor(rng.Next(Min, Max));
+        }
 
-//        public static ToolRange Parse(string range)
-//        {
-//            if (range.Equals("all", StringComparison.OrdinalIgnoreCase))
-//                return new ToolRange { Type = HeightmapRangeType.All, Min = 0, Max = 100 };
-//            if (range.Equals("land", StringComparison.OrdinalIgnoreCase))
-//                return new ToolRange { Type = HeightmapRangeType.Land, Min = 20, Max = 100 };
-
-//            var parts = range.Split('-');
-//            int min = int.Parse(parts[0]);
-//            int max = parts.Length > 1 ? int.Parse(parts[1]) : min;
-//            return new ToolRange { Type = HeightmapRangeType.Custom, Min = min, Max = max };
-//        }
-//    }
-//}
+        // Fixed: Added the missing GetPoint method
+        public double GetPoint(double scale, IRandom rng)
+        {
+            return (rng.Next(Min, Max) / 100.0) * scale;
+        }
+    }
+}

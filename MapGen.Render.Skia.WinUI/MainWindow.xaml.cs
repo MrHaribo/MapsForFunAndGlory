@@ -32,8 +32,13 @@ namespace MapGen.Render.Skia.WinUI
                 PointsCount = 2000,
             };
 
+            var rng = new Alea(options.Seed);
+
             var generator = new MapGenerator();
-            generator.Generate(options);
+            generator.Generate(options, rng);
+
+            HeightmapGenerator.Generate(generator.Data, "Hill 1 90-100 44-56 40-60", rng);
+
             _map = generator.Data;
         }
 
@@ -43,66 +48,59 @@ namespace MapGen.Render.Skia.WinUI
 
             canvas.Clear(SKColors.Transparent);
 
-            //DrawVoronoi(canvas);
+            DrawVoronoi(canvas);
         }
 
-        //private void DrawVoronoi(SKCanvas canvas)
-        //{
-        //    if (_map == null || _map.H == null) return;
+        private void DrawVoronoi(SKCanvas canvas)
+        {
+            if (_map == null || _map.Cells == null) return;
 
-        //    using var strokePaint = new SKPaint
-        //    {
-        //        Color = new SKColor(0, 0, 0, 30), // Very faint edges
-        //        Style = SKPaintStyle.Stroke,
-        //        StrokeWidth = 0.5f,
-        //        IsAntialias = true
-        //    };
+            // 1. Calculate Scaling to fit MapData into current Canvas
+            float scaleX = (float)canvas.LocalClipBounds.Width / _map.Width;
+            float scaleY = (float)canvas.LocalClipBounds.Height / _map.Height;
+            float finalScale = Math.Min(scaleX, scaleY); // Maintain aspect ratio
 
-        //    for (int i = 0; i < _map.PointsCount; i++)
-        //    {
-        //        var vertexIndices = _map.Cells.V[i];
-        //        if (vertexIndices == null || vertexIndices.Count < 3) continue;
+            canvas.Save();
+            canvas.Scale(finalScale);
 
-        //        // Determine Color based on Height
-        //        byte h = _map.H[i];
-        //        SKColor fillColor;
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
 
-        //        if (h < 20)
-        //        {
-        //            // Ocean: Dark blue to light blue
-        //            // Scale 0-19 to a blue range
-        //            byte blueDepth = (byte)(100 + (h * 5));
-        //            fillColor = new SKColor(30, 60, blueDepth);
-        //        }
-        //        else
-        //        {
-        //            // Land: Grayscale (or you could do Green/Brown)
-        //            // Scale 20-100 to 50-250 for better visibility
-        //            byte landBrightness = (byte)Math.Clamp((h - 20) * 3 + 50, 0, 255);
-        //            fillColor = new SKColor(landBrightness, landBrightness, landBrightness);
-        //        }
 
-        //        using var fillPaint = new SKPaint
-        //        {
-        //            Color = fillColor,
-        //            Style = SKPaintStyle.Fill,
-        //            IsAntialias = true
-        //        };
 
-        //        using var path = new SKPath();
-        //        var v0 = _map.Vertices.P[vertexIndices[0]];
-        //        path.MoveTo((float)v0.X, (float)v0.Y);
+            for (int i = 0; i < _map.Cells.Length; i++)
+            {
+                var cell = _map.Cells[i];
+                if (cell.V == null || cell.V.Count < 3) continue;
 
-        //        for (int j = 1; j < vertexIndices.Count; j++)
-        //        {
-        //            var v = _map.Vertices.P[vertexIndices[j]];
-        //            path.LineTo((float)v.X, (float)v.Y);
-        //        }
-        //        path.Close();
+                // Determine Color
+                byte h = cell.H;
+                if (h < 20)
+                {
+                    byte blueDepth = (byte)(100 + (h * 5));
+                    fillPaint.Color = new SKColor(30, 60, blueDepth);
+                }
+                else
+                {
+                    byte landBrightness = (byte)Math.Clamp((h - 20) * 3 + 50, 0, 255);
+                    fillPaint.Color = new SKColor(landBrightness, landBrightness, landBrightness);
+                }
 
-        //        canvas.DrawPath(path, fillPaint);
-        //        // canvas.DrawPath(path, strokePaint); // Optional: toggle for grid visibility
-        //    }
-        //}
+                // Draw Path
+                using var path = new SKPath();
+                var v0 = _map.Vertices[cell.V[0]].P;
+                path.MoveTo((float)v0.X, (float)v0.Y);
+
+                for (int j = 1; j < cell.V.Count; j++)
+                {
+                    var v = _map.Vertices[cell.V[j]].P;
+                    path.LineTo((float)v.X, (float)v.Y);
+                }
+                path.Close();
+
+                canvas.DrawPath(path, fillPaint);
+            }
+
+            canvas.Restore(); // Reset transform for other UI elements
+        }
     }
 }
