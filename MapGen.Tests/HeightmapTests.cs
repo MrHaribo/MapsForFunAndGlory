@@ -15,7 +15,8 @@ namespace MapGen.Tests
         [Theory]
         [InlineData("data/regression_heightmap_hill.json", "Hill 1 90-100 44-56 40-60")]
         [InlineData("data/regression_heightmap_add.json", "Add 30 0-100")]
-        [InlineData("data/regression_heightmap_pit.json", "Add 50 0-100; Pit 1 30 50 50")]
+        [InlineData("data/regression_heightmap_pit.json", "Add 50 0-100;Pit 1 30 50 50")]
+        [InlineData("data/regression_heightmap_pit_shallow.json", "Add 50 0-100;Pit 1 5 50 50")]
         public void HeightmapGenerator_MatchesJsOutput(string filename, string testRecipe)
         {
             // 1. Load the specific heightmap dump
