@@ -67,7 +67,7 @@ namespace MapGen.Core
         }
 
         private int NextHalfedge(int e) => (e % 3 == 2) ? e - 2 : e + 1;
-        private int TriangleOfEdge(int e) => e / 3;
+        private int TriangleOfEdge(int e) => e == -1 ? -1 : e / 3;
 
         private List<int> EdgesAroundPoint(int start)
         {
@@ -90,19 +90,25 @@ namespace MapGen.Core
 
         private int[] PointsOfTriangle(int t) => new int[]
         {
-        Delaunay.Triangles[3 * t],
-        Delaunay.Triangles[3 * t + 1],
-        Delaunay.Triangles[3 * t + 2]
+            Delaunay.Triangles[3 * t],
+            Delaunay.Triangles[3 * t + 1],
+            Delaunay.Triangles[3 * t + 2]
         };
 
         private List<int> TrianglesAdjacentToTriangle(int t)
         {
             var adjacent = new List<int>();
-            foreach (var edge in new[] { 3 * t, 3 * t + 1, 3 * t + 2 })
+
+            // Explicitly iterate through the 3 edges of triangle t
+            for (int i = 0; i < 3; i++)
             {
+                int edge = 3 * t + i;
                 int opposite = Delaunay.Halfedges[edge];
-                if (opposite != -1) adjacent.Add(TriangleOfEdge(opposite));
+
+                // Use the updated TriangleOfEdge that handles -1
+                adjacent.Add(TriangleOfEdge(opposite));
             }
+
             return adjacent;
         }
 
