@@ -46,19 +46,12 @@ namespace MapGen.Tests
         public void VoronoiGenerator_Graph_MatchesJsOutput()
         {
             // 1. Load the JS dump using System.Text.Json
-            var json = File.ReadAllText("regression_voronoi.json");
+            var json = File.ReadAllText("data/regression_voronoi.json");
             var expectedRoot = JsonSerializer.Deserialize<JsGridDump>(json);
             var expected = expectedRoot.Grid;
 
             // 2. Run the full C# pipeline
-            var options = new GenerationOptions
-            {
-                Seed = expectedRoot.Seed,
-                Width = expectedRoot.Width,
-                Height = expectedRoot.Height,
-                PointsCount = expected.cellsDesired
-            };
-
+            var options = GenerationOptions.TestOptions;
             var generator = new MapGenerator();
             generator.Generate(options);
             var actual = generator.Data;
@@ -100,14 +93,7 @@ namespace MapGen.Tests
         [Fact]
         public void ExportStrictGrid()
         {
-            var options = new GenerationOptions
-            {
-                Seed = "42",
-                Width = 1920,
-                Height = 1080,
-                PointsCount = 2000
-            };
-
+            var options = GenerationOptions.TestOptions;
             var generator = new MapGenerator();
             generator.Generate(options);
             var data = generator.Data;

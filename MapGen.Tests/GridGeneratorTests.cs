@@ -34,18 +34,11 @@ namespace MapGen.Tests
         [Fact]
         public void GridGenerator_Points_MatchJsOutput()
         {
-            var json = File.ReadAllText("regression_points.json");
+            var json = File.ReadAllText("data/regression_points.json");
             var expected = JsonConvert.DeserializeObject<PointsRegressionData>(json);
 
             // Act
-            var options = new GenerationOptions
-            {
-                Seed = "42",
-                Width = 1920,
-                Height = 1080,
-                PointsCount = 2000
-            };
-
+            var options = GenerationOptions.TestOptions;
             var generator = new MapGenerator();
             generator.Generate(options);
 
@@ -75,7 +68,7 @@ namespace MapGen.Tests
         [Fact]
         public void GridGenerator_BoundaryPoints_MatchJsOutput()
         {
-            var json = File.ReadAllText("regression_boundary.json");
+            var json = File.ReadAllText("data/regression_boundary.json");
             var expected = JsonConvert.DeserializeObject<BoundaryRegressionData>(json);
 
             var options = new GenerationOptions

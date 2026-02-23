@@ -65,8 +65,6 @@ namespace MapGen.Render.Skia.WinUI
 
             using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
 
-
-
             for (int i = 0; i < _map.Cells.Length; i++)
             {
                 var cell = _map.Cells[i];

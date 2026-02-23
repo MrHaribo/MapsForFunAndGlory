@@ -72,6 +72,7 @@ namespace MapGen.Core
             StringBuilder log = new StringBuilder();
 
             // 1. Setup
+            double blobPower = GetBlobPower(data.PointsCount);
             double[] change = new double[data.Cells.Length];
             int h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
 
@@ -109,7 +110,7 @@ namespace MapGen.Core
                     double parentHeight = change[q];
 
                     // 2. Perform exponentiation FIRST
-                    double exponentResult = Math.Pow(parentHeight, 0.95); // blobPower = 0.95
+                    double exponentResult = Math.Pow(parentHeight, blobPower);
 
                     // 3. Multiply by the random factor
                     double finalValue = exponentResult * (r * 0.2 + 0.9);
@@ -379,6 +380,42 @@ namespace MapGen.Core
             }
             return nearest;
         }
+
+        public static double GetBlobPower(int cells) => cells switch
+        {
+            1000 => 0.93,
+            2000 => 0.95,
+            5000 => 0.97,
+            10000 => 0.98,
+            20000 => 0.99,
+            30000 => 0.991,
+            40000 => 0.993,
+            50000 => 0.994,
+            60000 => 0.995,
+            70000 => 0.9955,
+            80000 => 0.996,
+            90000 => 0.9964,
+            100000 => 0.9973,
+            _ => throw new ArgumentException($"Invalid cell count: {cells}. Power map requires a standard Azgaar point tier.")
+        };
+
+        public static double GetLinePower(int cells) => cells switch
+        {
+            1000 => 0.75,
+            2000 => 0.77,
+            5000 => 0.79,
+            10000 => 0.81,
+            20000 => 0.82,
+            30000 => 0.83,
+            40000 => 0.84,
+            50000 => 0.86,
+            60000 => 0.87,
+            70000 => 0.88,
+            80000 => 0.91,
+            90000 => 0.92,
+            100000 => 0.93,
+            _ => throw new ArgumentException($"Invalid cell count: {cells}. Power map requires a standard Azgaar point tier.")
+        };
     }
 
     public class ToolRange

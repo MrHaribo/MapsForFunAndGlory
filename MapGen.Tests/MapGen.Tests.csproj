@@ -25,16 +25,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="regression_boundary.json">
+    <None Update="data\regression_boundary.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="regression_heightmap_hill.json">
+    <None Update="data\regression_heightmap_hill.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="regression_points.json">
+    <None Update="data\regression_points.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="regression_voronoi.json">
+    <None Update="data\regression_voronoi.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
