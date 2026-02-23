@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace MapGen.Core
 {
@@ -58,70 +60,81 @@ namespace MapGen.Core
         private static void AddHill(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
             int count = Probability.GetNumberInRange(rng, countArg);
-            double blobPower = 0.98;
-
             while (count > 0)
             {
-                // 1. Get Height (1 RNG call)
-                int h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
-
-                int start = -1;
-                int limit = 0;
-
-                // 2. Search for a valid start point
-                while (limit < 50)
-                {
-                    // 2 RNG calls (X then Y)
-                    double x = ToolRange.Parse(rangeX).GetPoint(data.Width, rng);
-                    double y = ToolRange.Parse(rangeY).GetPoint(data.Height, rng);
-
-                    int candidate = FindNearestCell(data, x, y);
-                    Trace.WriteLine($"Hill {count} attempt {limit}: Target({x:F1}, {y:F1}) -> Cell {candidate}");
-
-                    if (data.Cells[candidate].H + h <= 90)
-                    {
-                        start = candidate;
-                        break;
-                    }
-                    limit++;
-                }
-
-                if (start != -1)
-                {
-                    // 4. Propagation logic
-                    byte[] change = new byte[data.Cells.Length];
-                    change[start] = (byte)h;
-                    var queue = new Queue<int>();
-                    queue.Enqueue(start);
-
-                    while (queue.Count > 0)
-                    {
-                        int q = queue.Dequeue();
-                        foreach (int n in data.Cells[q].C)
-                        {
-                            if (change[n] > 0) continue;
-
-                            // Precision: Using NextDouble to match Math.random() consumption
-                            // JS: Math.pow(change[q], blobPower) * (Math.random() * 0.2 + 0.9)
-                            double randomModifier = (rng.Next() * 0.2) + 0.9;
-                            double newValue = Math.Pow(change[q], blobPower) * randomModifier;
-
-                            // Matches JS (byte) truncation
-                            change[n] = (byte)newValue;
-
-                            if (change[n] > 1) queue.Enqueue(n);
-                        }
-                    }
-
-                    // 5. Apply the hill to the permanent heightmap
-                    for (int i = 0; i < data.Cells.Length; i++)
-                    {
-                        data.Cells[i].H = (byte)Math.Clamp(data.Cells[i].H + change[i], 0, 100);
-                    }
-                }
-
+                AddOneHill(data, rng, rangeX, rangeY, heightArg);
                 count--;
             }
+        }
+
+        private static void AddOneHill(MapData data, IRandom rng, string rangeX, string rangeY, string heightArg)
+        {
+            StringBuilder log = new StringBuilder();
+
+            // 1. Setup
+            double[] change = new double[data.Cells.Length];
+            int h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
+
+            int start = -1;
+            int limit = 0;
+
+            // 2. Find Start Point (Using Grid Lookup)
+            do
+            {
+                double x = ToolRange.Parse(rangeX).GetPoint(data.Width, rng);
+                double y = ToolRange.Parse(rangeY).GetPoint(data.Height, rng);
+                start = FindGridCell(data, x, y);
+                limit++;
+            } while (data.Cells[start].H + h > 90 && limit < 50);
+
+            // 3. BFS Hill Generation on Voronoi Mesh
+            change[start] = h;
+            Queue<int> queue = new Queue<int>();
+            queue.Enqueue(start);
+
+            log.AppendLine($"Hill Start: {start} with height {h}");
+
+            while (queue.Count > 0)
+            {
+                // Inside the BFS while loop
+                int q = queue.Dequeue();
+
+                foreach (int c in data.Cells[q].C)
+                {
+                    if (c == -1 || change[c] > 0) continue;
+
+                    double r = rng.Next(); // Must consume RNG here to maintain sequence parity
+
+                    // 1. Get the height of the parent cell as an integer (JS Uint8Array behavior)
+                    double parentHeight = change[q];
+
+                    // 2. Perform exponentiation FIRST
+                    double exponentResult = Math.Pow(parentHeight, 0.95); // blobPower = 0.95
+
+                    // 3. Multiply by the random factor
+                    double finalValue = exponentResult * (r * 0.2 + 0.9);
+
+                    // 4. CRITICAL: JS Uint8Array assignment floors the value
+                    // Use Math.Floor to ensure 76.9 becomes 76, matching JS logs
+                    change[c] = Math.Floor(Math.Clamp(finalValue, 0, 255));
+
+                    log.AppendLine($"From {q} to {c}: R={r:F4}, NewHeight={change[c]}");
+
+                    if (change[c] > 1)
+                    {
+                        queue.Enqueue(c);
+                    }
+                }
+            }
+
+            // 4. Final Merge (Clamping to 0-100)
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                int mergedHeight = (int)Math.Round(data.Cells[i].H + change[i]);
+                data.Cells[i].H = (byte)Math.Clamp(mergedHeight, 0, 100);
+            }
+
+            File.WriteAllText("d:\\Downloads\\cs_hill_log.txt", log.ToString());
         }
 
         private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
@@ -335,6 +348,15 @@ namespace MapGen.Core
             var p = range.Split('-');
             double min = double.Parse(p[0]) / 100.0, max = p.Length > 1 ? double.Parse(p[1]) / 100.0 : min;
             return (min + (max - min) * rng.Next()) * length;
+        }
+
+        private static int FindGridCell(MapData data, double x, double y)
+        {
+            // Math.Min ensures we don't go out of bounds on the right/bottom edges
+            int row = (int)Math.Floor(Math.Min(y / data.Spacing, data.CellsCountY - 1));
+            int col = (int)Math.Floor(Math.Min(x / data.Spacing, data.CellsCountX - 1));
+
+            return (row * data.CellsCountX) + col;
         }
 
         private static int FindNearestCell(MapData data, double x, double y)
