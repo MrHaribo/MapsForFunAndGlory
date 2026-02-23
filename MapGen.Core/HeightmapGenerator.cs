@@ -57,50 +57,69 @@ namespace MapGen.Core
 
         private static void AddHill(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
-            int count = ToolRange.Parse(countArg).GetNumber(rng);
+            int count = Probability.GetNumberInRange(rng, countArg);
             double blobPower = 0.98;
 
             while (count > 0)
             {
-                byte[] change = new byte[data.Cells.Length];
-                int limit = 0;
-                int start;
-                int h = Math.Clamp(ToolRange.Parse(heightArg).GetNumber(rng), 0, 100);
+                // 1. Get Height (1 RNG call)
+                int h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
 
-                do
+                int start = -1;
+                int limit = 0;
+
+                // 2. Search for a valid start point
+                while (limit < 50)
                 {
-                    // Use the new GetPoint method to handle the 0-100 to pixel conversion
+                    // 2 RNG calls (X then Y)
                     double x = ToolRange.Parse(rangeX).GetPoint(data.Width, rng);
                     double y = ToolRange.Parse(rangeY).GetPoint(data.Height, rng);
 
-                    // Renamed to match your likely method name
-                    start = FindNearestCell(data, x, y);
-                    limit++;
-                } while (data.Cells[start].H + h > 90 && limit < 50);
+                    int candidate = FindNearestCell(data, x, y);
+                    Trace.WriteLine($"Hill {count} attempt {limit}: Target({x:F1}, {y:F1}) -> Cell {candidate}");
 
-                change[start] = (byte)h;
-                var queue = new Queue<int>();
-                queue.Enqueue(start);
-
-                while (queue.Count > 0)
-                {
-                    int q = queue.Dequeue();
-                    foreach (int n in data.Cells[q].C)
+                    if (data.Cells[candidate].H + h <= 90)
                     {
-                        if (change[n] > 0) continue;
+                        start = candidate;
+                        break;
+                    }
+                    limit++;
+                }
 
-                        // Precision: Using NextDouble to match Math.random()
-                        double newValue = Math.Pow(change[q], blobPower) * (rng.Next() * 0.2 + 0.9);
-                        change[n] = (byte)newValue;
+                if (start != -1)
+                {
+                    // 4. Propagation logic
+                    byte[] change = new byte[data.Cells.Length];
+                    change[start] = (byte)h;
+                    var queue = new Queue<int>();
+                    queue.Enqueue(start);
 
-                        if (change[n] > 1) queue.Enqueue(n);
+                    while (queue.Count > 0)
+                    {
+                        int q = queue.Dequeue();
+                        foreach (int n in data.Cells[q].C)
+                        {
+                            if (change[n] > 0) continue;
+
+                            // Precision: Using NextDouble to match Math.random() consumption
+                            // JS: Math.pow(change[q], blobPower) * (Math.random() * 0.2 + 0.9)
+                            double randomModifier = (rng.Next() * 0.2) + 0.9;
+                            double newValue = Math.Pow(change[q], blobPower) * randomModifier;
+
+                            // Matches JS (byte) truncation
+                            change[n] = (byte)newValue;
+
+                            if (change[n] > 1) queue.Enqueue(n);
+                        }
+                    }
+
+                    // 5. Apply the hill to the permanent heightmap
+                    for (int i = 0; i < data.Cells.Length; i++)
+                    {
+                        data.Cells[i].H = (byte)Math.Clamp(data.Cells[i].H + change[i], 0, 100);
                     }
                 }
 
-                for (int i = 0; i < data.Cells.Length; i++)
-                {
-                    data.Cells[i].H = (byte)Math.Clamp(data.Cells[i].H + change[i], 0, 100);
-                }
                 count--;
             }
         }
@@ -318,23 +337,21 @@ namespace MapGen.Core
             return (min + (max - min) * rng.Next()) * length;
         }
 
-        // Ensure this method exists in your Generator class
         private static int FindNearestCell(MapData data, double x, double y)
         {
             int nearest = 0;
             double minDist = double.MaxValue;
 
-            for (int i = 0; i < data.Cells.Length; i++)
+            for (int i = 0; i < data.Points.Length; i++)
             {
-                // Accessing the point from the flat point array in MapData
-                var point = data.Points[i];
-                double dx = point.X - x;
-                double dy = point.Y - y;
-                double distSq = dx * dx + dy * dy;
+                double dx = data.Points[i].X - x;
+                double dy = data.Points[i].Y - y;
+                // Do not use Math.Sqrt for comparison to avoid rounding errors
+                double dist = dx * dx + dy * dy;
 
-                if (distSq < minDist)
+                if (dist < minDist)
                 {
-                    minDist = distSq;
+                    minDist = dist;
                     nearest = i;
                 }
             }
@@ -374,11 +391,12 @@ namespace MapGen.Core
         {
             return (int)Math.Floor(rng.Next(Min, Max));
         }
-
-        // Fixed: Added the missing GetPoint method
         public double GetPoint(double scale, IRandom rng)
         {
-            return (rng.Next(Min, Max) / 100.0) * scale;
+            double minP = this.Min / 100.0;
+            double maxP = this.Max / 100.0;
+            // Use NextDouble to get the fractional coordinate (e.g. 970.8)
+            return (rng.Next() * (maxP - minP) + minP) * scale;
         }
     }
 }

@@ -33,10 +33,10 @@ namespace MapGen.Render.Skia.WinUI
             };
 
             var rng = new Alea(options.Seed);
-
             var generator = new MapGenerator();
             generator.Generate(options, rng);
 
+            rng = new Alea(options.Seed);
             HeightmapGenerator.Generate(generator.Data, "Hill 1 90-100 44-56 40-60", rng);
 
             _map = generator.Data;

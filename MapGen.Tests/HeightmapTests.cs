@@ -37,6 +37,8 @@ namespace MapGen.Tests
 
             var rng = new Alea(options.Seed);
             var generator = new MapGenerator();
+
+            rng = new Alea(options.Seed);
             generator.Generate(options, rng); // This runs Voronoi to build the graph
             var data = generator.Data;
 

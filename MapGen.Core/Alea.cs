@@ -38,10 +38,11 @@ namespace MapGen.Core
             return s2;
         }
 
-        // Range for Integers (inclusive min, exclusive max to match JS logic)
+        // To match JS rand(min, max)
         public int Next(int min, int max)
         {
-            return (int)Math.Floor(Next() * (max - min) + min);
+            // The +1 is vital to match JS Math.floor(r * (max - min + 1))
+            return (int)Math.Floor(Next() * (max - min + 1)) + min;
         }
 
         // Range for Doubles
