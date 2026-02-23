@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace MapGen.Core
+﻿namespace MapGen.Core
 {
     public class Alea : IRandom
     {
@@ -36,19 +34,6 @@ namespace MapGen.Core
             c = (uint)t;
             s2 = t - c;
             return s2;
-        }
-
-        // To match JS rand(min, max)
-        public int Next(int min, int max)
-        {
-            // The +1 is vital to match JS Math.floor(r * (max - min + 1))
-            return (int)Math.Floor(Next() * (max - min + 1)) + min;
-        }
-
-        // Range for Doubles
-        public double Next(double min, double max)
-        {
-            return Next() * (max - min) + min;
         }
 
         private class Mash

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,7 +10,7 @@ namespace MapGen.Core
 {
     public enum HeightmapTemplate { HighIsland, Volcano, MountainRange, Archipelago, Test }
     public enum HeightmapTool { Hill, Pit, Range, Trough, Strait, Mask, Invert, Add, Multiply, Smooth }
-    public enum HeightmapRangeType { All, Land, Water, Range }
+    public enum HeightmapSelection { All, Land, Water }
 
     public static class HeightmapGenerator
     {
@@ -45,15 +46,37 @@ namespace MapGen.Core
         {
             switch (tool)
             {
-                case HeightmapTool.Hill: AddHill(data, rng, args[1], args[2], args[3], args[4]); break;
-                case HeightmapTool.Pit: AddPit(data, rng, args[1], args[2], args[3], args[4]); break;
-                case HeightmapTool.Range: AddRange(data, rng, args[1], args[2], args[3], args[4]); break;
-                case HeightmapTool.Trough: AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
-                case HeightmapTool.Strait: AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical"); break;
-                case HeightmapTool.Add: Modify(data, ToolRange.Parse(args[2]), double.Parse(args[1]), 1); break;
-                case HeightmapTool.Multiply: Modify(data, ToolRange.Parse(args[2]), 0, double.Parse(args[1])); break;
-                case HeightmapTool.Smooth: Smooth(data, double.Parse(args[1])); break;
-                case HeightmapTool.Mask: Mask(data, double.Parse(args[1])); break;
+                case HeightmapTool.Hill:
+                    AddHill(data, rng, args[1], args[2], args[3], args[4]); break;
+
+                case HeightmapTool.Pit:
+                    AddPit(data, rng, args[1], args[2], args[3], args[4]); break;
+
+                case HeightmapTool.Range: 
+                    AddRange(data, rng, args[1], args[2], args[3], args[4]); break;
+
+                case HeightmapTool.Trough: 
+                    AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
+
+                case HeightmapTool.Add:
+                    double addVal = double.Parse(args[1], CultureInfo.InvariantCulture);
+                    Modify(data, args[2], addVal, 1.0, HeightmapSelection.All);
+                    break;
+
+                case HeightmapTool.Multiply:
+                    double multVal = double.Parse(args[1], CultureInfo.InvariantCulture);
+                    Modify(data, args[2], 0.0, multVal, HeightmapSelection.All);
+                    break;
+
+                case HeightmapTool.Strait:
+                    AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical", HeightmapSelection.Land);
+                    break;
+
+                case HeightmapTool.Smooth:
+                    Smooth(data, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
+
+                case HeightmapTool.Mask: 
+                    Mask(data, double.Parse(args[1])); break;
             }
         }
 
@@ -69,8 +92,6 @@ namespace MapGen.Core
 
         private static void AddOneHill(MapData data, IRandom rng, string rangeX, string rangeY, string heightArg)
         {
-            StringBuilder log = new StringBuilder();
-
             // 1. Setup
             double blobPower = GetBlobPower(data.PointsCount);
             double[] change = new double[data.Cells.Length];
@@ -82,8 +103,8 @@ namespace MapGen.Core
             // 2. Find Start Point (Using Grid Lookup)
             do
             {
-                double x = ToolRange.Parse(rangeX).GetPoint(data.Width, rng);
-                double y = ToolRange.Parse(rangeY).GetPoint(data.Height, rng);
+                double x = GetPointInRange(rangeX, data.Width, rng);
+                double y = GetPointInRange(rangeY, data.Height, rng);
                 start = FindGridCell(data, x, y);
                 limit++;
             } while (data.Cells[start].H + h > 90 && limit < 50);
@@ -92,8 +113,6 @@ namespace MapGen.Core
             change[start] = h;
             Queue<int> queue = new Queue<int>();
             queue.Enqueue(start);
-
-            log.AppendLine($"Hill Start: {start} with height {h}");
 
             while (queue.Count > 0)
             {
@@ -119,8 +138,6 @@ namespace MapGen.Core
                     // Use Math.Floor to ensure 76.9 becomes 76, matching JS logs
                     change[c] = Math.Floor(Math.Clamp(finalValue, 0, 255));
 
-                    log.AppendLine($"From {q} to {c}: R={r:F4}, NewHeight={change[c]}");
-
                     if (change[c] > 1)
                     {
                         queue.Enqueue(c);
@@ -134,8 +151,32 @@ namespace MapGen.Core
                 int mergedHeight = (int)Math.Round(data.Cells[i].H + change[i]);
                 data.Cells[i].H = (byte)Math.Clamp(mergedHeight, 0, 100);
             }
+        }
 
-            File.WriteAllText("d:\\Downloads\\cs_hill_log.txt", log.ToString());
+        private static void AddPit(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
+        {
+            int count = GetNumberInRange(countStr, rng);
+            for (int i = 0; i < count; i++)
+            {
+                double h = GetNumberInRange(heightStr, rng);
+                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                var queue = new Queue<int>(); queue.Enqueue(start);
+                var used = new HashSet<int> { start };
+                while (queue.Count > 0)
+                {
+                    int q = queue.Dequeue();
+                    h = Math.Pow(h, BlobPower) * (rng.Next() * 0.2 + 0.9);
+                    if (h < 1) break;
+                    foreach (int n in data.Cells[q].C)
+                    {
+                        if (used.Add(n))
+                        {
+                            data.Cells[n].H = Lim(data.Cells[n].H - h * (rng.Next() * 0.2 + 0.9));
+                            queue.Enqueue(n);
+                        }
+                    }
+                }
+            }
         }
 
         private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
@@ -174,32 +215,6 @@ namespace MapGen.Core
             }
         }
 
-        private static void AddPit(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
-        {
-            int count = GetNumberInRange(countStr, rng);
-            for (int i = 0; i < count; i++)
-            {
-                double h = GetNumberInRange(heightStr, rng);
-                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-                var queue = new Queue<int>(); queue.Enqueue(start);
-                var used = new HashSet<int> { start };
-                while (queue.Count > 0)
-                {
-                    int q = queue.Dequeue();
-                    h = Math.Pow(h, BlobPower) * (rng.Next() * 0.2 + 0.9);
-                    if (h < 1) break;
-                    foreach (int n in data.Cells[q].C)
-                    {
-                        if (used.Add(n))
-                        {
-                            data.Cells[n].H = Lim(data.Cells[n].H - h * (rng.Next() * 0.2 + 0.9));
-                            queue.Enqueue(n);
-                        }
-                    }
-                }
-            }
-        }
-
         private static void AddTrough(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
         {
             int count = GetNumberInRange(countStr, rng);
@@ -226,53 +241,79 @@ namespace MapGen.Core
             }
         }
 
-        private static void AddStrait(MapData data, IRandom rng, string widthStr, string direction = "vertical")
+        private static void AddStrait(MapData data, IRandom rng, string widthArg, string direction, HeightmapSelection selection)
         {
-            int width = GetNumberInRange(widthStr, rng);
-            bool vert = direction.Equals("vertical", StringComparison.OrdinalIgnoreCase);
+            // 1. Get width using the new GetPointInRange helper
+            // In Azgaar, width is relative to the total map width
+            double width = GetPointInRange(widthArg, data.Width, rng);
 
-            double startX = vert ? rng.Next() * data.Width * 0.4 + data.Width * 0.3 : 5;
-            double startY = vert ? 5 : rng.Next() * data.Height * 0.4 + data.Height * 0.3;
-            double endX = vert ? data.Width - startX : data.Width - 5;
-            double endY = vert ? data.Height - 5 : data.Height - startY;
+            // 2. Determine start and end points based on direction
+            // Logic for picking coordinates on the edges of the map
+            (double x1, double y1, double x2, double y2) = GetStraitPath(data, direction, rng);
 
-            int startCell = FindNearestCell(data, startX, startY);
-            int endCell = FindNearestCell(data, endX, endY);
+            // 3. Find cells along the line
+            // This typically uses a line-drawing algorithm or distance-to-segment check
+            var affectedCells = new List<int>();// FindCellsNearLine(data, x1, y1, x2, y2, width);
 
-            var path = GetRangePath(data, startCell, endCell, rng);
-            var used = new HashSet<int>();
-            var query = new List<int>();
-
-            double step = 0.1 / width;
-            while (width > 0)
+            foreach (var cellIdx in affectedCells)
             {
-                double exp = 0.9 - step * width;
-                foreach (int r in path)
-                {
-                    foreach (int e in data.Cells[r].C)
-                    {
-                        if (used.Add(e))
-                        {
-                            query.Add(e);
-                            double h = Math.Pow(data.Cells[e].H, exp);
-                            data.Cells[e].H = (h > 100) ? (byte)5 : Lim(h);
-                        }
-                    }
-                }
-                path = new List<int>(query);
-                query.Clear();
-                width--;
+                var cell = data.Cells[cellIdx];
+                bool isLand = cell.H >= 20;
+
+                // 4. Apply the Selection Filter
+                if (selection == HeightmapSelection.Land && !isLand) continue;
+                if (selection == HeightmapSelection.Water && isLand) continue;
+
+                // 5. Carve the strait (Setting to 5 = shallow water)
+                // We use Lim() to ensure it stays within 0-100 range
+                cell.H = Lim(5);
             }
         }
 
-        private static void Modify(MapData data, ToolRange range, double add, double mult)
+        // Helper to determine the strait's vector based on the direction string
+        private static (double, double, double, double) GetStraitPath(MapData data, string direction, IRandom rng)
         {
+            if (direction == "vertical")
+            {
+                double x = rng.Next(0.0, data.Width);
+                return (x, 0, x, data.Height);
+            }
+            else // horizontal
+            {
+                double y = rng.Next(0.0, data.Height);
+                return (0, y, data.Width, y);
+            }
+        }
+
+        private static void Modify(MapData data, string rangeStr, double add, double mult, HeightmapSelection selection)
+        {
+            // Parse range (e.g., "20-100")
+            var parts = rangeStr.Split('-');
+            double min = double.Parse(parts[0], CultureInfo.InvariantCulture);
+            double max = parts.Length > 1 ? double.Parse(parts[1], CultureInfo.InvariantCulture) : min;
+
             foreach (var cell in data.Cells)
             {
-                if (cell.H < range.Min || cell.H > range.Max) continue;
+                bool isLand = cell.H >= 20;
+
+                // 1. Filter by Selection type
+                if (selection == HeightmapSelection.Land && !isLand) continue;
+                if (selection == HeightmapSelection.Water && isLand) continue;
+
+                // 2. Filter by Height Range
+                if (cell.H < min || cell.H > max) continue;
+
                 double h = cell.H;
-                if (add != 0) h = (range.Type == HeightmapRangeType.Land) ? Math.Max(h + add, 20) : h + add;
-                if (mult != 1) h = (range.Type == HeightmapRangeType.Land) ? (h - 20) * mult + 20 : h * mult;
+
+                // 3. Apply Transformations
+                // Land is clamped to sea level (20) when adding/subtracting
+                if (add != 0)
+                    h = isLand ? Math.Max(h + add, 20) : h + add;
+
+                // Land scales relative to the shoreline (20)
+                if (mult != 1)
+                    h = isLand ? (h - 20) * mult + 20 : h * mult;
+
                 cell.H = Lim(h);
             }
         }
@@ -344,12 +385,7 @@ namespace MapGen.Core
             return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
         }
 
-        private static double GetPointInRange(string range, int length, IRandom rng)
-        {
-            var p = range.Split('-');
-            double min = double.Parse(p[0]) / 100.0, max = p.Length > 1 ? double.Parse(p[1]) / 100.0 : min;
-            return (min + (max - min) * rng.Next()) * length;
-        }
+
 
         private static int FindGridCell(MapData data, double x, double y)
         {
@@ -379,6 +415,35 @@ namespace MapGen.Core
                 }
             }
             return nearest;
+        }
+
+        public static double GetPointInRange(string range, int length, IRandom rng)
+        {
+            if (string.IsNullOrWhiteSpace(range))
+            {
+                throw new ArgumentException("Range should be a string and not null");
+            }
+
+            string[] parts = range.Split('-');
+
+            if (!double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double minPercent))
+            {
+                minPercent = 0;
+            }
+            double min = minPercent / 100.0;
+
+            double max;
+            if (parts.Length > 1 && double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double maxPercent))
+            {
+                max = maxPercent / 100.0;
+            }
+            else
+            {
+                max = min;
+            }
+
+            // Now using the extension method: rng.Next(double min, double max)
+            return rng.Next(min * length, max * length);
         }
 
         public static double GetBlobPower(int cells) => cells switch
@@ -416,46 +481,5 @@ namespace MapGen.Core
             100000 => 0.93,
             _ => throw new ArgumentException($"Invalid cell count: {cells}. Power map requires a standard Azgaar point tier.")
         };
-    }
-
-    public class ToolRange
-    {
-        public double Min { get; set; }
-        public double Max { get; set; }
-        public HeightmapRangeType Type { get; set; }
-
-        public static ToolRange Parse(string input)
-        {
-            var range = new ToolRange { Type = HeightmapRangeType.Range };
-
-            if (input == "all") { range.Type = HeightmapRangeType.All; range.Min = 0; range.Max = 100; }
-            else if (input == "land") { range.Type = HeightmapRangeType.Land; range.Min = 20; range.Max = 100; }
-            else if (input == "water") { range.Type = HeightmapRangeType.Water; range.Min = 0; range.Max = 19; }
-            else if (input.Contains("-"))
-            {
-                var parts = input.Split('-');
-                range.Min = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
-                range.Max = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-            }
-            else
-            {
-                var val = double.Parse(input, System.Globalization.CultureInfo.InvariantCulture);
-                range.Min = val; range.Max = val;
-            }
-            return range;
-        }
-
-        // Fixed: Added the missing GetNumber method
-        public int GetNumber(IRandom rng)
-        {
-            return (int)Math.Floor(rng.Next(Min, Max));
-        }
-        public double GetPoint(double scale, IRandom rng)
-        {
-            double minP = this.Min / 100.0;
-            double maxP = this.Max / 100.0;
-            // Use NextDouble to get the fractional coordinate (e.g. 970.8)
-            return (rng.Next() * (maxP - minP) + minP) * scale;
-        }
     }
 }
