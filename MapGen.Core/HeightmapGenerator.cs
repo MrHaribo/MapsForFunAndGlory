@@ -97,7 +97,7 @@ namespace MapGen.Core
             int start = -1;
             int limit = 0;
 
-            // 2. Find Start Point (Using Grid Lookup)
+            // 2. Find Start Point
             do
             {
                 double x = GetPointInRange(rangeX, data.Width, rng);
@@ -106,33 +106,24 @@ namespace MapGen.Core
                 limit++;
             } while (data.Cells[start].H + h > 90 && limit < 50);
 
-            // 3. BFS Hill Generation on Voronoi Mesh
+            // 3. BFS Hill Generation
             change[start] = h;
             Queue<int> queue = new Queue<int>();
             queue.Enqueue(start);
 
             while (queue.Count > 0)
             {
-                // Inside the BFS while loop
                 int q = queue.Dequeue();
-
                 foreach (int c in data.Cells[q].C)
                 {
                     if (c == -1 || change[c] > 0) continue;
 
-                    double r = rng.Next(); // Must consume RNG here to maintain sequence parity
-
-                    // 1. Get the height of the parent cell as an integer (JS Uint8Array behavior)
+                    double r = rng.Next();
                     double parentHeight = change[q];
-
-                    // 2. Perform exponentiation FIRST
                     double exponentResult = Math.Pow(parentHeight, blobPower);
-
-                    // 3. Multiply by the random factor
                     double finalValue = exponentResult * (r * 0.2 + 0.9);
 
-                    // 4. CRITICAL: JS Uint8Array assignment floors the value
-                    // Use Math.Floor to ensure 76.9 becomes 76, matching JS logs
+                    // Correct: BFS values are floored
                     change[c] = Math.Floor(Math.Clamp(finalValue, 0, 255));
 
                     if (change[c] > 1)
@@ -142,10 +133,14 @@ namespace MapGen.Core
                 }
             }
 
-            // 4. Final Merge (Clamping to 0-100)
+            // 4. Final Merge (CRITICAL CHANGE)
             for (int i = 0; i < data.Cells.Length; i++)
             {
-                int mergedHeight = (int)Math.Round(data.Cells[i].H + change[i]);
+                if (change[i] <= 0) continue;
+
+                // JS: heights[i] = lim(heights[i] + change[i])
+                // Assignment to Uint8Array always floors in JS.
+                double mergedHeight = Math.Floor(data.Cells[i].H + change[i]);
                 data.Cells[i].H = (byte)Math.Clamp(mergedHeight, 0, 100);
             }
         }
