@@ -14,9 +14,6 @@ namespace MapGen.Core
 
     public static class HeightmapGenerator
     {
-        private const double BlobPower = 0.98;
-        private const double LinePower = 0.81;
-
         // Overload 1: Standard Enum-based generation
         public static void Generate(MapData data, HeightmapTemplate template, IRandom rng)
         {
@@ -30,7 +27,7 @@ namespace MapGen.Core
             // Reset heights to 0 before applying tools
             foreach (var cell in data.Cells) cell.H = 0;
 
-            var lines = recipe.Split(new[] { "\n", "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = recipe.Split(new[] { "\n", "\r\n", ";" }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
                 // Trim() handles the leading whitespace from the JS template blocks
@@ -153,34 +150,69 @@ namespace MapGen.Core
             }
         }
 
-        private static void AddPit(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
+        private static void AddPit(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
-            int count = GetNumberInRange(countStr, rng);
-            for (int i = 0; i < count; i++)
+            int count = Probability.GetNumberInRange(rng, countArg);
+            while (count > 0)
             {
-                double h = GetNumberInRange(heightStr, rng);
-                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-                var queue = new Queue<int>(); queue.Enqueue(start);
-                var used = new HashSet<int> { start };
-                while (queue.Count > 0)
+                AddOnePit(data, rng, rangeX, rangeY, heightArg);
+                count--;
+            }
+        }
+
+        private static void AddOnePit(MapData data, IRandom rng, string rangeX, string rangeY, string heightArg)
+        {
+            byte[] used = new byte[data.Cells.Length];
+            double blobPower = GetBlobPower(data.PointsCount);
+            int limit = 0, start = -1;
+            double h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
+
+            // 1. Find Start Point
+            do
+            {
+                double x = GetPointInRange(rangeX, data.Width, rng);
+                double y = GetPointInRange(rangeY, data.Height, rng);
+                start = FindGridCell(data, x, y);
+                limit++;
+            } while (data.Cells[start].H < 20 && limit < 50);
+
+            // 2. BFS Mutation Loop
+            Queue<int> queue = new Queue<int>();
+            queue.Enqueue(start);
+            // JS parity: do NOT set used[start] = 1 here if you want the "pimple/flat" center.
+            // However, if the JS dump shows the center is exactly 50, uncomment the line below:
+            // used[start] = 1; 
+
+            while (queue.Count > 0)
+            {
+                int q = queue.Dequeue();
+
+                // Mutate global intensity h (consumes 1 RNG)
+                h = Math.Pow(h, blobPower) * (rng.Next() * 0.2 + 0.9);
+                if (h < 1) return;
+
+                foreach (int c in data.Cells[q].C)
                 {
-                    int q = queue.Dequeue();
-                    h = Math.Pow(h, BlobPower) * (rng.Next() * 0.2 + 0.9);
-                    if (h < 1) break;
-                    foreach (int n in data.Cells[q].C)
-                    {
-                        if (used.Add(n))
-                        {
-                            data.Cells[n].H = Lim(data.Cells[n].H - h * (rng.Next() * 0.2 + 0.9));
-                            queue.Enqueue(n);
-                        }
-                    }
+                    // Skip border cells and already processed cells
+                    if (c == -1 || used[c] == 1) continue;
+
+                    // Calculate reduction for this neighbor (consumes 1 RNG)
+                    double reduction = h * (rng.Next() * 0.2 + 0.9);
+
+                    // Apply reduction with Floor to match JS Uint8Array behavior
+                    double currentH = data.Cells[c].H;
+                    double newH = Math.Floor(currentH - reduction);
+                    data.Cells[c].H = (byte)Math.Clamp(newH, 0, 100);
+
+                    used[c] = 1;
+                    queue.Enqueue(c);
                 }
             }
         }
 
         private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
         {
+            double linePower = GetLinePower(data.PointsCount);
             int count = GetNumberInRange(countStr, rng);
             for (int i = 0; i < count; i++)
             {
@@ -192,7 +224,7 @@ namespace MapGen.Core
                 int end = FindNearestCell(data, endX, endY);
 
                 var ridge = GetRangePath(data, start, end, rng);
-                ExpandRange(data, ridge, h, rng, LinePower);
+                ExpandRange(data, ridge, h, rng, linePower);
             }
         }
 
@@ -217,6 +249,7 @@ namespace MapGen.Core
 
         private static void AddTrough(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
         {
+            double linePower = GetLinePower(data.PointsCount);
             int count = GetNumberInRange(countStr, rng);
             for (int i = 0; i < count; i++)
             {
@@ -236,7 +269,7 @@ namespace MapGen.Core
                         data.Cells[q].H = Lim(data.Cells[q].H - h * (rng.Next() * 0.3 + 0.85));
                         foreach (int n in data.Cells[q].C) if (used.Add(n)) queue.Enqueue(n);
                     }
-                    h = Math.Pow(h, LinePower) - 1;
+                    h = Math.Pow(h, linePower) - 1;
                 }
             }
         }
