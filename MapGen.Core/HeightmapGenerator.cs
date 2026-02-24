@@ -321,6 +321,8 @@ namespace MapGen.Core
                 byte[] used = new byte[data.Cells.Length];
                 double h = Lim(GetNumberInRange(heightStr, rng));
 
+                double startX = 0;
+                double startY = 0;
                 int startCell = 0;
                 int endCell = 0;
 
@@ -330,8 +332,8 @@ namespace MapGen.Core
                     int limit = 0;
                     do
                     {
-                        double startX = GetPointInRange(rX, data.Width, rng);
-                        double startY = GetPointInRange(rY, data.Height, rng);
+                        startX = GetPointInRange(rX, data.Width, rng);
+                        startY = GetPointInRange(rY, data.Height, rng);
                         startCell = FindGridCell(data, startX, startY);
                         limit++;
                     } while (data.Cells[startCell].H < 20 && limit < 50);
@@ -343,9 +345,9 @@ namespace MapGen.Core
                         double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
                         double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
 
-                        double sX = data.Points[startCell].X;
-                        double sY = data.Points[startCell].Y;
-                        dist = Math.Abs(endX - sX) + Math.Abs(endY - sY);
+                        //double sX = data.Points[startCell].X;
+                        //double sY = data.Points[startCell].Y;
+                        dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
 
                         endCell = FindGridCell(data, endX, endY);
                         limit++;
