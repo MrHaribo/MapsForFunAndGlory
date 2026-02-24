@@ -52,8 +52,8 @@ namespace MapGen.Tests
 
         [Theory]
         [InlineData("data/regression_heightmap_range_cs.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
-        //[InlineData("data/regression_heightmap_trough_cs.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
-        //[InlineData("data/regression_heightmap_strait_cs.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
+        [InlineData("data/regression_heightmap_trough_cs.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
+        [InlineData("data/regression_heightmap_strait_cs.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
         public void Dump_Heightmap_After_Pit_Recipe(string filename, string testRecipe)
         {
             // 1. Setup Map
@@ -65,6 +65,7 @@ namespace MapGen.Tests
 
             // 2. Run the recipe that matches your JS test
             // Example: Initial height of 50, then one Pit
+            rng = new Alea(options.Seed);
             HeightmapGenerator.Generate(data, testRecipe, rng);
 
             // 3. Create the Export Object

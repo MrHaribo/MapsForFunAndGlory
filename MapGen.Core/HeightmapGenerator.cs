@@ -322,61 +322,130 @@ namespace MapGen.Core
                 byte[] used = new byte[data.Cells.Length];
                 double h = Lim(GetNumberInRange(heightStr, rng));
 
-                // Start point selection with height constraint (> 20)
-                int startCell, limit = 0;
-                do
+                int startCell = 0;
+                int endCell = 0;
+
+                // 1. Find Start and End Points
+                if (!string.IsNullOrEmpty(rX) && !string.IsNullOrEmpty(rY))
                 {
-                    startCell = FindGridCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-                } while (data.Cells[startCell].H < 20 && ++limit < 50);
+                    int limit = 0;
+                    do
+                    {
+                        double startX = GetPointInRange(rX, data.Width, rng);
+                        double startY = GetPointInRange(rY, data.Height, rng);
+                        startCell = FindGridCell(data, startX, startY);
+                        limit++;
+                    } while (data.Cells[startCell].H < 20 && limit < 50);
 
-                // End point selection
-                limit = 0;
-                int endCell;
-                double dist, startX = data.Points[startCell].X, startY = data.Points[startCell].Y;
-                do
+                    limit = 0;
+                    double dist = 0;
+                    do
+                    {
+                        double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
+                        double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
+
+                        double sX = data.Points[startCell].X;
+                        double sY = data.Points[startCell].Y;
+                        dist = Math.Abs(endX - sX) + Math.Abs(endY - sY);
+
+                        endCell = FindGridCell(data, endX, endY);
+                        limit++;
+                    } while ((dist < data.Width / 8.0 || dist > data.Width / 2.0) && limit < 50);
+                }
+
+                // 2. Define Local Function for Pathfinding (Matches JS getRange)
+                List<int> GetRange(int cur, int end)
                 {
-                    double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
-                    double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
-                    dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
-                    endCell = FindGridCell(data, endX, endY);
-                } while ((dist < data.Width / 8.0 || dist > data.Width / 2.0) && ++limit < 50);
+                    List<int> range = new List<int> { cur };
+                    used[cur] = 1;
 
-                List<int> ridge = GetRangePath(data, startCell, endCell, rng, used);
+                    while (cur != end)
+                    {
+                        double min = double.MaxValue;
+                        int next = -1;
 
+                        foreach (int e in data.Cells[cur].C)
+                        {
+                            if (e == -1 || used[e] == 1) continue;
+
+                            double dx = data.Points[end].X - data.Points[e].X;
+                            double dy = data.Points[end].Y - data.Points[e].Y;
+                            double diff = dx * dx + dy * dy;
+
+                            // Apply the 20% jitter chance from JS
+                            if (rng.Next() > 0.8) diff /= 2.0;
+
+                            if (diff < min)
+                            {
+                                min = diff;
+                                next = e;
+                            }
+                        }
+
+                        if (next == -1) return range; // Dead end
+
+                        cur = next;
+                        range.Add(cur);
+                        used[cur] = 1;
+                    }
+                    return range;
+                }
+
+                List<int> ridge = GetRange(startCell, endCell);
+
+                // 3. Expansion (BFS)
                 List<int> queue = new List<int>(ridge);
                 int iterations = 0;
                 while (queue.Count > 0)
                 {
-                    var frontier = new List<int>(queue);
+                    List<int> frontier = new List<int>(queue);
                     queue.Clear();
                     iterations++;
 
-                    foreach (int i in frontier)
-                        data.Cells[i].H = Lim(data.Cells[i].H - h * (rng.Next() * 0.3 + 0.85));
+                    foreach (int cellIdx in frontier)
+                    {
+                        data.Cells[cellIdx].H = Lim(data.Cells[cellIdx].H - h * (rng.Next() * 0.3 + 0.85));
+                    }
 
                     h = Math.Pow(h, linePower) - 1;
                     if (h < 2) break;
 
                     foreach (int f in frontier)
+                    {
                         foreach (int n in data.Cells[f].C)
-                            if (n != -1 && used[n] == 0) { used[n] = 1; queue.Add(n); }
+                        {
+                            if (n != -1 && used[n] == 0)
+                            {
+                                used[n] = 1;
+                                queue.Add(n);
+                            }
+                        }
+                    }
                 }
 
-                // Prominences for Troughs
+                // 4. Generate Prominences
                 for (int d = 0; d < ridge.Count; d++)
                 {
                     if (d % 6 != 0) continue;
                     int cur = ridge[d];
+
                     for (int l = 0; l < iterations; l++)
                     {
                         int minCell = -1;
                         double minH = double.MaxValue;
+
                         foreach (int n in data.Cells[cur].C)
                         {
-                            if (n != -1 && data.Cells[n].H < minH) { minH = data.Cells[n].H; minCell = n; }
+                            if (n != -1 && data.Cells[n].H < minH)
+                            {
+                                minH = data.Cells[n].H;
+                                minCell = n;
+                            }
                         }
+
                         if (minCell == -1) break;
-                        data.Cells[minCell].H = Lim((data.Cells[cur].H * 2 + data.Cells[minCell].H) / 3.0);
+
+                        data.Cells[minCell].H = Lim((data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0);
                         cur = minCell;
                     }
                 }
