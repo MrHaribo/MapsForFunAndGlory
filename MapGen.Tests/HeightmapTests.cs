@@ -26,6 +26,9 @@ namespace MapGen.Tests
         [InlineData("data/regression_heightmap_trough.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
         [InlineData("data/regression_heightmap_strait.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
         [InlineData("data/regression_heightmap_template_highIsland.json", HeightmapTemplates.HighIsland)]
+        [InlineData("data/regression_heightmap_template_archipelago.json", HeightmapTemplates.Archipelago)]
+        [InlineData("data/regression_heightmap_template_shattered.json", HeightmapTemplates.Shattered)]
+        [InlineData("data/regression_heightmap_template_volcano.json", HeightmapTemplates.Volcano)]
         public void HeightmapGenerator_MatchesJsOutput(string filename, string testRecipe)
         {
             // 1. Load the specific heightmap dump
