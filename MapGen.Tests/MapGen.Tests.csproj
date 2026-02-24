@@ -56,6 +56,9 @@
     <None Update="data\regression_heightmap_strait.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\regression_heightmap_template_highIsland.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\regression_heightmap_trough.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

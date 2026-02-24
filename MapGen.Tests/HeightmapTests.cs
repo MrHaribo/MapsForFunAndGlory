@@ -12,6 +12,8 @@ namespace MapGen.Tests
     }
     public class HeightmapTests
     {
+        const string foo = "foo";
+
         [Theory]
         [InlineData("data/regression_heightmap_hill.json", "Hill 1 90-100 44-56 40-60")]
         [InlineData("data/regression_heightmap_add.json", "Add 30 0-100")]
@@ -23,6 +25,7 @@ namespace MapGen.Tests
         [InlineData("data/regression_heightmap_range.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
         [InlineData("data/regression_heightmap_trough.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
         [InlineData("data/regression_heightmap_strait.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
+        [InlineData("data/regression_heightmap_template_highIsland.json", HeightmapTemplates.HighIsland)]
         public void HeightmapGenerator_MatchesJsOutput(string filename, string testRecipe)
         {
             // 1. Load the specific heightmap dump

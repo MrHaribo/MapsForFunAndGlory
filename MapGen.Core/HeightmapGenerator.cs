@@ -8,7 +8,6 @@ using System.Text;
 
 namespace MapGen.Core
 {
-    public enum HeightmapTemplate { HighIsland, Volcano, MountainRange, Archipelago, Test }
     public enum HeightmapTool { Hill, Pit, Range, Trough, Strait, Mask, Invert, Add, Multiply, Smooth }
     public enum HeightmapSelection { All, Land, Water }
 
