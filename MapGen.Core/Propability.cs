@@ -15,7 +15,10 @@ namespace MapGen.Core
             => rng.Next(0, max);
 
         public static double Next(this IRandom rng, double min, double max)
-            => rng.Next() * (max - min) + min;
+        {
+            var r = rng.Next();
+            return Math.Floor(r * (max - min + 1)) + min;
+        }
 
         // --- Azgaar Specific Logic ---
 

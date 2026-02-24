@@ -55,6 +55,9 @@ namespace MapGen.Core
                 case HeightmapTool.Trough: 
                     AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
 
+                case HeightmapTool.Strait:
+                    AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical", HeightmapSelection.Land); break;
+
                 case HeightmapTool.Invert:
                     Invert(data, args.Length > 2 ? args[2] : "both");break;
 
@@ -64,9 +67,6 @@ namespace MapGen.Core
                 case HeightmapTool.Multiply:
                     Modify(data, args.Length > 2 ? args[2] : "all", 0.0, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
 
-                case HeightmapTool.Strait:
-                    AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical", HeightmapSelection.Land); break;
-
                 case HeightmapTool.Smooth:
                     Smooth(data, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
 
@@ -74,6 +74,8 @@ namespace MapGen.Core
                     Mask(data, double.Parse(args[1])); break;
             }
         }
+
+        #region Hill, Pit
 
         private static void AddHill(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
@@ -203,40 +205,110 @@ namespace MapGen.Core
             }
         }
 
+        #endregion
+
+        #region Trough, Range, Strait
+
         private static void AddRange(MapData data, IRandom rng, string countStr, string heightStr, string rX, string rY)
         {
             double linePower = GetLinePower(data.PointsCount);
             int count = GetNumberInRange(countStr, rng);
-            for (int i = 0; i < count; i++)
+            Trace.WriteLine($"AddRange: count={count}, height={heightStr}");
+
+            while (count-- > 0)
             {
-                double h = GetNumberInRange(heightStr, rng);
-                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                byte[] used = new byte[data.Cells.Length];
+                double h = Lim(GetNumberInRange(heightStr, rng));
 
-                double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
-                double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
-                int end = FindNearestCell(data, endX, endY);
+                // 1. Point Selection
+                double startX = GetPointInRange(rX, data.Width, rng);
+                double startY = GetPointInRange(rY, data.Height, rng);
 
-                var ridge = GetRangePath(data, start, end, rng);
-                ExpandRange(data, ridge, h, rng, linePower);
-            }
-        }
-
-        private static void ExpandRange(MapData data, List<int> range, double h, IRandom rng, double power)
-        {
-            var used = new HashSet<int>(range);
-            var queue = new Queue<int>(range);
-            while (queue.Count > 0)
-            {
-                int levelSize = queue.Count;
-                for (int j = 0; j < levelSize; j++)
+                double endX = 0, endY = 0, dist = 0;
+                int limit = 0;
+                do
                 {
-                    int q = queue.Dequeue();
-                    data.Cells[q].H = Lim(data.Cells[q].H + h * (rng.Next() * 0.3 + 0.85));
-                    foreach (int n in data.Cells[q].C)
-                        if (used.Add(n)) queue.Enqueue(n);
+                    endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
+                    endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
+                    dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
+                    limit++;
+                } while ((dist < data.Width / 8.0 || dist > data.Width / 3.0) && limit < 50);
+
+                int startCell = FindGridCell(data, startX, startY);
+                int endCell = FindGridCell(data, endX, endY);
+                Trace.WriteLine($"Points: start({startX:F2}, {startY:F2}) end({endX:F2}, {endY:F2}) cells: {startCell}->{endCell}");
+
+                List<int> getRange(int cur, int end)
+                {
+                    List<int> rPath = new List<int> { cur };
+                    used[cur] = 1;
+                    while (cur != end)
+                    {
+                        double min = double.PositiveInfinity;
+                        int nextStep = -1;
+                        foreach (int e in data.Cells[cur].C)
+                        {
+                            if (e == -1 || used[e] == 1) continue;
+                            double diff = Math.Pow(data.Points[end].X - data.Points[e].X, 2) +
+                                         Math.Pow(data.Points[end].Y - data.Points[e].Y, 2);
+                            if (rng.Next() > 0.85) diff /= 2.0;
+                            if (diff < min) { min = diff; nextStep = e; }
+                        }
+                        if (nextStep == -1) return rPath;
+                        cur = nextStep;
+                        rPath.Add(cur);
+                        used[cur] = 1;
+                    }
+                    return rPath;
                 }
-                h = Math.Pow(h, power) - 1;
-                if (h < 2) break;
+
+                List<int> ridge = getRange(startCell, endCell);
+                Trace.WriteLine($"Ridge path length: {ridge.Count}");
+
+                List<int> queue = new List<int>(ridge);
+                int iterations = 0;
+                while (queue.Count > 0)
+                {
+                    List<int> frontier = new List<int>(queue);
+                    queue.Clear();
+                    iterations++;
+                    foreach (int idx in frontier)
+                    {
+                        double noise = rng.Next() * 0.3 + 0.85;
+                        double newH = data.Cells[idx].H + h * noise;
+                        data.Cells[idx].H = Lim((int)Math.Floor(newH));
+                    }
+                    h = Math.Pow(h, linePower) - 1;
+                    if (h < 2) break;
+                    foreach (int f in frontier)
+                    {
+                        foreach (int n in data.Cells[f].C)
+                        {
+                            if (n != -1 && used[n] == 0) { queue.Add(n); used[n] = 1; }
+                        }
+                    }
+                }
+                Trace.WriteLine($"Expansion: iterations={iterations}, finalH={h:F2}");
+
+                for (int d = 0; d < ridge.Count; d++)
+                {
+                    if (d % 6 != 0) continue;
+                    int cur = ridge[d];
+                    for (int l = 0; l < iterations; l++)
+                    {
+                        int minCell = -1;
+                        double minH = double.PositiveInfinity;
+                        foreach (int n in data.Cells[cur].C)
+                        {
+                            if (n == -1) continue;
+                            if (data.Cells[n].H < minH) { minH = data.Cells[n].H; minCell = n; }
+                        }
+                        if (minCell == -1) break;
+                        double avgH = (data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0;
+                        data.Cells[minCell].H = Lim((int)Math.Floor(avgH));
+                        cur = minCell;
+                    }
+                }
             }
         }
 
@@ -244,72 +316,155 @@ namespace MapGen.Core
         {
             double linePower = GetLinePower(data.PointsCount);
             int count = GetNumberInRange(countStr, rng);
-            for (int i = 0; i < count; i++)
-            {
-                double h = GetNumberInRange(heightStr, rng);
-                int start = FindNearestCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
-                int end = FindNearestCell(data, rng.Next() * data.Width, rng.Next() * data.Height);
-                var ridge = GetRangePath(data, start, end, rng);
 
-                var used = new HashSet<int>(ridge);
-                var queue = new Queue<int>(ridge);
-                while (queue.Count > 0 && h > 2)
+            while (count-- > 0)
+            {
+                byte[] used = new byte[data.Cells.Length];
+                double h = Lim(GetNumberInRange(heightStr, rng));
+
+                // Start point selection with height constraint (> 20)
+                int startCell, limit = 0;
+                do
                 {
-                    int levelSize = queue.Count;
-                    for (int j = 0; j < levelSize; j++)
-                    {
-                        int q = queue.Dequeue();
-                        data.Cells[q].H = Lim(data.Cells[q].H - h * (rng.Next() * 0.3 + 0.85));
-                        foreach (int n in data.Cells[q].C) if (used.Add(n)) queue.Enqueue(n);
-                    }
+                    startCell = FindGridCell(data, GetPointInRange(rX, data.Width, rng), GetPointInRange(rY, data.Height, rng));
+                } while (data.Cells[startCell].H < 20 && ++limit < 50);
+
+                // End point selection
+                limit = 0;
+                int endCell;
+                double dist, startX = data.Points[startCell].X, startY = data.Points[startCell].Y;
+                do
+                {
+                    double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
+                    double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
+                    dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
+                    endCell = FindGridCell(data, endX, endY);
+                } while ((dist < data.Width / 8.0 || dist > data.Width / 2.0) && ++limit < 50);
+
+                List<int> ridge = GetRangePath(data, startCell, endCell, rng, used);
+
+                List<int> queue = new List<int>(ridge);
+                int iterations = 0;
+                while (queue.Count > 0)
+                {
+                    var frontier = new List<int>(queue);
+                    queue.Clear();
+                    iterations++;
+
+                    foreach (int i in frontier)
+                        data.Cells[i].H = Lim(data.Cells[i].H - h * (rng.Next() * 0.3 + 0.85));
+
                     h = Math.Pow(h, linePower) - 1;
+                    if (h < 2) break;
+
+                    foreach (int f in frontier)
+                        foreach (int n in data.Cells[f].C)
+                            if (n != -1 && used[n] == 0) { used[n] = 1; queue.Add(n); }
+                }
+
+                // Prominences for Troughs
+                for (int d = 0; d < ridge.Count; d++)
+                {
+                    if (d % 6 != 0) continue;
+                    int cur = ridge[d];
+                    for (int l = 0; l < iterations; l++)
+                    {
+                        int minCell = -1;
+                        double minH = double.MaxValue;
+                        foreach (int n in data.Cells[cur].C)
+                        {
+                            if (n != -1 && data.Cells[n].H < minH) { minH = data.Cells[n].H; minCell = n; }
+                        }
+                        if (minCell == -1) break;
+                        data.Cells[minCell].H = Lim((data.Cells[cur].H * 2 + data.Cells[minCell].H) / 3.0);
+                        cur = minCell;
+                    }
                 }
             }
         }
 
         private static void AddStrait(MapData data, IRandom rng, string widthArg, string direction, HeightmapSelection selection)
         {
-            // 1. Get width using the new GetPointInRange helper
-            // In Azgaar, width is relative to the total map width
-            double width = GetPointInRange(widthArg, data.Width, rng);
+            int width = (int)Math.Min(GetNumberInRange(widthArg, rng), data.CellsCountX / 3.0);
+            if (width < 1) return;
 
-            // 2. Determine start and end points based on direction
-            // Logic for picking coordinates on the edges of the map
-            (double x1, double y1, double x2, double y2) = GetStraitPath(data, direction, rng);
+            byte[] used = new byte[data.Cells.Length];
+            bool vert = direction == "vertical";
 
-            // 3. Find cells along the line
-            // This typically uses a line-drawing algorithm or distance-to-segment check
-            var affectedCells = new List<int>();// FindCellsNearLine(data, x1, y1, x2, y2, width);
+            double startX = vert ? Math.Floor(rng.Next() * data.Width * 0.4 + data.Width * 0.3) : 5;
+            double startY = vert ? 5 : Math.Floor(rng.Next() * data.Height * 0.4 + data.Height * 0.3);
+            double endX = vert ? Math.Floor(data.Width - startX - data.Width * 0.1 + rng.Next() * data.Width * 0.2) : data.Width - 5;
+            double endY = vert ? data.Height - 5 : Math.Floor(data.Height - startY - data.Height * 0.1 + rng.Next() * data.Height * 0.2);
 
-            foreach (var cellIdx in affectedCells)
+            int start = FindGridCell(data, startX, startY);
+            int end = FindGridCell(data, endX, endY);
+
+            // Strait path is distinct: No 'used' tracking in path selection to allow straighter lines
+            List<int> range = new List<int>();
+            int cur = start;
+            while (cur != end)
             {
-                var cell = data.Cells[cellIdx];
-                bool isLand = cell.H >= 20;
+                double minD = double.MaxValue;
+                int next = -1;
+                foreach (int e in data.Cells[cur].C)
+                {
+                    if (e == -1) continue;
+                    double d = Math.Pow(data.Points[end].X - data.Points[e].X, 2) + Math.Pow(data.Points[end].Y - data.Points[e].Y, 2);
+                    if (rng.Next() > 0.8) d /= 2.0;
+                    if (d < minD) { minD = d; next = e; }
+                }
+                if (next == -1) break;
+                cur = next;
+                range.Add(cur);
+            }
 
-                // 4. Apply the Selection Filter
-                if (selection == HeightmapSelection.Land && !isLand) continue;
-                if (selection == HeightmapSelection.Water && isLand) continue;
+            double step = 0.1 / width;
+            while (width > 0)
+            {
+                double exp = 0.9 - step * width;
+                List<int> query = new List<int>();
+                foreach (int r in range)
+                {
+                    foreach (int e in data.Cells[r].C)
+                    {
+                        if (e == -1 || used[e] == 1) continue;
+                        used[e] = 1;
+                        query.Add(e);
 
-                // 5. Carve the strait (Setting to 5 = shallow water)
-                // We use Lim() to ensure it stays within 0-100 range
-                cell.H = Lim(5);
+                        double newH = Math.Pow(data.Cells[e].H, exp);
+                        data.Cells[e].H = newH > 100 ? (byte)5 : Lim(newH);
+                    }
+                }
+                range = query;
+                width--;
             }
         }
 
-        // Helper to determine the strait's vector based on the direction string
-        private static (double, double, double, double) GetStraitPath(MapData data, string direction, IRandom rng)
+        // Updated Helper to include 'used' array to match JS scope logic
+        private static List<int> GetRangePath(MapData data, int cur, int end, IRandom rng, byte[] used)
         {
-            if (direction == "vertical")
+            var path = new List<int> { cur };
+            used[cur] = 1;
+            while (cur != end)
             {
-                double x = rng.Next(0.0, data.Width);
-                return (x, 0, x, data.Height);
+                int best = -1;
+                double minD = double.MaxValue;
+                foreach (int n in data.Cells[cur].C)
+                {
+                    if (n == -1 || used[n] == 1) continue;
+                    double d = Math.Pow(data.Points[end].X - data.Points[n].X, 2) + Math.Pow(data.Points[end].Y - data.Points[n].Y, 2);
+                    if (rng.Next() > 0.85) d /= 2.0; // Random "wiggle"
+                    if (d < minD) { minD = d; best = n; }
+                }
+                if (best == -1) break;
+                cur = best; path.Add(cur); used[cur] = 1;
             }
-            else // horizontal
-            {
-                double y = rng.Next(0.0, data.Height);
-                return (0, y, data.Width, y);
-            }
+            return path;
         }
+
+        #endregion
+
+        #region Simple Tools
 
         private static void Invert(MapData data, string axes = "both")
         {
@@ -428,6 +583,10 @@ namespace MapGen.Core
             }
         }
 
+        #endregion
+
+        #region Helper Functions
+
         private static byte Lim(double val) => (byte)Math.Clamp(val, 0, 100);
 
         // Utility and Pathing methods updated to object structure
@@ -455,18 +614,34 @@ namespace MapGen.Core
             return path;
         }
 
-        private static int GetNumberInRange(string range, IRandom rng)
+        private static int GetNumberInRange(string r, IRandom rng)
         {
-            if (!range.Contains('-'))
+            if (string.IsNullOrWhiteSpace(r)) return 0;
+
+            // JS: if (!isNaN(+r))
+            if (double.TryParse(r, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
             {
-                double val = double.Parse(range, System.Globalization.CultureInfo.InvariantCulture);
-                int floor = (int)Math.Floor(val);
-                return rng.Next() < (val - floor) ? floor + 1 : floor;
+                // JS: ~~r + +P(r - ~~r)
+                // (int)val in C# performs the same truncation as ~~ in JS
+                int intPart = (int)val;
+                return intPart + (rng.P(val - intPart) ? 1 : 0);
             }
-            var p = range.Split('-');
-            double min = double.Parse(p[0], System.Globalization.CultureInfo.InvariantCulture);
-            double max = double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
-            return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
+
+            double sign = r[0] == '-' ? -1 : 1;
+            string s = r;
+            // JS: if (isNaN(+r[0])) r = r.slice(1);
+            if (!char.IsDigit(s[0])) s = s.Substring(1);
+
+            if (s.Contains('-'))
+            {
+                string[] range = s.Split('-');
+                double min = double.Parse(range[0], System.Globalization.CultureInfo.InvariantCulture) * sign;
+                double max = double.Parse(range[1], System.Globalization.CultureInfo.InvariantCulture);
+                // JS: rand(min, max) -> Math.floor(Math.random() * (max - min + 1)) + min
+                return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
+            }
+
+            return 0;
         }
 
 
@@ -527,7 +702,10 @@ namespace MapGen.Core
             }
 
             // Now using the extension method: rng.Next(double min, double max)
-            return rng.Next(min * length, max * length);
+
+            var result = rng.Next(min * length, max * length);
+
+            return result;
         }
 
         public static double GetBlobPower(int cells) => cells switch
@@ -565,5 +743,7 @@ namespace MapGen.Core
             100000 => 0.93,
             _ => throw new ArgumentException($"Invalid cell count: {cells}. Power map requires a standard Azgaar point tier.")
         };
+
+        #endregion
     }
 }

@@ -20,6 +20,9 @@ namespace MapGen.Tests
         [InlineData("data/regression_heightmap_pit_shallow.json", "Add 50 0-100;Pit 1 5 50 50")]
         [InlineData("data/regression_heightmap_smooth.json", "Add 20 all;Hill 1 60 50 50;Smooth 2 0;Smooth 1.5 1")]
         [InlineData("data/regression_heightmap_invert.json", "Add 20 all;Hill 1 60 20 20;Invert 1 x")]
+        [InlineData("data/regression_heightmap_range.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
+        [InlineData("data/regression_heightmap_trough.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
+        [InlineData("data/regression_heightmap_strait.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
         public void HeightmapGenerator_MatchesJsOutput(string filename, string testRecipe)
         {
             // 1. Load the specific heightmap dump
@@ -47,8 +50,11 @@ namespace MapGen.Tests
             }
         }
 
-        [Fact]
-        public void Dump_Heightmap_After_Pit_Recipe()
+        [Theory]
+        [InlineData("data/regression_heightmap_range_cs.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
+        //[InlineData("data/regression_heightmap_trough_cs.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
+        //[InlineData("data/regression_heightmap_strait_cs.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
+        public void Dump_Heightmap_After_Pit_Recipe(string filename, string testRecipe)
         {
             // 1. Setup Map
             var options = GenerationOptions.TestOptions;
@@ -59,7 +65,7 @@ namespace MapGen.Tests
 
             // 2. Run the recipe that matches your JS test
             // Example: Initial height of 50, then one Pit
-            HeightmapGenerator.Generate(data, "Add 50 0-100; Pit 1 30 50 50", rng);
+            HeightmapGenerator.Generate(data, testRecipe, rng);
 
             // 3. Create the Export Object
             var dump = new
@@ -73,7 +79,7 @@ namespace MapGen.Tests
 
             // 4. Serialize and Save
             string json = JsonConvert.SerializeObject(dump, Formatting.Indented);
-            File.WriteAllText("regression_heightmap_invert_csharp.json", json);
+            File.WriteAllText(filename, json);
         }
     }
 }
