@@ -37,7 +37,7 @@ namespace MapGen.Render.Skia.WinUI
             generator.Generate(options, rng);
 
             rng = new Alea(options.Seed);
-            HeightmapGenerator.Generate(generator.Data, HeightmapTemplates.HighIsland, rng);
+            HeightmapGenerator.Generate(generator.Data, HeightmapTemplates.Test, rng);
 
             _map = generator.Data;
         }

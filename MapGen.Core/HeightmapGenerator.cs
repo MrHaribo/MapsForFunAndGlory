@@ -70,7 +70,7 @@ namespace MapGen.Core
                     Smooth(data, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
 
                 case HeightmapTool.Mask: 
-                    Mask(data, double.Parse(args[1])); break;
+                    Mask(data, args[1]); break;
             }
         }
 
@@ -637,17 +637,41 @@ namespace MapGen.Core
             }
         }
 
-        private static void Mask(MapData data, double power)
+        private static void Mask(MapData data, string powerStr)
         {
-            double fr = power != 0 ? Math.Abs(power) : 1;
-            for (int i = 0; i < data.Points.Length; i++)
+            // Directly parse the power string as a number, as it does not require a range/random in JS
+            if (!double.TryParse(powerStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double power))
             {
-                var p = data.Points[i];
-                double nx = (2 * p.X) / data.Width - 1;
-                double ny = (2 * p.Y) / data.Height - 1;
-                double dist = (1 - nx * nx) * (1 - ny * ny);
-                if (power < 0) dist = 1 - dist;
-                data.Cells[i].H = Lim((data.Cells[i].H * (fr - 1) + (data.Cells[i].H * dist)) / fr);
+                power = 1.0; // Default value matching JS (power = 1)
+            }
+
+            double fr = power != 0 ? Math.Abs(power) : 1.0;
+
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                double x = data.Points[i].X;
+                double y = data.Points[i].Y;
+
+                // Normalize coordinates to [-1, 1] range where 0 is the center
+                double nx = (2.0 * x) / data.Width - 1.0;
+                double ny = (2.0 * y) / data.Height - 1.0;
+
+                // Calculate distance factor (1 at center, 0 at edges)
+                // JS: let distance = (1 - nx ** 2) * (1 - ny ** 2);
+                double distance = (1.0 - nx * nx) * (1.0 - ny * ny);
+
+                // If power is negative, invert the mask (0 at center, 1 at edges)
+                if (power < 0)
+                {
+                    distance = 1.0 - distance;
+                }
+
+                double h = data.Cells[i].H;
+                double masked = h * distance;
+
+                // Blend the original height with the masked height based on fr
+                // JS: lim((h * (fr - 1) + masked) / fr)
+                data.Cells[i].H = Lim((h * (fr - 1.0) + masked) / fr);
             }
         }
 

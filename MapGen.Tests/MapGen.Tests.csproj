@@ -59,6 +59,12 @@
     <None Update="data\regression_heightmap_template_archipelago.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\regression_heightmap_template_continents.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="data\regression_heightmap_template_fractious.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\regression_heightmap_template_highIsland.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
