@@ -15,9 +15,11 @@ namespace MapGen.Tests
         [Theory]
         [InlineData("data/regression_heightmap_hill.json", "Hill 1 90-100 44-56 40-60")]
         [InlineData("data/regression_heightmap_add.json", "Add 30 0-100")]
+        [InlineData("data/regression_heightmap_mult.json", "Add 20 all;Hill 1 50 50 50;Multiply 1.5 land;Multiply 0.5 0-20")]
         [InlineData("data/regression_heightmap_pit.json", "Add 50 0-100;Pit 1 30 50 50")]
         [InlineData("data/regression_heightmap_pit_shallow.json", "Add 50 0-100;Pit 1 5 50 50")]
         [InlineData("data/regression_heightmap_smooth.json", "Add 20 all;Hill 1 60 50 50;Smooth 2 0;Smooth 1.5 1")]
+        [InlineData("data/regression_heightmap_invert.json", "Add 20 all;Hill 1 60 20 20;Invert 1 x")]
         public void HeightmapGenerator_MatchesJsOutput(string filename, string testRecipe)
         {
             // 1. Load the specific heightmap dump
@@ -71,7 +73,7 @@ namespace MapGen.Tests
 
             // 4. Serialize and Save
             string json = JsonConvert.SerializeObject(dump, Formatting.Indented);
-            File.WriteAllText("regression_heightmap_pit_csharp.json", json);
+            File.WriteAllText("regression_heightmap_invert_csharp.json", json);
         }
     }
 }

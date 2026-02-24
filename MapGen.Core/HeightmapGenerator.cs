@@ -55,6 +55,9 @@ namespace MapGen.Core
                 case HeightmapTool.Trough: 
                     AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
 
+                case HeightmapTool.Invert:
+                    Invert(data, args.Length > 2 ? args[2] : "both");break;
+
                 case HeightmapTool.Add:
                     Modify(data, args.Length > 2 ? args[2] : "all", double.Parse(args[1], CultureInfo.InvariantCulture), 1.0); break;
 
@@ -305,6 +308,37 @@ namespace MapGen.Core
             {
                 double y = rng.Next(0.0, data.Height);
                 return (0, y, data.Width, y);
+            }
+        }
+
+        private static void Invert(MapData data, string axes = "both")
+        {
+            bool invertX = axes != "y";
+            bool invertY = axes != "x";
+
+            int cellsX = data.CellsCountX;
+            int cellsY = data.CellsCountY;
+
+            // 1. Snapshot the current heights into a flat array
+            byte[] oldHeights = new byte[data.Cells.Length];
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                oldHeights[i] = data.Cells[i].H;
+            }
+
+            // 2. Map the snapped heights back to the cells using inverted coordinates
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                int x = i % cellsX;
+                int y = i / cellsX;
+
+                int nx = invertX ? cellsX - x - 1 : x;
+                int ny = invertY ? cellsY - y - 1 : y;
+
+                int invertedI = nx + ny * cellsX;
+
+                // Parity Check: JS returns heights[invertedI]
+                data.Cells[i].H = oldHeights[invertedI];
             }
         }
 
