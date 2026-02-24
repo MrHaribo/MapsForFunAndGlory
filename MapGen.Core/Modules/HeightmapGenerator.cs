@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace MapGen.Core
+namespace MapGen.Core.Modules
 {
     public enum HeightmapTool { Hill, Pit, Range, Trough, Strait, Mask, Invert, Add, Multiply, Smooth }
     public enum HeightmapSelection { All, Land, Water }
@@ -549,10 +549,10 @@ namespace MapGen.Core
             // JS: const max = range === "land" || range === "all" ? 100 : +range.split("-")[1];
             var split = range.Split('-');
             double min = range == "land" ? 20 : range == "all" ? 0 : double.Parse(split[0], CultureInfo.InvariantCulture);
-            double max = (range == "land" || range == "all") ? 100 : (split.Length > 1 ? double.Parse(split[1], CultureInfo.InvariantCulture) : min);
+            double max = range == "land" || range == "all" ? 100 : split.Length > 1 ? double.Parse(split[1], CultureInfo.InvariantCulture) : min;
 
             // JS: const isLand = min === 20;
-            bool isLand = (min == 20);
+            bool isLand = min == 20;
 
             foreach (var cell in data.Cells)
             {
@@ -618,7 +618,7 @@ namespace MapGen.Core
         private static void Mask(MapData data, string powerStr)
         {
             // Directly parse the power string as a number, as it does not require a range/random in JS
-            if (!double.TryParse(powerStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double power))
+            if (!double.TryParse(powerStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double power))
             {
                 power = 1.0; // Default value matching JS (power = 1)
             }
@@ -631,8 +631,8 @@ namespace MapGen.Core
                 double y = data.Points[i].Y;
 
                 // Normalize coordinates to [-1, 1] range where 0 is the center
-                double nx = (2.0 * x) / data.Width - 1.0;
-                double ny = (2.0 * y) / data.Height - 1.0;
+                double nx = 2.0 * x / data.Width - 1.0;
+                double ny = 2.0 * y / data.Height - 1.0;
 
                 // Calculate distance factor (1 at center, 0 at edges)
                 // JS: let distance = (1 - nx ** 2) * (1 - ny ** 2);
@@ -664,7 +664,7 @@ namespace MapGen.Core
             if (string.IsNullOrWhiteSpace(r)) return 0;
 
             // JS: if (!isNaN(+r))
-            if (double.TryParse(r, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
+            if (double.TryParse(r, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
             {
                 // JS: ~~r + +P(r - ~~r)
                 // (int)val in C# performs the same truncation as ~~ in JS
@@ -680,8 +680,8 @@ namespace MapGen.Core
             if (s.Contains('-'))
             {
                 string[] range = s.Split('-');
-                double min = double.Parse(range[0], System.Globalization.CultureInfo.InvariantCulture) * sign;
-                double max = double.Parse(range[1], System.Globalization.CultureInfo.InvariantCulture);
+                double min = double.Parse(range[0], CultureInfo.InvariantCulture) * sign;
+                double max = double.Parse(range[1], CultureInfo.InvariantCulture);
                 // JS: rand(min, max) -> Math.floor(Math.random() * (max - min + 1)) + min
                 return (int)Math.Floor(rng.Next() * (max - min + 1) + min);
             }
@@ -697,7 +697,7 @@ namespace MapGen.Core
             int row = (int)Math.Floor(Math.Min(y / data.Spacing, data.CellsCountY - 1));
             int col = (int)Math.Floor(Math.Min(x / data.Spacing, data.CellsCountX - 1));
 
-            return (row * data.CellsCountX) + col;
+            return row * data.CellsCountX + col;
         }
 
         private static int FindNearestCell(MapData data, double x, double y)
@@ -730,14 +730,14 @@ namespace MapGen.Core
 
             string[] parts = range.Split('-');
 
-            if (!double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double minPercent))
+            if (!double.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out double minPercent))
             {
                 minPercent = 0;
             }
             double min = minPercent / 100.0;
 
             double max;
-            if (parts.Length > 1 && double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double maxPercent))
+            if (parts.Length > 1 && double.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out double maxPercent))
             {
                 max = maxPercent / 100.0;
             }

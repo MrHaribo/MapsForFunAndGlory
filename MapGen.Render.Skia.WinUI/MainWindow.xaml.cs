@@ -1,5 +1,6 @@
 ﻿using MapGen.Core;
 using MapGen.Core.Helpers;
+using MapGen.Core.Modules;
 using Microsoft.UI.Xaml;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;

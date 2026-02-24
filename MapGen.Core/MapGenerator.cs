@@ -1,4 +1,5 @@
 ﻿using MapGen.Core.Helpers;
+using MapGen.Core.Modules;
 using System;
 using System.Collections.Generic;
 using System.Text;

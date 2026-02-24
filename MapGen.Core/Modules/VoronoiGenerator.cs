@@ -1,7 +1,7 @@
 ﻿using DelaunatorSharp;
 using System;
 
-namespace MapGen.Core
+namespace MapGen.Core.Modules
 {
     public static class VoronoiGenerator
     {

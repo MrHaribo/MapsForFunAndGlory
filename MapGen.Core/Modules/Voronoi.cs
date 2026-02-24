@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MapGen.Core
+namespace MapGen.Core.Modules
 {
     public class Voronoi
     {
@@ -66,7 +66,7 @@ namespace MapGen.Core
             }
         }
 
-        private int NextHalfedge(int e) => (e % 3 == 2) ? e - 2 : e + 1;
+        private int NextHalfedge(int e) => e % 3 == 2 ? e - 2 : e + 1;
         private int TriangleOfEdge(int e) => e == -1 ? -1 : e / 3;
 
         private List<int> EdgesAroundPoint(int start)
