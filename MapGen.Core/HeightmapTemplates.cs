@@ -185,7 +185,8 @@ namespace MapGen.Core
             Add -20 30-100 0 0
             Range 6-8 40-50 5-95 10-90";
 
-        public const string Test = @"Hill 1 80-85 60-80 40-60
+        public const string Test = 
+            @"Hill 1 80-85 60-80 40-60
             Hill 1 80-85 20-30 40-60
             Hill 6-7 15-30 25-75 15-85
             Multiply 0.6 land 0 0
@@ -196,7 +197,10 @@ namespace MapGen.Core
             Strait 2 vertical 0 0
             Strait 1 vertical 0 0
             Smooth 3 0 0 0
-            Trough 3-4 15-20 15-85 20-80";
+            Trough 3-4 15-20 15-85 20-80
+            Trough 3-4 5-10 45-55 45-55
+            Pit 3-4 10-20 15-85 20-80
+            Mask 4 0 0 0";
 
     //    public const string Continents =
     //        @"Hill 1 80-85 60-80 40-60
