@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MapGen.Core.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -14,7 +15,7 @@ namespace MapGen.Core
 
         public void Generate(GenerationOptions options)
         {
-            Generate(options, new Alea(options.Seed));
+            Generate(options, new AleaRandom(options.Seed));
         }
 
         public void Generate(GenerationOptions options, IRandom rng)

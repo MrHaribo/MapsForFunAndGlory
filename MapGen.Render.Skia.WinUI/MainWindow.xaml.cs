@@ -1,4 +1,5 @@
 ﻿using MapGen.Core;
+using MapGen.Core.Helpers;
 using Microsoft.UI.Xaml;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
@@ -32,11 +33,11 @@ namespace MapGen.Render.Skia.WinUI
                 PointsCount = 2000,
             };
 
-            var rng = new Alea(options.Seed);
+            var rng = new AleaRandom(options.Seed);
             var generator = new MapGenerator();
             generator.Generate(options, rng);
 
-            rng = new Alea(options.Seed);
+            rng = new AleaRandom(options.Seed);
             HeightmapGenerator.Generate(generator.Data, HeightmapTemplates.Continents, rng);
 
             _map = generator.Data;

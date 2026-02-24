@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace MapGen.Core
+namespace MapGen.Core.Helpers
 {
     public static class Probability
     {

@@ -1,7 +1,6 @@
-﻿using Moq;
-using Xunit;
-using MapGen.Core;
-using System.Collections.Generic;
+﻿using MapGen.Core;
+using MapGen.Core.Helpers;
+using Moq;
 
 namespace MapGen.Tests
 {

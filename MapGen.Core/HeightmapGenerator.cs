@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MapGen.Core.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -344,9 +345,6 @@ namespace MapGen.Core
                     {
                         double endX = rng.Next() * data.Width * 0.8 + data.Width * 0.1;
                         double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
-
-                        //double sX = data.Points[startCell].X;
-                        //double sY = data.Points[startCell].Y;
                         dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
 
                         endCell = FindGridCell(data, endX, endY);
@@ -510,28 +508,6 @@ namespace MapGen.Core
             }
         }
 
-        // Updated Helper to include 'used' array to match JS scope logic
-        private static List<int> GetRangePath(MapData data, int cur, int end, IRandom rng, byte[] used)
-        {
-            var path = new List<int> { cur };
-            used[cur] = 1;
-            while (cur != end)
-            {
-                int best = -1;
-                double minD = double.MaxValue;
-                foreach (int n in data.Cells[cur].C)
-                {
-                    if (n == -1 || used[n] == 1) continue;
-                    double d = Math.Pow(data.Points[end].X - data.Points[n].X, 2) + Math.Pow(data.Points[end].Y - data.Points[n].Y, 2);
-                    if (rng.Next() > 0.85) d /= 2.0; // Random "wiggle"
-                    if (d < minD) { minD = d; best = n; }
-                }
-                if (best == -1) break;
-                cur = best; path.Add(cur); used[cur] = 1;
-            }
-            return path;
-        }
-
         #endregion
 
         #region Simple Tools
@@ -682,31 +658,6 @@ namespace MapGen.Core
         #region Helper Functions
 
         private static byte Lim(double val) => (byte)Math.Clamp(val, 0, 100);
-
-        // Utility and Pathing methods updated to object structure
-        private static List<int> GetRangePath(MapData data, int cur, int end, IRandom rng)
-        {
-            var path = new List<int> { cur };
-            var used = new HashSet<int> { cur };
-            var target = data.Points[end];
-
-            while (cur != end)
-            {
-                int best = -1;
-                double minD = double.MaxValue;
-                foreach (int n in data.Cells[cur].C)
-                {
-                    if (used.Contains(n)) continue;
-                    var neighbor = data.Points[n];
-                    double d = Math.Pow(target.X - neighbor.X, 2) + Math.Pow(target.Y - neighbor.Y, 2);
-                    if (rng.Next() > 0.85) d /= 2;
-                    if (d < minD) { minD = d; best = n; }
-                }
-                if (best == -1) break;
-                cur = best; path.Add(cur); used.Add(cur);
-            }
-            return path;
-        }
 
         private static int GetNumberInRange(string r, IRandom rng)
         {

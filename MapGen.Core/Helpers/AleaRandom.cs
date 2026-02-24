@@ -1,10 +1,10 @@
-﻿namespace MapGen.Core
+﻿namespace MapGen.Core.Helpers
 {
-    public class Alea : IRandom
+    public class AleaRandom : IRandom
     {
         private double s0, s1, s2, c;
 
-        public Alea(string seed)
+        public AleaRandom(string seed)
         {
             var mash = new Mash();
             // The state MUST persist across these three calls
@@ -53,7 +53,7 @@
                     h -= n;
                     n += (uint)(h * 0x100000000); // 2^32
                 }
-                return (double)n * 2.3283064365386963e-10;
+                return n * 2.3283064365386963e-10;
             }
         }
     }

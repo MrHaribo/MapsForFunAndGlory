@@ -202,23 +202,6 @@ namespace MapGen.Core
             Pit 3-4 10-20 15-85 20-80
             Mask 4 0 0 0";
 
-    //    public const string Continents =
-    //        @"Hill 1 80-85 60-80 40-60
-    //        Hill 1 80-85 20-30 40-60
-    //        Hill 6-7 15-30 25-75 15-85
-    //        Multiply 0.6 land 0 0
-    //        Hill 8-10 5-10 15-85 20-80
-    //        Range 1-2 30-60 5-15 25-75
-    //        Range 1-2 30-60 80-95 25-75
-    //        Range 0-3 30-60 80-90 20-80
-    //        Strait 2 vertical 0 0
-    //        Strait 1 vertical 0 0
-    //        Smooth 3 0 0 0
-    //        Trough 3-4 15-20 15-85 20-80
-    //        Trough 3-4 5-10 45-55 45-55
-    //        Pit 3-4 10-20 15-85 20-80
-    //        Mask 4 0 0 0";
-
         public static string GetRecipe(HeightmapTemplate template)
         {
             return template switch

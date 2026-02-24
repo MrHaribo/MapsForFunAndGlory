@@ -1,9 +1,4 @@
-﻿using MapGen.Core;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using MapGen.Core.Helpers;
 
 namespace MapGen.Tests
 {
@@ -12,7 +7,7 @@ namespace MapGen.Tests
         [Fact]
         public void Alea_SeedAzgaar_MatchesJsOutput()
         {
-            var rng = new Alea("azgaar");
+            var rng = new AleaRandom("azgaar");
 
             Assert.Equal(0.944474590709433, rng.Next(), 15);
             Assert.Equal(0.47310595540329814, rng.Next(), 15);

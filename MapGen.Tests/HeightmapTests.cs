@@ -1,4 +1,5 @@
 ﻿using MapGen.Core;
+using MapGen.Core.Helpers;
 using Newtonsoft.Json;
 
 namespace MapGen.Tests
@@ -40,13 +41,13 @@ namespace MapGen.Tests
             // 2. Setup MapData with the exact topology from the dump
             // We need the same points/neighbors to ensure the BFS spreads correctly
             var options = GenerationOptions.TestOptions;
-            var rng = new Alea(options.Seed);
+            var rng = new AleaRandom(options.Seed);
             var generator = new MapGenerator();
             generator.Generate(options, rng); // This runs Voronoi to build the graph
             var data = generator.Data;
 
             // 3. Run ONLY the tool from the JS recipe
-            rng = new Alea(options.Seed);
+            rng = new AleaRandom(options.Seed);
             HeightmapGenerator.Generate(data, testRecipe, rng);
 
             // 4. Verify Parity
@@ -67,14 +68,14 @@ namespace MapGen.Tests
         {
             // 1. Setup Map
             var options = GenerationOptions.TestOptions;
-            var rng = new Alea(options.Seed);
+            var rng = new AleaRandom(options.Seed);
             var generator = new MapGenerator();
             generator.Generate(options, rng); // This runs Voronoi to build the graph
             var data = generator.Data;
 
             // 2. Run the recipe that matches your JS test
             // Example: Initial height of 50, then one Pit
-            rng = new Alea(options.Seed);
+            rng = new AleaRandom(options.Seed);
             HeightmapGenerator.Generate(data, testRecipe, rng);
 
             // 3. Create the Export Object
