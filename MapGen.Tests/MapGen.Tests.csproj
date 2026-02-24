@@ -41,6 +41,9 @@
     <None Update="data\regression_heightmap_pit_shallow.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\regression_heightmap_smooth.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\regression_points.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

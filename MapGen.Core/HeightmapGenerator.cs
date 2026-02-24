@@ -56,18 +56,13 @@ namespace MapGen.Core
                     AddTrough(data, rng, args[1], args[2], args[3], args[4]); break;
 
                 case HeightmapTool.Add:
-                    double addVal = double.Parse(args[1], CultureInfo.InvariantCulture);
-                    Modify(data, args[2], addVal, 1.0, HeightmapSelection.All);
-                    break;
+                    Modify(data, args.Length > 2 ? args[2] : "all", double.Parse(args[1], CultureInfo.InvariantCulture), 1.0); break;
 
                 case HeightmapTool.Multiply:
-                    double multVal = double.Parse(args[1], CultureInfo.InvariantCulture);
-                    Modify(data, args[2], 0.0, multVal, HeightmapSelection.All);
-                    break;
+                    Modify(data, args.Length > 2 ? args[2] : "all", 0.0, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
 
                 case HeightmapTool.Strait:
-                    AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical", HeightmapSelection.Land);
-                    break;
+                    AddStrait(data, rng, args[1], args.Length > 2 ? args[2] : "vertical", HeightmapSelection.Land); break;
 
                 case HeightmapTool.Smooth:
                     Smooth(data, double.Parse(args[1], CultureInfo.InvariantCulture)); break;
@@ -313,49 +308,76 @@ namespace MapGen.Core
             }
         }
 
-        private static void Modify(MapData data, string rangeStr, double add, double mult, HeightmapSelection selection)
+        private static void Modify(MapData data, string range, double add, double mult, double power = 0)
         {
-            // Parse range (e.g., "20-100")
-            var parts = rangeStr.Split('-');
-            double min = double.Parse(parts[0], CultureInfo.InvariantCulture);
-            double max = parts.Length > 1 ? double.Parse(parts[1], CultureInfo.InvariantCulture) : min;
+            // JS: const min = range === "land" ? 20 : range === "all" ? 0 : +range.split("-")[0];
+            // JS: const max = range === "land" || range === "all" ? 100 : +range.split("-")[1];
+            var split = range.Split('-');
+            double min = range == "land" ? 20 : range == "all" ? 0 : double.Parse(split[0], CultureInfo.InvariantCulture);
+            double max = (range == "land" || range == "all") ? 100 : (split.Length > 1 ? double.Parse(split[1], CultureInfo.InvariantCulture) : min);
+
+            // JS: const isLand = min === 20;
+            bool isLand = (min == 20);
 
             foreach (var cell in data.Cells)
             {
-                bool isLand = cell.H >= 20;
-
-                // 1. Filter by Selection type
-                if (selection == HeightmapSelection.Land && !isLand) continue;
-                if (selection == HeightmapSelection.Water && isLand) continue;
-
-                // 2. Filter by Height Range
-                if (cell.H < min || cell.H > max) continue;
-
                 double h = cell.H;
 
-                // 3. Apply Transformations
-                // Land is clamped to sea level (20) when adding/subtracting
+                // JS: if (h < min || h > max) return h;
+                if (h < min || h > max) continue;
+
+                // JS: if (add) h = isLand ? Math.max(h + add, 20) : h + add;
                 if (add != 0)
                     h = isLand ? Math.Max(h + add, 20) : h + add;
 
-                // Land scales relative to the shoreline (20)
+                // JS: if (mult !== 1) h = isLand ? (h - 20) * mult + 20 : h * mult;
                 if (mult != 1)
                     h = isLand ? (h - 20) * mult + 20 : h * mult;
+
+                // JS: if (power) h = isLand ? (h - 20) ** power + 20 : h ** power;
+                if (power != 0)
+                    h = isLand ? Math.Pow(h - 20, power) + 20 : Math.Pow(h, power);
 
                 cell.H = Lim(h);
             }
         }
 
-        private static void Smooth(MapData data, double fr)
+        private static void Smooth(MapData data, double fr = 2, double add = 0)
         {
             byte[] result = new byte[data.Cells.Length];
+
             for (int i = 0; i < data.Cells.Length; i++)
             {
+                // Calculate the mean of self + neighbors
                 double sum = data.Cells[i].H;
-                foreach (var n in data.Cells[i].C) sum += data.Cells[n].H;
-                result[i] = Lim((data.Cells[i].H * (fr - 1) + (sum / (data.Cells[i].C.Count + 1))) / fr);
+                foreach (int n in data.Cells[i].C)
+                {
+                    if (n == -1) continue;
+                    sum += data.Cells[n].H;
+                }
+
+                double mean = sum / (data.Cells[i].C.Count + 1);
+                double finalValue;
+
+                if (Math.Abs(fr - 1.0) < 0.0001)
+                {
+                    finalValue = mean + add;
+                }
+                else
+                {
+                    // JS: lim((h * (fr - 1) + d3.mean(a) + add) / fr)
+                    finalValue = (data.Cells[i].H * (fr - 1) + mean + add) / fr;
+                }
+
+                // Apply Lim and Floor to match JS Uint8Array behavior
+                result[i] = (byte)Math.Clamp(Math.Floor(finalValue), 0, 100);
             }
-            for (int i = 0; i < data.Cells.Length; i++) data.Cells[i].H = result[i];
+
+            // Apply the buffer back to the map
+            for (int i = 0; i < data.Cells.Length; i++)
+            {
+                data.Cells[i].H = result[i];
+            }
         }
 
         private static void Mask(MapData data, double power)
