@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
 using System;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -39,7 +40,10 @@ namespace MapGen.Render.Skia.WinUI
             generator.Generate(options, rng);
 
             rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(generator.Data, HeightmapTemplates.Continents, rng);
+            HeightmapGenerator.Generate(generator.Data, HeightmapTemplate.Continents, rng);
+            FeatureModule.MarkupGrid(generator.Data);
+            LakeModule.AddLakesInDeepDepressions(generator.Data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
+            LakeModule.OpenNearSeaLakes(generator.Data, HeightmapTemplate.Test);
 
             _map = generator.Data;
         }

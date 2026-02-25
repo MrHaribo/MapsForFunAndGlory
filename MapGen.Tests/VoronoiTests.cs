@@ -90,51 +90,51 @@ namespace MapGen.Tests
             }
         }
 
-        [Fact]
-        public void ExportStrictGrid()
-        {
-            var options = GenerationOptions.TestOptions;
-            var generator = new MapGenerator();
-            generator.Generate(options);
-            var data = generator.Data;
+        //[Fact]
+        //public void ExportStrictGrid()
+        //{
+        //    var options = GenerationOptions.TestOptions;
+        //    var generator = new MapGenerator();
+        //    generator.Generate(options);
+        //    var data = generator.Data;
 
-            // Build the object following the exact JS structure from snippets
-            var rootExport = new JsGridDump
-            {
-                Seed = options.Seed,
-                Width = options.Width,
-                Height = options.Height,
-                Grid = new JsGrid
-                {
-                    spacing = data.Spacing,
-                    cellsDesired = options.PointsCount,
-                    boundary = data.BoundaryPoints.Select(p => new[] { p.X, p.Y }).ToArray(),
-                    points = data.Points.Select(p => new[] { p.X, p.Y }).ToArray(),
-                    cellsX = data.CellsCountX,
-                    cellsY = data.CellsCountY,
-                    cells = new JsCells
-                    {
-                        v = data.Cells.Select(c => c.V.ToArray()).ToArray(),
-                        c = data.Cells.Select(c => c.C.ToArray()).ToArray(),
-                        b = data.Cells.Select(c => (int)c.B).ToArray()
-                    },
-                    vertices = new JsVertices
-                    {
-                        p = data.Vertices.Select(v => new[] { v.P.X, v.P.Y }).ToArray(),
-                        v = data.Vertices.Select(v => v.V.ToArray()).ToArray(),
-                        c = data.Vertices.Select(v => v.C.ToArray()).ToArray()
-                    }
-                }
-            };
+        //    // Build the object following the exact JS structure from snippets
+        //    var rootExport = new JsGridDump
+        //    {
+        //        Seed = options.Seed,
+        //        Width = options.Width,
+        //        Height = options.Height,
+        //        Grid = new JsGrid
+        //        {
+        //            spacing = data.Spacing,
+        //            cellsDesired = options.PointsCount,
+        //            boundary = data.BoundaryPoints.Select(p => new[] { p.X, p.Y }).ToArray(),
+        //            points = data.Points.Select(p => new[] { p.X, p.Y }).ToArray(),
+        //            cellsX = data.CellsCountX,
+        //            cellsY = data.CellsCountY,
+        //            cells = new JsCells
+        //            {
+        //                v = data.Cells.Select(c => c.V.ToArray()).ToArray(),
+        //                c = data.Cells.Select(c => c.C.ToArray()).ToArray(),
+        //                b = data.Cells.Select(c => (int)c.B).ToArray()
+        //            },
+        //            vertices = new JsVertices
+        //            {
+        //                p = data.Vertices.Select(v => new[] { v.P.X, v.P.Y }).ToArray(),
+        //                v = data.Vertices.Select(v => v.V.ToArray()).ToArray(),
+        //                c = data.Vertices.Select(v => v.C.ToArray()).ToArray()
+        //            }
+        //        }
+        //    };
 
-            var serializerOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = null // Keeps PascalCase for root, but we use camelCase in models
-            };
+        //    var serializerOptions = new JsonSerializerOptions
+        //    {
+        //        WriteIndented = true,
+        //        PropertyNamingPolicy = null // Keeps PascalCase for root, but we use camelCase in models
+        //    };
 
-            string json = JsonSerializer.Serialize(rootExport, serializerOptions);
-            File.WriteAllText("grid_csharp_dump.json", json);
-        }
+        //    string json = JsonSerializer.Serialize(rootExport, serializerOptions);
+        //    File.WriteAllText("grid_csharp_dump.json", json);
+        //}
     }
 }

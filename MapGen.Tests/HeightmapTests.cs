@@ -61,37 +61,104 @@ namespace MapGen.Tests
         }
 
         [Theory]
-        [InlineData("data/regression_heightmap_range_cs.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
-        [InlineData("data/regression_heightmap_trough_cs.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
-        [InlineData("data/regression_heightmap_strait_cs.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
-        [InlineData("data/regression_heightmap_template_continents_cs.json", HeightmapTemplates.Continents)]
-        public void Dump_Heightmap_After_Pit_Recipe(string filename, string testRecipe)
+        [InlineData("data/regression_heightmap_addLakesInDeepDepressions_template_continents.json", HeightmapTemplates.Continents)]
+        [InlineData("data/regression_heightmap_addLakesInDeepDepressions_template_lakeTest.json", "Hill 1 80-85 60-80 40-60;Hill 1 80-85 20-30 40-60")]
+        public void LakeModule_AddLakes_MatchesJsOutput(string filename, string testRecipe)
         {
-            // 1. Setup Map
+            // 1. Load the specific heightmap dump from JS
+            var json = File.ReadAllText(filename);
+            var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
+
+            // 2. Setup MapData (Voronoi Graph)
             var options = GenerationOptions.TestOptions;
             var rng = new AleaRandom(options.Seed);
             var generator = new MapGenerator();
-            generator.Generate(options, rng); // This runs Voronoi to build the graph
+            generator.Generate(options, rng);
             var data = generator.Data;
 
-            // 2. Run the recipe that matches your JS test
-            // Example: Initial height of 50, then one Pit
+            // 3. Run Template Heightmap
             rng = new AleaRandom(options.Seed);
             HeightmapGenerator.Generate(data, testRecipe, rng);
 
-            // 3. Create the Export Object
-            var dump = new
-            {
-                Seed = "42",
-                Width = data.Width,
-                Height = data.Height,
-                // Extracting the H (byte) values from the Cell array
-                Heights = data.Cells.Select(c => (int)c.H).ToArray()
-            };
+            // 4. Required: Feature detection must run before LakeModule
+            FeatureModule.MarkupGrid(data);
 
-            // 4. Serialize and Save
-            string json = JsonConvert.SerializeObject(dump, Formatting.Indented);
-            File.WriteAllText(filename, json);
+            // 5. Execute Lake Filling
+            LakeModule.AddLakesInDeepDepressions(data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
+
+            // 6. Verify Height Parity
+            for (int i = 0; i < expected.Heights.Length; i++)
+            {
+                Assert.Equal(expected.Heights[i], data.Cells[i].H);
+            }
         }
+
+        [Theory]
+        [InlineData("data/regression_heightmap_openNearSeaLakes_template_continents.json", HeightmapTemplates.Continents)]
+        [InlineData("data/regression_heightmap_openNearSeaLakes_template_lakeTest.json", "Hill 1 80-85 60-80 40-60;Hill 1 80-85 20-30 40-60")]
+        public void LakeModule_OpenLakes_MatchesJsOutput(string filename, string testRecipe)
+        {
+            // 1. Load the specific heightmap dump from JS
+            var json = File.ReadAllText(filename);
+            var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
+
+            // 2. Setup MapData
+            var options = GenerationOptions.TestOptions;
+            var rng = new AleaRandom(options.Seed);
+            var generator = new MapGenerator();
+            generator.Generate(options, rng);
+            var data = generator.Data;
+
+            // 3. Run Template Heightmap
+            rng = new AleaRandom(options.Seed);
+            HeightmapGenerator.Generate(data, testRecipe, rng);
+
+            // 4. Feature detection
+            FeatureModule.MarkupGrid(data);
+
+            // 5. Run sequential processing (Match JS order)
+            LakeModule.AddLakesInDeepDepressions(data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
+            LakeModule.OpenNearSeaLakes(data, HeightmapTemplate.Test);
+
+            // 6. Verify Height Parity
+            for (int i = 0; i < expected.Heights.Length; i++)
+            {
+                Assert.Equal(expected.Heights[i], data.Cells[i].H);
+            }
+        }
+
+        //[Theory]
+        //[InlineData("data/regression_heightmap_range_cs.json", "Add 15 all; Range 1 60 10-20 10-20; Smooth 2")]
+        //[InlineData("data/regression_heightmap_trough_cs.json", "Add 70 all; Trough 1 40 40-60 5-10; Smooth 1.5")]
+        //[InlineData("data/regression_heightmap_strait_cs.json", "Add 50 all; Strait 15 vertical; Strait 15 horizontal")]
+        //[InlineData("data/regression_heightmap_template_continents_cs.json", HeightmapTemplates.Continents)]
+        //public void Dump_Heightmap_After_Pit_Recipe(string filename, string testRecipe)
+        //{
+        //    // 1. Setup Map
+        //    var options = GenerationOptions.TestOptions;
+        //    var rng = new AleaRandom(options.Seed);
+        //    var generator = new MapGenerator();
+        //    generator.Generate(options, rng); // This runs Voronoi to build the graph
+        //    var data = generator.Data;
+
+        //    // 2. Run the recipe that matches your JS test
+        //    // Example: Initial height of 50, then one Pit
+        //    rng = new AleaRandom(options.Seed);
+        //    HeightmapGenerator.Generate(data, testRecipe, rng);
+
+        //    // 3. Create the Export Object
+        //    var dump = new
+        //    {
+        //        Seed = "42",
+        //        Width = data.Width,
+        //        Height = data.Height,
+        //        // Extracting the H (byte) values from the Cell array
+        //        Heights = data.Cells.Select(c => (int)c.H).ToArray()
+        //    };
+
+        //    // 4. Serialize and Save
+        //    string json = JsonConvert.SerializeObject(dump, Formatting.Indented);
+        //    File.WriteAllText(filename, json);
+        //}
     }
 }
