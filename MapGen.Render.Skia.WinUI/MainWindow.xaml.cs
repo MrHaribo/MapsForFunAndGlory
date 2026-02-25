@@ -38,12 +38,15 @@ namespace MapGen.Render.Skia.WinUI
             var rng = new AleaRandom(options.Seed);
             var generator = new MapGenerator();
             generator.Generate(options, rng);
+            generator.Data.Template = HeightmapTemplate.Continents;
 
             rng = new AleaRandom(options.Seed);
             HeightmapGenerator.Generate(generator.Data, HeightmapTemplate.Continents, rng);
             FeatureModule.MarkupGrid(generator.Data);
             LakeModule.AddLakesInDeepDepressions(generator.Data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
-            LakeModule.OpenNearSeaLakes(generator.Data, HeightmapTemplate.Test);
+            LakeModule.OpenNearSeaLakes(generator.Data, HeightmapTemplate.Continents);
+            GlobeModule.DefineMapSize(generator.Data, rng);
+            GlobeModule.CalculateMapCoordinates(generator.Data);
 
             _map = generator.Data;
         }

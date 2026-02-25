@@ -1,4 +1,5 @@
 ﻿using DelaunatorSharp;
+using MapGen.Core.Modules;
 using System.Collections.Generic;
 
 namespace MapGen.Core
@@ -28,6 +29,17 @@ namespace MapGen.Core
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public sbyte[] DistanceField { get; set; } // grid.cells.t
         public ushort[] FeatureIds { get; set; }  // grid.cells.f
+
+        // Generation Context
+        public HeightmapTemplate Template { get; set; }
+
+        // Globe Settings (Inputs)
+        public double MapSize { get; set; }      // 1-100%
+        public double Latitude { get; set; }     // 0-100 shift
+        public double Longitude { get; set; }    // 0-100 shift
+
+        // Calculated Coordinates (Outputs)
+        public MapCoordinates Coords { get; set; } = new MapCoordinates();
 
         public MapData(int count, int width, int height)
         {
@@ -62,6 +74,16 @@ namespace MapGen.Core
         public bool IsLand { get; set; }
         public bool IsBorder { get; set; }
         public FeatureType Type { get; set; }
+    }
+
+    public class MapCoordinates
+    {
+        public double LatT { get; set; } // Total Latitude span
+        public double LatN { get; set; } // Northern Latitude
+        public double LatS { get; set; } // Southern Latitude
+        public double LonT { get; set; } // Total Longitude span
+        public double LonW { get; set; } // Western Longitude
+        public double LonE { get; set; } // Eastern Longitude
     }
 
     public readonly struct MapPoint
