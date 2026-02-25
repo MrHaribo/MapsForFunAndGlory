@@ -29,6 +29,9 @@
     <None Update="data\regression_boundary.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\regression_features_grid.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\regression_heightmap_add.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
