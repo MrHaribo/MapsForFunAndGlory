@@ -52,6 +52,8 @@ namespace MapGen.Render.Skia.WinUI
             LakeModule.OpenNearSeaLakes(mapData);
             GlobeModule.DefineMapSize(mapData);
             GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
 
             _map = mapData;
         }
@@ -59,24 +61,27 @@ namespace MapGen.Render.Skia.WinUI
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
         {
             SKCanvas canvas = e.Surface.Canvas;
-
             canvas.Clear(SKColors.Transparent);
 
-            DrawVoronoi(canvas);
-        }
-
-        private void DrawVoronoi(SKCanvas canvas)
-        {
             if (_map == null || _map.Cells == null) return;
 
-            // 1. Calculate Scaling to fit MapData into current Canvas
             float scaleX = (float)canvas.LocalClipBounds.Width / _map.Width;
             float scaleY = (float)canvas.LocalClipBounds.Height / _map.Height;
-            float finalScale = Math.Min(scaleX, scaleY); // Maintain aspect ratio
+            float finalScale = Math.Min(scaleX, scaleY);
 
             canvas.Save();
             canvas.Scale(finalScale);
 
+            // --- Toggle Layers Here ---
+            RenderHeightmap(canvas);
+            //RenderTemperature(canvas);
+            RenderPrecipitation(canvas);
+
+            canvas.Restore();
+        }
+
+        private void RenderHeightmap(SKCanvas canvas)
+        {
             using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
 
             for (int i = 0; i < _map.Cells.Length; i++)
@@ -84,11 +89,10 @@ namespace MapGen.Render.Skia.WinUI
                 var cell = _map.Cells[i];
                 if (cell.V == null || cell.V.Count < 3) continue;
 
-                // Determine Color
                 byte h = cell.H;
-                if (h < 20)
+                if (h < MapConstants.LAND_THRESHOLD)
                 {
-                    byte blueDepth = (byte)(100 + (h * 5));
+                    byte blueDepth = (byte)Math.Clamp(100 + (h * 5), 0, 255);
                     fillPaint.Color = new SKColor(30, 60, blueDepth);
                 }
                 else
@@ -97,22 +101,72 @@ namespace MapGen.Render.Skia.WinUI
                     fillPaint.Color = new SKColor(landBrightness, landBrightness, landBrightness);
                 }
 
-                // Draw Path
-                using var path = new SKPath();
-                var v0 = _map.Vertices[cell.V[0]].P;
-                path.MoveTo((float)v0.X, (float)v0.Y);
-
-                for (int j = 1; j < cell.V.Count; j++)
-                {
-                    var v = _map.Vertices[cell.V[j]].P;
-                    path.LineTo((float)v.X, (float)v.Y);
-                }
-                path.Close();
-
+                using var path = CreateCellPath(cell);
                 canvas.DrawPath(path, fillPaint);
             }
+        }
 
-            canvas.Restore(); // Reset transform for other UI elements
+        private void RenderTemperature(SKCanvas canvas)
+        {
+            using var tempPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+
+            for (int i = 0; i < _map.Cells.Length; i++)
+            {
+                var cell = _map.Cells[i];
+                if (cell.V == null || cell.V.Count < 3) continue;
+
+                // Map temperature to a 0-1 range for a gradient. 
+                // We'll assume a range of -20°C (Green/Cool) to 40°C (Red/Hot)
+                float t = (cell.Temp + 20) / 60f;
+                t = Math.Clamp(t, 0, 1);
+
+                // Simple Green (cool) to Red (hot) interpolation
+                byte r = (byte)(t * 255);
+                byte g = (byte)((1 - t) * 255);
+                tempPaint.Color = new SKColor(r, g, 50, 180); // Semi-transparent
+
+                using var path = CreateCellPath(cell);
+                canvas.DrawPath(path, tempPaint);
+            }
+        }
+
+        private void RenderPrecipitation(SKCanvas canvas)
+        {
+            using var precPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = new SKColor(100, 150, 255, 200),
+                IsAntialias = true
+            };
+
+            for (int i = 0; i < _map.Cells.Length; i++)
+            {
+                var cell = _map.Cells[i];
+
+                // Filter: Only render if it's land and has precipitation
+                if (cell.H < MapConstants.LAND_THRESHOLD || cell.Prec == 0) continue;
+
+                var point = _map.Points[cell.Index];
+                float radius = (float)(Math.Sqrt(cell.Prec) * 0.85);
+
+                canvas.DrawCircle((float)point.X, (float)point.Y, radius, precPaint);
+            }
+        }
+
+        // Helper to keep the rendering loops clean
+        private SKPath CreateCellPath(MapCell cell)
+        {
+            var path = new SKPath();
+            var v0 = _map.Vertices[cell.V[0]].P;
+            path.MoveTo((float)v0.X, (float)v0.Y);
+
+            for (int j = 1; j < cell.V.Count; j++)
+            {
+                var v = _map.Vertices[cell.V[j]].P;
+                path.LineTo((float)v.X, (float)v.Y);
+            }
+            path.Close();
+            return path;
         }
     }
 }
