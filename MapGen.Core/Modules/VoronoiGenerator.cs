@@ -7,14 +7,25 @@ namespace MapGen.Core.Modules
     {
         public static void CalculateVoronoi(MapData data)
         {
+            // 1. Calculate the Voronoi
+            var (cells, vertices) = CalculateVoronoi(data.Points, data.BoundaryPoints);
+
+            // 2. Store the results in MapData
+            data.Cells = cells;
+            data.CellsCount = cells.Length;
+            data.Vertices = vertices;
+        }
+
+        public static (MapCell[] Cells, MapVertex[] Vertices) CalculateVoronoi(MapPoint[] points, MapPoint[] boundary)
+        {
             // 1. Combine Playable and Boundary points into our domain array
-            int playableCount = data.Points.Length;
-            int boundaryCount = data.BoundaryPoints.Length;
+            int playableCount = points.Length;
+            int boundaryCount = boundary.Length;
             int totalCount = playableCount + boundaryCount;
 
             MapPoint[] allPoints = new MapPoint[totalCount];
-            Array.Copy(data.Points, 0, allPoints, 0, playableCount);
-            Array.Copy(data.BoundaryPoints, 0, allPoints, playableCount, boundaryCount);
+            Array.Copy(points, 0, allPoints, 0, playableCount);
+            Array.Copy(boundary, 0, allPoints, playableCount, boundaryCount);
 
             // 2. Project MapPoints to the library's expected Point type
             // This keeps the IPoint dependency local to this method
@@ -33,9 +44,7 @@ namespace MapGen.Core.Modules
             var voronoi = new Voronoi(delaunator, allPoints, playableCount);
 
             // 5. Store the results in MapData
-            data.Cells = voronoi.Cells;
-            data.Vertices = voronoi.Vertices;
-            data.CellsCount = voronoi.Cells.Length;
+            return (voronoi.Cells, voronoi.Vertices);
         }
     }
 }
