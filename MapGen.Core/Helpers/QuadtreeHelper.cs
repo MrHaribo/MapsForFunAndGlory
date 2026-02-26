@@ -17,8 +17,7 @@ namespace MapGen.Core.Helpers
 
     public static class QuadtreeHelper
     {
-        // Update the delegate to match JS: (x, y, radius)
-        public static Func<double, double, double, int> CreateQuadtreeLookup(List<MapPoint> points)
+        public static (ClosestCell Find, ClosestCellInRange FindInRange) CreateLookupDelegates(List<MapPoint> points)
         {
             var quadDatas = points.Select((p, i) => new QuadPoint
             {
@@ -29,16 +28,21 @@ namespace MapGen.Core.Helpers
 
             var tree = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
 
-            // Return the search delegate with radius support
-            return (x, y, radius) =>
+            // 1. Closest Cell (Matches JS find(x, y) with default Infinity)
+            int find(double x, double y)
             {
-                // If D3Sharp.Find doesn't have a radius overload, 
-                // ensure you are using the one that matches D3's search logic.
-                // Note: If the port only supports (x, y), you might need to 
-                // manually check distance against the result, but D3Sharp usually mirrors the radius.
+                var foundNode = tree.Find(x, y, double.PositiveInfinity);
+                return foundNode != null ? foundNode.DataIndex : -1;
+            }
+
+            // 2. Closest Cell within a specific radius
+            int findInRange(double x, double y, double radius)
+            {
                 var foundNode = tree.Find(x, y, radius);
                 return foundNode != null ? foundNode.DataIndex : -1;
-            };
+            }
+
+            return (find, findInRange);
         }
     }
 }

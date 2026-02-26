@@ -4,15 +4,18 @@ using System.Text;
 
 namespace MapGen.Core
 {
+    public delegate int ClosestCell(double x, double y);
+    public delegate int ClosestCellInRange(double x, double y, double radius);
+
     public class MapPack
     {
         public MapCell[] Cells { get; set; }
         public MapVertex[] Vertices { get; set; }
         public MapPoint[] Points { get; set; }
 
-        // The JS-equivalent of pack.cells.q.find(x, y)
-        // Returns the Index of the closest cell
-        public Func<double, double, double, int> FindCell { get; set; }
+        // Spatial queries
+        public ClosestCell FindCell { get; set; }
+        public ClosestCellInRange FindCellInRange { get; set; }
 
         public MapOptions Options { get; set; }
     }

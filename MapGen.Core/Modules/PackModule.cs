@@ -61,7 +61,7 @@ namespace MapGen.Core.Modules
             var (packCells, packVertices) = VoronoiGenerator.CalculateVoronoi(newP.ToArray(), data.BoundaryPoints);
 
             // 3. Setup Spatial Lookup
-            var findFunc = QuadtreeHelper.CreateQuadtreeLookup(newP);
+            var lookups = QuadtreeHelper.CreateLookupDelegates(newP);
 
             // 4. MapPack Assembly
             var pack = new MapPack
@@ -70,8 +70,10 @@ namespace MapGen.Core.Modules
                 Vertices = packVertices,
                 Points = newP.ToArray(),
                 Options = data.Options,
+
                 // JS: pack.cells.q.find(x, y)
-                FindCell = findFunc
+                FindCell = lookups.Find,
+                FindCellInRange = lookups.FindInRange
             };
 
             // 5. Populate Pack-specific Cell Data & Calculate Area

@@ -69,7 +69,7 @@ namespace MapGen.Tests
             foreach (var probe in expected.Probes)
             {
                 // Passing double.PositiveInfinity to match JS 'Infinity' default
-                int actualIndex = pack.FindCell(probe.X, probe.Y, double.PositiveInfinity);
+                int actualIndex = pack.FindCellInRange(probe.X, probe.Y, double.PositiveInfinity);
 
                 Assert.True(actualIndex != -1, $"Quadtree failed to find a cell for probe at {probe.X},{probe.Y}");
                 Assert.Equal(probe.ExpectedIndex, actualIndex);
