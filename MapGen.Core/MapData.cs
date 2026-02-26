@@ -60,6 +60,10 @@ namespace MapGen.Core
         public sbyte Distance { get; set; }   // t
         public sbyte Temp { get; set; }
         public byte Prec { get; set; }
+
+        // Map Pack Properties
+        public ushort Area { get; set; } // Added for MapPack parity (Pack only)
+        public int G { get; set; }       // Mapping back to Grid cell index (Pack only)
     }
 
     public class MapVertex
