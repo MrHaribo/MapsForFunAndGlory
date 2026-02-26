@@ -1,4 +1,4 @@
-﻿using DelaunatorSharp;
+﻿using MapGen.Core.Helpers;
 using MapGen.Core.Modules;
 using System.Collections.Generic;
 
@@ -8,6 +8,10 @@ namespace MapGen.Core
 
     public class MapData
     {
+        // Rng
+        public string Seed { get; set; }
+        public IRandom Rng { get; set; }
+
         // Grid Constants
         public int Width { get; set; }
         public int Height { get; set; }
@@ -41,12 +45,15 @@ namespace MapGen.Core
         // Calculated Coordinates (Outputs)
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
 
-        public MapData(int count, int width, int height)
+        public static MapData TestData => new MapData
         {
-            PointsCount = count;
-            Width = width;
-            Height = height;
-        }
+            Seed = "42",
+            Rng = new AleaRandom(),
+            Width = 1920,
+            Height = 1080,
+            PointsCount = 2000,
+            Template = HeightmapTemplate.Continents,
+        };
     }
 
     public class MapCell

@@ -1,6 +1,7 @@
-﻿using System.Text.Json;
+﻿using MapGen.Core;
+using MapGen.Core.Modules;
+using System.Text.Json;
 using System.Text.Json.Serialization;
-using MapGen.Core;
 using Xunit;
 
 namespace MapGen.Tests
@@ -51,33 +52,32 @@ namespace MapGen.Tests
             var expected = expectedRoot.Grid;
 
             // 2. Run the full C# pipeline
-            var options = GenerationOptions.TestOptions;
-            var generator = new MapGenerator();
-            generator.Generate(options);
-            var actual = generator.Data;
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
 
             // 3. Verify Global Properties
-            Assert.Equal(expected.spacing, actual.Spacing, 2);
-            Assert.Equal(expected.cells.c.Length, actual.Cells.Length);
+            Assert.Equal(expected.spacing, mapData.Spacing, 2);
+            Assert.Equal(expected.cells.c.Length, mapData.Cells.Length);
 
             // 4. Verify Cell Topology and Boundary Flags
-            for (int i = 0; i < actual.Cells.Length; i++)
+            for (int i = 0; i < mapData.Cells.Length; i++)
             {
                 // Verify adjacent cells (c)
-                Assert.Equal(expected.cells.c[i], actual.Cells[i].C.ToArray());
+                Assert.Equal(expected.cells.c[i], mapData.Cells[i].C.ToArray());
 
                 // Verify cell vertices (v)
-                Assert.Equal(expected.cells.v[i], actual.Cells[i].V.ToArray());
+                Assert.Equal(expected.cells.v[i], mapData.Cells[i].V.ToArray());
 
                 // Verify boundary flag (b)
-                Assert.Equal(expected.cells.b[i], (int)actual.Cells[i].B);
+                Assert.Equal(expected.cells.b[i], (int)mapData.Cells[i].B);
             }
 
             // 5. Verify Vertex Geometry and Topology
-            Assert.Equal(expected.vertices.p.Length, actual.Vertices.Length);
-            for (int i = 0; i < actual.Vertices.Length; i++)
+            Assert.Equal(expected.vertices.p.Length, mapData.Vertices.Length);
+            for (int i = 0; i < mapData.Vertices.Length; i++)
             {
-                var actualP = actual.Vertices[i].P;
+                var actualP = mapData.Vertices[i].P;
                 var expectedP = expected.vertices.p[i];
 
                 // Geometry: Use precision 0 for snapped coordinates, or 2 for exact
@@ -85,8 +85,8 @@ namespace MapGen.Tests
                 Assert.Equal(expectedP[1], actualP.Y, 0);
 
                 // Topology: Vertex-to-cell and Vertex-to-vertex
-                Assert.Equal(expected.vertices.c[i], actual.Vertices[i].C.ToArray());
-                Assert.Equal(expected.vertices.v[i], actual.Vertices[i].V.ToArray());
+                Assert.Equal(expected.vertices.c[i], mapData.Vertices[i].C.ToArray());
+                Assert.Equal(expected.vertices.v[i], mapData.Vertices[i].V.ToArray());
             }
         }
 

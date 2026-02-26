@@ -6,9 +6,9 @@ namespace MapGen.Core.Modules
 {
     public static class GlobeModule
     {
-        public static void DefineMapSize(MapData data, IRandom rng)
+        public static void DefineMapSize(MapData data)
         {
-            var (size, lat, lon) = GetSizeAndLatitude(data, rng);
+            var (size, lat, lon) = GetSizeAndLatitude(data, data.Rng);
 
             data.MapSize = size;
             data.Latitude = lat;

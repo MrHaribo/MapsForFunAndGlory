@@ -13,15 +13,23 @@ namespace MapGen.Core.Modules
     public static class HeightmapGenerator
     {
         // Overload 1: Standard Enum-based generation
-        public static void Generate(MapData data, HeightmapTemplate template, IRandom rng)
+        public static void Generate(MapData data)
+        {
+            string recipe = HeightmapTemplates.GetRecipe(data.Template);
+            Generate(data, recipe);
+        }
+
+        public static void Generate(MapData data, HeightmapTemplate template)
         {
             string recipe = HeightmapTemplates.GetRecipe(template);
-            Generate(data, recipe, rng);
+            Generate(data, recipe);
         }
 
         // Overload 2: Direct string-based generation (for Regression/Isolated tests)
-        public static void Generate(MapData data, string recipe, IRandom rng)
+        public static void Generate(MapData data, string recipe)
         {
+            data.Rng.Init(data.Seed);
+
             // Reset heights to 0 before applying tools
             foreach (var cell in data.Cells) cell.H = 0;
 
@@ -32,7 +40,7 @@ namespace MapGen.Core.Modules
                 var args = line.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 if (args.Length > 0 && Enum.TryParse<HeightmapTool>(args[0], true, out var tool))
                 {
-                    ApplyTool(data, tool, args, rng);
+                    ApplyTool(data, tool, args, data.Rng);
                 }
             }
         }

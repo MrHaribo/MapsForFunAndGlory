@@ -1,5 +1,4 @@
 ﻿using MapGen.Core;
-using MapGen.Core.Helpers;
 using MapGen.Core.Modules;
 using Newtonsoft.Json;
 
@@ -34,26 +33,21 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<GridFeatureRegressionData>(json);
 
             // 2. Setup MapData with the exact topology from our test setup
-            var options = GenerationOptions.TestOptions; // Ensure this is Seed 42
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng); // Builds the Voronoi Graph
-            var data = generator.Data;
-
-            // 3. Run the same template as in JS (resetting seed to match JS heightmap state)
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(data, HeightmapTemplate.Continents, rng);
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
 
             // 4. Execute markup grid
-            FeatureModule.MarkupGrid(data);
+            FeatureModule.MarkupGrid(mapData);
 
             // 5. Assert: Cell-level Data
-            Assert.Equal(expected.cells_f, data.FeatureIds);
-            Assert.Equal(expected.cells_t, data.DistanceField);
+            Assert.Equal(expected.cells_f, mapData.FeatureIds);
+            Assert.Equal(expected.cells_t, mapData.DistanceField);
 
             // 6. Assert: Feature-level Metadata
             // We skip index 0 in data.Features because JS export filtered out the null at index 0
-            var actualFeatures = data.Features.Where(f => f != null).ToList();
+            var actualFeatures = mapData.Features.Where(f => f != null).ToList();
 
             Assert.Equal(expected.features.Count, actualFeatures.Count);
 

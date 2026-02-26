@@ -4,7 +4,10 @@
     {
         private double s0, s1, s2, c;
 
-        public AleaRandom(string seed)
+        public AleaRandom() => Init(string.Empty);
+        public AleaRandom(string seed) => Init(seed);
+
+        public void Init(string seed)
         {
             var mash = new Mash();
             // The state MUST persist across these three calls

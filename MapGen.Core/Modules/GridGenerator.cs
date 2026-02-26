@@ -6,18 +6,23 @@ namespace MapGen.Core.Modules
 {
     public static class GridGenerator
     {
-
-
-        public static void PlacePoints(MapData data, GenerationOptions options, IRandom rng)
+        public static void Generate(MapData data)
         {
-            data.Spacing = Round(Math.Sqrt((options.Width * options.Height) / (double)options.PointsCount), 2);
+            data.Rng.Init(data.Seed);
+            PlacePoints(data);
+            PlaceBoundaryPoints(data);
+        }
+
+        public static void PlacePoints(MapData data)
+        {
+            data.Spacing = Round(Math.Sqrt((data.Width * data.Height) / (double)data.PointsCount), 2);
 
             double radius = data.Spacing / 2.0;
             double jittering = radius * 0.9;
             double doubleJittering = jittering * 2.0;
 
-            data.CellsCountX = (int)Math.Floor((options.Width + 0.5 * data.Spacing - 1e-10) / data.Spacing);
-            data.CellsCountY = (int)Math.Floor((options.Height + 0.5 * data.Spacing - 1e-10) / data.Spacing);
+            data.CellsCountX = (int)Math.Floor((data.Width + 0.5 * data.Spacing - 1e-10) / data.Spacing);
+            data.CellsCountY = (int)Math.Floor((data.Height + 0.5 * data.Spacing - 1e-10) / data.Spacing);
             data.CellsCount = data.CellsCountX * data.CellsCountY;
 
             // Use the new struct array
@@ -31,8 +36,8 @@ namespace MapGen.Core.Modules
                 {
                     double xBase = Round(radius + (i * data.Spacing), 2);
 
-                    double xj = Math.Min(Round(xBase + (rng.Next() * doubleJittering - jittering), 2), (double)options.Width);
-                    double yj = Math.Min(Round(yBase + (rng.Next() * doubleJittering - jittering), 2), (double)options.Height);
+                    double xj = Math.Min(Round(xBase + (data.Rng.Next() * doubleJittering - jittering), 2), (double)data.Width);
+                    double yj = Math.Min(Round(yBase + (data.Rng.Next() * doubleJittering - jittering), 2), (double)data.Height);
 
                     data.Points[index] = new MapPoint(xj, yj);
                     index++;
@@ -40,7 +45,7 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static void PlaceBoundaryPoints(MapData data, int width, int height)
+        public static void PlaceBoundaryPoints(MapData data)
         {
             double s = data.Spacing;
 
@@ -48,8 +53,8 @@ namespace MapGen.Core.Modules
             double offset = Round(-1 * s, 0);
 
             double bSpacing = s * 2;
-            double w = width - offset * 2;
-            double h = height - offset * 2;
+            double w = data.Width - offset * 2;
+            double h = data.Height - offset * 2;
 
             int numberX = (int)Math.Ceiling(w / bSpacing) - 1;
             int numberY = (int)Math.Ceiling(h / bSpacing) - 1;

@@ -6,6 +6,7 @@ namespace MapGen.Core
 {
     public interface IRandom
     {
+        void Init(string seed);
         double Next();
     }
 }

@@ -41,22 +41,19 @@ namespace MapGen.Tests
 
             // 2. Setup MapData with the exact topology from the dump
             // We need the same points/neighbors to ensure the BFS spreads correctly
-            var options = GenerationOptions.TestOptions;
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng); // This runs Voronoi to build the graph
-            var data = generator.Data;
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
 
             // 3. Run ONLY the tool from the JS recipe
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(data, testRecipe, rng);
+            HeightmapGenerator.Generate(mapData, testRecipe);
 
             // 4. Verify Parity
             for (int i = 0; i < expected.Heights.Length; i++)
             {
                 // We use 0 tolerance because heights are bytes (0-100)
                 // If the RNG or BFS decay math is off by even 1, this fails.
-                Assert.Equal(expected.Heights[i], data.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
             }
         }
 
@@ -70,26 +67,23 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
 
             // 2. Setup MapData (Voronoi Graph)
-            var options = GenerationOptions.TestOptions;
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng);
-            var data = generator.Data;
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
 
             // 3. Run Template Heightmap
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(data, testRecipe, rng);
+            HeightmapGenerator.Generate(mapData, testRecipe);
 
             // 4. Required: Feature detection must run before LakeModule
-            FeatureModule.MarkupGrid(data);
+            FeatureModule.MarkupGrid(mapData);
 
             // 5. Execute Lake Filling
-            LakeModule.AddLakesInDeepDepressions(data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
+            LakeModule.AddLakesInDeepDepressions(mapData);
 
             // 6. Verify Height Parity
             for (int i = 0; i < expected.Heights.Length; i++)
             {
-                Assert.Equal(expected.Heights[i], data.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
             }
         }
 
@@ -102,28 +96,25 @@ namespace MapGen.Tests
             var json = File.ReadAllText(filename);
             var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
 
-            // 2. Setup MapData
-            var options = GenerationOptions.TestOptions;
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng);
-            var data = generator.Data;
+            // 2. Setup MapData (Voronoi Graph)
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
 
             // 3. Run Template Heightmap
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(data, testRecipe, rng);
+            HeightmapGenerator.Generate(mapData, testRecipe);
 
             // 4. Feature detection
-            FeatureModule.MarkupGrid(data);
+            FeatureModule.MarkupGrid(mapData);
 
             // 5. Run sequential processing (Match JS order)
-            LakeModule.AddLakesInDeepDepressions(data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
-            LakeModule.OpenNearSeaLakes(data, HeightmapTemplate.Test);
+            LakeModule.AddLakesInDeepDepressions(mapData);
+            LakeModule.OpenNearSeaLakes(mapData);
 
             // 6. Verify Height Parity
             for (int i = 0; i < expected.Heights.Length; i++)
             {
-                Assert.Equal(expected.Heights[i], data.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
             }
         }
 

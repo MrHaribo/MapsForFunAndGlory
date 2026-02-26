@@ -70,9 +70,9 @@ namespace MapGen.Core.Modules
             data.Features.Add(new MapFeature { Id = newFeatureId, Type = FeatureType.Lake, IsLand = false });
         }
 
-        public static void OpenNearSeaLakes(MapData data, HeightmapTemplate template)
+        public static void OpenNearSeaLakes(MapData data)
         {
-            if (template == HeightmapTemplate.Atoll) return;
+            if (data.Template == HeightmapTemplate.Atoll) return;
             if (!data.Features.Any(f => f?.Type == FeatureType.Lake)) return;
 
             for (int i = 0; i < data.Cells.Length; i++)

@@ -31,32 +31,21 @@ namespace MapGen.Tests
             var expected = LoadExpected();
 
             // 2. Setup MapData with the exact topology from our test setup
-            var options = GenerationOptions.TestOptions; // Ensure this is Seed 42
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng); // Builds the Voronoi Graph
-            var data = generator.Data;
-            data.Template = HeightmapTemplate.Continents;
+            var mapData = MapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            LakeModule.AddLakesInDeepDepressions(mapData);
+            LakeModule.OpenNearSeaLakes(mapData);
 
-            // 3. Run the same template as in JS (resetting seed to match JS heightmap state)
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(data, HeightmapTemplate.Continents, rng);
+            // 3. Execute Placement Logic
+            GlobeModule.DefineMapSize(mapData);
 
-            // 2. Requires feature detection for "touchesBorder" check
-            rng = new AleaRandom(options.Seed);
-            FeatureModule.MarkupGrid(data);
-
-            // 3. Lake Module
-            LakeModule.AddLakesInDeepDepressions(data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
-            LakeModule.OpenNearSeaLakes(data, HeightmapTemplate.Test);
-
-            // 4. Execute Placement Logic
-            GlobeModule.DefineMapSize(data, rng);
-
-            // 5. Assert (The "Where" of the map)
-            Assert.Equal(expected.Size, data.MapSize);
-            Assert.Equal(expected.Lat, data.Latitude);
-            Assert.Equal(expected.Lon, data.Longitude);
+            // 4. Assert (The "Where" of the map)
+            Assert.Equal(expected.Size, mapData.MapSize);
+            Assert.Equal(expected.Lat, mapData.Latitude);
+            Assert.Equal(expected.Lon, mapData.Longitude);
         }
 
         [Fact]
@@ -65,7 +54,12 @@ namespace MapGen.Tests
             // 1. Setup
             var expected = LoadExpected();
             // Use standard 1000x500 to match JS graphWidth/Height
-            var data = new MapData(2000, 1920, 1080);
+            var data = new MapData 
+            {
+                PointsCount = 2000,
+                Width = 1920,
+                Height = 1080
+            };
 
             // 2. Inject the specific inputs from the dump to isolate coordinate math
             data.MapSize = expected.Size;

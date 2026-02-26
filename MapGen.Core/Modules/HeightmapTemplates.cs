@@ -6,6 +6,7 @@ namespace MapGen.Core.Modules
 {
     public enum HeightmapTemplate
     {
+        Undefined,
         Volcano,
         HighIsland,
         LowIsland,

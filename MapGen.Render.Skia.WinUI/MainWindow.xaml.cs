@@ -26,29 +26,26 @@ namespace MapGen.Render.Skia.WinUI
 
         private void Window_Activated(object sender, WindowActivatedEventArgs args)
         {
-            var options = new GenerationOptions
+            var mapData = new MapData
             {
                 Seed = "42",
-                //Seed = "azgaar",
+                Rng = new AleaRandom(),
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 2000,
+                Template = HeightmapTemplate.Continents,
             };
 
-            var rng = new AleaRandom(options.Seed);
-            var generator = new MapGenerator();
-            generator.Generate(options, rng);
-            generator.Data.Template = HeightmapTemplate.Continents;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            LakeModule.AddLakesInDeepDepressions(mapData);
+            LakeModule.OpenNearSeaLakes(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
 
-            rng = new AleaRandom(options.Seed);
-            HeightmapGenerator.Generate(generator.Data, HeightmapTemplate.Continents, rng);
-            FeatureModule.MarkupGrid(generator.Data);
-            LakeModule.AddLakesInDeepDepressions(generator.Data, MapConstants.DEFAULT_LAKE_ELEV_LIMIT);
-            LakeModule.OpenNearSeaLakes(generator.Data, HeightmapTemplate.Continents);
-            GlobeModule.DefineMapSize(generator.Data, rng);
-            GlobeModule.CalculateMapCoordinates(generator.Data);
-
-            _map = generator.Data;
+            _map = mapData;
         }
 
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)

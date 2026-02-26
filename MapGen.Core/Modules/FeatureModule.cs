@@ -8,6 +8,8 @@ namespace MapGen.Core.Modules
     {
         public static void MarkupGrid(MapData data)
         {
+            data.Rng.Init(data.Seed);
+
             int cellsCount = data.Cells.Length;
             data.DistanceField = new sbyte[cellsCount];
             data.FeatureIds = new ushort[cellsCount];
