@@ -15,6 +15,7 @@ namespace MapGen.Core
         public HeightmapTemplate Template { get; set; }
 
         // Simulation Properties
+        public double HeightExponent { get; set; } = 2.0;
         public double TemperatureEquator { get; set; }
         public double TemperatureNorthPole { get; set; }
         public double TemperatureSouthPole { get; set; }

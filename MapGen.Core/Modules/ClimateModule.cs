@@ -16,7 +16,7 @@ namespace MapGen.Core.Modules
             double tempSouthTropic = opt.TemperatureEquator + MapConstants.TROPICS[1] * MapConstants.TROPICAL_GRADIENT;
             double southernGradient = (tempSouthTropic - opt.TemperatureSouthPole) / (90 + MapConstants.TROPICS[1]);
 
-            double heightExponent = 1.0;
+            double heightExponent = opt.HeightExponent;
 
             for (int r = 0; r < data.CellsCountY; r++)
             {
