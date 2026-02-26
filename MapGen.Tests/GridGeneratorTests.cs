@@ -34,7 +34,7 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<PointsRegressionData>(json);
 
             // Act
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
 
             // 1. Meta-Asserts: Verify the JS setup matches our C# options
@@ -66,7 +66,7 @@ namespace MapGen.Tests
             var json = File.ReadAllText("data/regression_boundary.json");
             var expected = JsonConvert.DeserializeObject<BoundaryRegressionData>(json);
 
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
 
             Assert.Equal(expected.BoundaryPoints.Length, mapData.BoundaryPoints.Length);

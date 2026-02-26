@@ -41,7 +41,7 @@ namespace MapGen.Tests
 
             // 2. Setup MapData with the exact topology from the dump
             // We need the same points/neighbors to ensure the BFS spreads correctly
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
 
@@ -67,7 +67,7 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
 
             // 2. Setup MapData (Voronoi Graph)
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
 
@@ -97,7 +97,7 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<HeightmapRegressionData>(json);
 
             // 2. Setup MapData (Voronoi Graph)
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
 

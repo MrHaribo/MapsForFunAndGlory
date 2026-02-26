@@ -26,13 +26,21 @@ namespace MapGen.Render.Skia.WinUI
 
         private void Window_Activated(object sender, WindowActivatedEventArgs args)
         {
-            var mapData = new MapData
+            var mapOptions = new MapOptions
             {
                 Seed = "42",
-                Rng = new AleaRandom(),
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 2000,
+            };
+
+            var rng = new AleaRandom(mapOptions.Seed);
+            MapOptions.RandomizeOptions(mapOptions, rng);
+
+            var mapData = new MapData
+            {
+                Options = mapOptions,
+                Rng = rng,
                 Template = HeightmapTemplate.Continents,
             };
 

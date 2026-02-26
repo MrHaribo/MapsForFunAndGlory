@@ -33,7 +33,7 @@ namespace MapGen.Tests
             var expected = JsonConvert.DeserializeObject<GridFeatureRegressionData>(json);
 
             // 2. Setup MapData with the exact topology from our test setup
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
             HeightmapGenerator.Generate(mapData);

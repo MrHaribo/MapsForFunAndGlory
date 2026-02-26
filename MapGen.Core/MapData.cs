@@ -8,14 +8,17 @@ namespace MapGen.Core
 
     public class MapData
     {
+        // Options
+        public MapOptions Options { get; set; }
+
         // Rng
-        public string Seed { get; set; }
+        public string Seed => Options.Seed;
         public IRandom Rng { get; set; }
 
         // Grid Constants
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public int PointsCount { get; set; }
+        public int Width => Options.Width;
+        public int Height => Options.Height;
+        public int PointsCount => Options.PointsCount;
         public double Spacing { get; set; }
 
         // Raw Coordinates (The "Grid")
@@ -45,15 +48,7 @@ namespace MapGen.Core
         // Calculated Coordinates (Outputs)
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
 
-        public static MapData TestData => new MapData
-        {
-            Seed = "42",
-            Rng = new AleaRandom(),
-            Width = 1920,
-            Height = 1080,
-            PointsCount = 2000,
-            Template = HeightmapTemplate.Continents,
-        };
+
     }
 
     public class MapCell
@@ -65,6 +60,7 @@ namespace MapGen.Core
         public byte H { get; set; }               // Height value
         public ushort FeatureId { get; set; } // f
         public sbyte Distance { get; set; }   // t
+        public sbyte Temp { get; set; } // Added for ClimateModule
     }
 
     public class MapVertex

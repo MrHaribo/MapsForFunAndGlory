@@ -31,7 +31,7 @@ namespace MapGen.Tests
             var expected = LoadExpected();
 
             // 2. Setup MapData with the exact topology from our test setup
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
             HeightmapGenerator.Generate(mapData);
@@ -54,12 +54,14 @@ namespace MapGen.Tests
             // 1. Setup
             var expected = LoadExpected();
             // Use standard 1000x500 to match JS graphWidth/Height
-            var data = new MapData 
+            var options = new MapOptions 
             {
                 PointsCount = 2000,
                 Width = 1920,
                 Height = 1080
             };
+
+            var data = new MapData { Options = options };
 
             // 2. Inject the specific inputs from the dump to isolate coordinate math
             data.MapSize = expected.Size;

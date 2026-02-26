@@ -52,7 +52,7 @@ namespace MapGen.Tests
             var expected = expectedRoot.Grid;
 
             // 2. Run the full C# pipeline
-            var mapData = MapData.TestData;
+            var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
 
