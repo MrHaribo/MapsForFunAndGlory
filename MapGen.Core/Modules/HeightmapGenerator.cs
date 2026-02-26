@@ -3,9 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Text;
+using static MapGen.Core.Helpers.NumberUtils;
 
 namespace MapGen.Core.Modules
 {
@@ -276,7 +274,7 @@ namespace MapGen.Core.Modules
                     {
                         double noise = rng.Next() * 0.3 + 0.85;
                         double newH = data.Cells[idx].H + h * noise;
-                        data.Cells[idx].H = Lim((int)Math.Floor(newH));
+                        data.Cells[idx].H = (byte)Lim(Math.Floor(newH));
                     }
                     h = Math.Pow(h, linePower) - 1;
                     if (h < 2) break;
@@ -305,7 +303,7 @@ namespace MapGen.Core.Modules
                         }
                         if (minCell == -1) break;
                         double avgH = (data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0;
-                        data.Cells[minCell].H = Lim((int)Math.Floor(avgH));
+                        data.Cells[minCell].H = (byte)Lim(Math.Floor(avgH));
                         cur = minCell;
                     }
                 }
@@ -403,7 +401,7 @@ namespace MapGen.Core.Modules
 
                     foreach (int cellIdx in frontier)
                     {
-                        data.Cells[cellIdx].H = Lim(data.Cells[cellIdx].H - h * (rng.Next() * 0.3 + 0.85));
+                        data.Cells[cellIdx].H = (byte)Lim(data.Cells[cellIdx].H - h * (rng.Next() * 0.3 + 0.85));
                     }
 
                     h = Math.Pow(h, linePower) - 1;
@@ -444,7 +442,7 @@ namespace MapGen.Core.Modules
 
                         if (minCell == -1) break;
 
-                        data.Cells[minCell].H = Lim((data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0);
+                        data.Cells[minCell].H = (byte)Lim((data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0);
                         cur = minCell;
                     }
                 }
@@ -500,7 +498,7 @@ namespace MapGen.Core.Modules
                         query.Add(e);
 
                         double newH = Math.Pow(data.Cells[e].H, exp);
-                        data.Cells[e].H = newH > 100 ? (byte)5 : Lim(newH);
+                        data.Cells[e].H = newH > 100 ? (byte)5 : (byte)Lim(newH);
                     }
                 }
                 range = query;
@@ -573,7 +571,7 @@ namespace MapGen.Core.Modules
                 if (power != 0)
                     h = isLand ? Math.Pow(h - 20, power) + 20 : Math.Pow(h, power);
 
-                cell.H = Lim(h);
+                cell.H = (byte)Lim(h);
             }
         }
 
@@ -649,15 +647,13 @@ namespace MapGen.Core.Modules
 
                 // Blend the original height with the masked height based on fr
                 // JS: lim((h * (fr - 1) + masked) / fr)
-                data.Cells[i].H = Lim((h * (fr - 1.0) + masked) / fr);
+                data.Cells[i].H = (byte)Lim((h * (fr - 1.0) + masked) / fr);
             }
         }
 
         #endregion
 
         #region Helper Functions
-
-        private static byte Lim(double val) => (byte)Math.Clamp(val, 0, 100);
 
         private static int GetNumberInRange(string r, IRandom rng)
         {
