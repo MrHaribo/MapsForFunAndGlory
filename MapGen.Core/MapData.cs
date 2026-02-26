@@ -58,7 +58,8 @@ namespace MapGen.Core
         public byte H { get; set; }               // Height value
         public ushort FeatureId { get; set; } // f
         public sbyte Distance { get; set; }   // t
-        public sbyte Temp { get; set; } // Added for ClimateModule
+        public sbyte Temp { get; set; }
+        public byte Prec { get; set; }
     }
 
     public class MapVertex

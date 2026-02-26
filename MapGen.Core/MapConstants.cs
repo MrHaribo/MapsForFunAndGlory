@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace MapGen.Core
+﻿namespace MapGen.Core
 {
     public static class MapConstants
     {
@@ -19,6 +15,12 @@ namespace MapGen.Core
         public const double TEMPERATURE_NORTH_POLE = -15;
         public const double TEMPERATURE_SOUTH_POLE = -25;
         public static readonly double[] TROPICS = { 16, -20 };
+
+        // Wind Directions (in degrees) based on Latitude bands
+        // 0-30° (Trade Winds), 30-60° (Westerlies), 60-90° (Polar Easterlies)
+        public static readonly int[] WIND_DIRECTIONS = { 225, 45, 225, 315, 135, 315 };
+        public static readonly double[] LATITUDE_MODIFIER = { 4, 2, 2, 2, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 0.5 };
+        public const int MAX_PASSABLE_ELEVATION = 85;
 
         // Distance Field Constants (T)
         public const sbyte DEEPER_LAND = 3;
