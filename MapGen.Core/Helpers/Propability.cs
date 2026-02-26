@@ -44,6 +44,16 @@ namespace MapGen.Core.Helpers
             return rng.Ra(list.ToArray());
         }
 
+        public static T Rw<T>(this IRandom rng, Dictionary<T, int> obj) where T : struct, Enum
+        {
+            var list = new List<T>();
+            foreach (var kvp in obj)
+                for (int i = 0; i < kvp.Value; i++)
+                    list.Add(kvp.Key);
+
+            return rng.Ra(list.ToArray());
+        }
+
         public static int Biased(this IRandom rng, int min, int max, double ex)
         {
             double value = min + (max - min) * Math.Pow(rng.Next(), ex);

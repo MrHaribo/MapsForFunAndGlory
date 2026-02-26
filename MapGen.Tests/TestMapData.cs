@@ -22,12 +22,12 @@ namespace MapGen.Tests
                 var rng = new AleaRandom(options.Seed);
 
                 MapOptions.RandomizeOptions(options, rng);
+                options.Template = HeightmapTemplate.Continents;
 
                 var mapData = new MapData
                 {
                     Rng = rng,
                     Options = options,
-                    Template = HeightmapTemplate.Continents,
                 };
 
                 return mapData;

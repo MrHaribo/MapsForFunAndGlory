@@ -10,6 +10,7 @@ namespace MapGen.Core
     {
         // Options
         public MapOptions Options { get; set; }
+        public HeightmapTemplate Template => Options.Template;
 
         // Rng
         public string Seed => Options.Seed;
@@ -36,9 +37,6 @@ namespace MapGen.Core
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public sbyte[] DistanceField { get; set; } // grid.cells.t
         public ushort[] FeatureIds { get; set; }  // grid.cells.f
-
-        // Generation Context
-        public HeightmapTemplate Template { get; set; }
 
         // Globe Settings (Inputs)
         public double MapSize { get; set; }      // 1-100%

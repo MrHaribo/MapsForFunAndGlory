@@ -36,12 +36,12 @@ namespace MapGen.Render.Skia.WinUI
 
             var rng = new AleaRandom(mapOptions.Seed);
             MapOptions.RandomizeOptions(mapOptions, rng);
+            mapOptions.Template = HeightmapTemplate.Continents;
 
             var mapData = new MapData
             {
                 Options = mapOptions,
                 Rng = rng,
-                Template = HeightmapTemplate.Continents,
             };
 
             GridGenerator.Generate(mapData);
