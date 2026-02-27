@@ -81,7 +81,7 @@ namespace MapGen.Core.Modules
             {
                 var cell = pack.Cells[i];
                 cell.H = newH[i];
-                cell.G = newG[i];
+                cell.GridId = newG[i];
                 cell.Index = i; // Ensure internal index is set
 
                 double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);

@@ -120,9 +120,11 @@ namespace MapGen.Tests
 
             // 5. Assert: Feature-level Metadata
             // JS filter(f => f) means we skip the null index 0
-            var actualFeatures = pack.Features.Where(f => f != null).ToList();
+            var actualFeatures = pack.Features;
 
-            Assert.Equal(expected.features.Count, actualFeatures.Count);
+            Assert.Equal(expected.features.Count, pack.Features.Count);
+            Assert.Equal(expected.features[0].id, pack.Features[0].Id); // Both should be 1
+
 
             for (int i = 0; i < expected.features.Count; i++)
             {

@@ -88,7 +88,7 @@ namespace MapGen.Core.Modules
             ushort[] featureIds = new ushort[packCellsNumber];  // pack.cells.f
             int[] haven = new int[packCellsNumber];             // haven: opposite water cell
             byte[] harbor = new byte[packCellsNumber];          // harbor: count of water neighbors
-            var features = new List<MapFeature> { null };
+            var features = new List<MapFeature>();
 
             // Helper: isLand check matching JS logic
             bool IsLand(int id) => cells[id].H >= MapConstants.LAND_THRESHOLD;

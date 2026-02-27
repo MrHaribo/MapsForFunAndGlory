@@ -141,5 +141,117 @@ namespace MapGen.Core.Modules
             // Match JS: rn(minShoreHeight - 0.01, 2)
             return NumberUtils.Round(minShoreHeight - MapConstants.LAKE_ELEVATION_DELTA, 2);
         }
+
+        public static void DetectCloseLakes(MapPack pack, double[] h)
+        {
+            var cells = pack.Cells;
+            // Standard Azgaar default for lake elevation limit
+            double elevationLimit = 10;
+
+            foreach (var feature in pack.Features)
+            {
+                if (feature.Type != FeatureType.Lake) continue;
+                feature.IsClosed = false;
+
+                double maxElevation = feature.Height + elevationLimit;
+                if (maxElevation > 99) continue;
+
+                bool isDeep = true;
+                int lowestShoreCell = feature.Shoreline.OrderBy(s => h[s]).First();
+
+                var queue = new Queue<int>();
+                queue.Enqueue(lowestShoreCell);
+
+                var checkedCells = new HashSet<int>();
+                checkedCells.Add(lowestShoreCell);
+
+                while (queue.Count > 0 && isDeep)
+                {
+                    int cellId = queue.Dequeue();
+
+                    foreach (int n in cells[cellId].C)
+                    {
+                        if (checkedCells.Contains(n) || h[n] >= maxElevation) continue;
+
+                        if (h[n] < 20) // Water found
+                        {
+                            var nFeature = pack.Features[cells[n].FeatureId];
+                            if (nFeature.Type == FeatureType.Ocean || feature.Height > nFeature.Height)
+                            {
+                                isDeep = false; // Found an outlet path
+                                break;
+                            }
+                        }
+
+                        checkedCells.Add(n);
+                        queue.Enqueue(n);
+                    }
+                }
+                feature.IsClosed = isDeep;
+            }
+        }
+
+        public static Dictionary<int, int> DefineClimateData(MapPack pack, MapData grid, double[] h)
+        {
+            var cells = pack.Cells;
+            var lakeOutCells = new Dictionary<int, int>();
+            double heightExponent = 1.8; // Match the default from the JS UI
+
+            foreach (var feature in pack.Features)
+            {
+                if (feature.Type != FeatureType.Lake) continue;
+
+                // JS: feature.flux = lake.shoreline.reduce((acc, c) => acc + grid.cells.prec[cells.g[c]], 0);
+                feature.Flux = feature.Shoreline.Sum(c => (double)grid.Cells[cells[c].GridId].Prec);
+
+                // JS: getLakeTemp
+                if (feature.Vertices.Count < 6)
+                    feature.Temp = grid.Cells[cells[feature.FirstCell].GridId].Temp;
+                else
+                    feature.Temp = feature.Shoreline.Average(c => (double)grid.Cells[cells[c].GridId].Temp);
+
+                // JS: getLakeEvaporation
+                double heightInMeters = Math.Pow(Math.Max(0, feature.Height - 18), heightExponent);
+                double evaporation = ((700 * (feature.Temp + 0.006 * heightInMeters)) / 50 + 75) / (80 - feature.Temp);
+
+                // Match JS: rn(evaporation * lake.cells)
+                // Note: feature.Vertices.Count corresponds to f.cells in the JS code
+                feature.Evaporation = NumberUtils.Round(evaporation * feature.Vertices.Count);
+
+                if (feature.IsClosed) continue;
+
+                // Outlet logic
+                feature.OutCell = feature.Shoreline.OrderBy(s => h[s]).First();
+                lakeOutCells[feature.OutCell] = feature.Id;
+            }
+
+            return lakeOutCells;
+        }
+
+        public static void CleanupLakeData(MapPack pack)
+        {
+            foreach (var feature in pack.Features)
+            {
+                if (feature.Type != FeatureType.Lake) continue;
+
+                feature.Height = NumberUtils.Round(feature.Height, 3);
+
+                // Clean up Inlets: keep only those that exist in the finalized pack.Rivers list
+                if (feature.Inlets != null)
+                {
+                    feature.Inlets = feature.Inlets
+                        .Where(rId => pack.Rivers.Any(river => river.Id == rId))
+                        .ToList();
+
+                    if (feature.Inlets.Count == 0) feature.Inlets = null;
+                }
+
+                // Validate outlet river
+                if (feature.RiverId > 0 && !pack.Rivers.Any(r => r.Id == feature.RiverId))
+                {
+                    feature.RiverId = 0;
+                }
+            }
+        }
     }
 }

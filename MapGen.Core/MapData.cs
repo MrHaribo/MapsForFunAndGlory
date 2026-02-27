@@ -46,12 +46,12 @@ namespace MapGen.Core
 
         // Calculated Coordinates (Outputs)
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
-
-
     }
 
     public class MapPack
     {
+        public MapOptions Options { get; set; }
+
         public int Width => Options.Width;
         public int Height => Options.Height;
         public int PointsCount => Options.PointsCount;
@@ -65,9 +65,8 @@ namespace MapGen.Core
         public ClosestCell FindCell { get; set; }
         public ClosestCellInRange FindCellInRange { get; set; }
 
-        public MapOptions Options { get; set; }
-
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
+        public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
     }
 
     public class MapCell
@@ -84,11 +83,16 @@ namespace MapGen.Core
 
         // Map Pack Properties
         public ushort Area { get; set; } // Added for MapPack parity (Pack only)
-        public int G { get; set; }       // Mapping back to Grid cell index (Pack only)
+        public int GridId { get; set; }       // Mapping back to Grid cell index (Pack only)
         
         // Geographical
         public int Haven { get; set; }   // Index of the closest water cell (for land cells)
         public byte Harbor { get; set; } // Number of adjacent water cells
+
+        // Rivers
+        public ushort Flux { get; set; }        // cells.fl: water flow volume
+        public ushort RiverId { get; set; }     // cells.r: ID of the river passing through
+        public byte Confluence { get; set; }    // cells.conf: marking confluence points
     }
 
     public class MapVertex
@@ -113,6 +117,16 @@ namespace MapGen.Core
         public double Area { get; set; }
         public double Height { get; set; }
         public List<int> Shoreline { get; set; } // Only for lakes/islands
+
+        // Added for Lake-River interactions
+        public ushort RiverId { get; set; }     // The main river associated with this lake
+        public double EnteringFlux { get; set; }
+        public double Flux { get; set; }        // Total flux passing through the lake
+        public List<ushort> Inlets { get; set; } = new List<ushort>();
+        public int OutCell { get; set; }        // The cell where the lake drains
+        public double Evaporation { get; set; } // Calculated based on area/climate
+        public bool IsClosed { get; set; }
+        public double Temp { get; set; }
     }
 
     public class MapCoordinates
@@ -123,6 +137,26 @@ namespace MapGen.Core
         public double LonT { get; set; } // Total Longitude span
         public double LonW { get; set; } // Western Longitude
         public double LonE { get; set; } // Eastern Longitude
+    }
+
+    public class MapRiver
+    {
+        public int Id { get; set; }
+        public int Source { get; set; }
+        public int Mouth { get; set; }
+        public double Discharge { get; set; }
+        public double Length { get; set; }
+        public double Width { get; set; }
+        public double WidthFactor { get; set; }
+        public double SourceWidth { get; set; }
+        public int Parent { get; set; }
+        public List<int> Cells { get; set; } = new List<int>();
+    }
+
+    public struct PointFlux
+    {
+        public double X, Y, Flux;
+        public PointFlux(double x, double y, double f) { X = x; Y = y; Flux = f; }
     }
 
     public readonly struct MapPoint

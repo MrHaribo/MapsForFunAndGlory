@@ -30,7 +30,20 @@
         public const sbyte WATER_COAST = -1;
         public const sbyte DEEP_WATER = -2;
 
-        // Lake Constants
+        // River Hydrology
+        public const int MIN_FLUX_TO_FORM_RIVER = 30;
         public const double LAKE_ELEVATION_DELTA = 0.1;
+        public const int MAX_DOWNCUT = 5;
+
+        // River Geometry
+        public const double RIVER_FLUX_FACTOR = 500.0;
+        public const double RIVER_MAX_FLUX_WIDTH = 1.0;
+        public const double RIVER_LENGTH_FACTOR = 200.0;
+        public static readonly double[] RIVER_LENGTH_PROGRESSION = { 1, 1, 2, 3, 5, 8, 13, 21, 34 };
+
+        // Depression Resolution
+        public const int DEPRESSION_MAX_ITERATIONS = 500;
+        public const double DEPRESSION_LAKE_ITER_RATIO = 0.85;
+        public const double DEPRESSION_ELEVATE_ITER_RATIO = 0.75;
     }
 }
