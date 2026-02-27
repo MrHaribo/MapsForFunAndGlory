@@ -29,5 +29,8 @@
         public const sbyte UNMARKED = 0;
         public const sbyte WATER_COAST = -1;
         public const sbyte DEEP_WATER = -2;
+
+        // Lake Constants
+        public const double LAKE_ELEVATION_DELTA = 0.01;
     }
 }

@@ -111,6 +111,7 @@ namespace MapGen.Core
         public int FirstCell { get; set; }
         public List<int> Vertices { get; set; } = new List<int>();
         public double Area { get; set; }
+        public double Height { get; set; }
         public List<int> Shoreline { get; set; } // Only for lakes/islands
     }
 

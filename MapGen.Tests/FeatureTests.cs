@@ -40,6 +40,7 @@ namespace MapGen.Tests
             public int verticesCount { get; set; }
             public double area { get; set; }
             public int shorelineCount { get; set; }
+            public double height { get; set; }
         }
 
         [Fact]
@@ -139,6 +140,7 @@ namespace MapGen.Tests
                 if (act.Type == FeatureType.Lake)
                 {
                     Assert.Equal(exp.shorelineCount, act.Shoreline.Count);
+                    Assert.InRange(act.Height, exp.height - 0.001, exp.height + 0.001);
                 }
             }
         }

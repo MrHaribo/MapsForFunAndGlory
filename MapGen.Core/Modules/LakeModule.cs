@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MapGen.Core.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -127,6 +128,18 @@ namespace MapGen.Core.Modules
                 if (cell.FeatureId == lakeId) cell.FeatureId = (ushort)oceanId;
             }
             data.Features[lakeId].Type = FeatureType.Ocean;
+        }
+
+        public static double GetHeight(MapPack pack, MapFeature feature)
+        {
+            if (feature.Shoreline == null || feature.Shoreline.Count == 0)
+                return 20.0; // Default matching JS logic
+
+            // Get minimum height from shoreline cells
+            double minShoreHeight = feature.Shoreline.Min(cellId => pack.Cells[cellId].H);
+
+            // Match JS: rn(minShoreHeight - 0.01, 2)
+            return NumberUtils.Round(minShoreHeight - MapConstants.LAKE_ELEVATION_DELTA, 2);
         }
     }
 }

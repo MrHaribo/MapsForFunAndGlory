@@ -226,7 +226,8 @@ namespace MapGen.Core.Modules
                         .Where(IsLand)
                         .Distinct()
                         .ToList();
-                    // feature.height = Lakes.getHeight(feature); // To be implemented
+
+                    feature.Height = LakeModule.GetHeight(pack, feature);
                 }
 
                 return feature;
