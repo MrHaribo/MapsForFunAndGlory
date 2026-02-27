@@ -84,7 +84,7 @@ namespace MapGen.Core.Modules
                 cell.G = newG[i];
                 cell.Index = i; // Ensure internal index is set
 
-                double rawArea = CalculatePolygonArea(cell, pack.Vertices);
+                double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);
                 // Area is clamped to ushort.MaxValue (65535)
                 cell.Area = (ushort)MinMax(Math.Abs(rawArea), 0, ushort.MaxValue);
             }
@@ -98,19 +98,5 @@ namespace MapGen.Core.Modules
             g.Add(gridIdx);
             h.Add(height);
         }
-
-        private static double CalculatePolygonArea(MapCell cell, MapVertex[] vertices)
-        {
-            double area = 0;
-            for (int i = 0; i < cell.V.Count; i++)
-            {
-                var p1 = vertices[cell.V[i]].P;
-                var p2 = vertices[cell.V[(i + 1) % cell.V.Count]].P;
-                area += (p1.X * p2.Y) - (p2.X * p1.Y);
-            }
-            return area / 2.0;
-        }
-
-        
     }
 }

@@ -42,11 +42,14 @@ namespace MapGen.Tests
             FeatureModule.MarkupGrid(mapData);
 
             // 5. Assert: Cell-level Data
-            Assert.Equal(expected.cells_f, mapData.FeatureIds);
-            Assert.Equal(expected.cells_t, mapData.DistanceField);
+            // We project the data from cells back into arrays to match the expected JSON structure
+            var actualFeatureIds = mapData.Cells.Select(c => c.FeatureId).ToArray();
+            var actualDistances = mapData.Cells.Select(c => c.Distance).ToArray();
+
+            Assert.Equal(expected.cells_f, actualFeatureIds);
+            Assert.Equal(expected.cells_t, actualDistances);
 
             // 6. Assert: Feature-level Metadata
-            // We skip index 0 in data.Features because JS export filtered out the null at index 0
             var actualFeatures = mapData.Features.Where(f => f != null).ToList();
 
             Assert.Equal(expected.features.Count, actualFeatures.Count);

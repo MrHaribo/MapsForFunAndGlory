@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 namespace MapGen.Core
 {
+    public delegate int ClosestCell(double x, double y);
+    public delegate int ClosestCellInRange(double x, double y, double radius);
+
     public enum FeatureType { Ocean, Lake, Island }
 
     public class MapData
@@ -35,8 +38,6 @@ namespace MapGen.Core
 
         // Features
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
-        public sbyte[] DistanceField { get; set; } // grid.cells.t
-        public ushort[] FeatureIds { get; set; }  // grid.cells.f
 
         // Globe Settings (Inputs)
         public double MapSize { get; set; }      // 1-100%
@@ -47,6 +48,21 @@ namespace MapGen.Core
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
 
 
+    }
+
+    public class MapPack
+    {
+        public MapCell[] Cells { get; set; }
+        public MapVertex[] Vertices { get; set; }
+        public MapPoint[] Points { get; set; }
+
+        // Spatial queries
+        public ClosestCell FindCell { get; set; }
+        public ClosestCellInRange FindCellInRange { get; set; }
+
+        public MapOptions Options { get; set; }
+
+        public List<MapFeature> Features { get; set; } = new List<MapFeature>();
     }
 
     public class MapCell
@@ -64,6 +80,10 @@ namespace MapGen.Core
         // Map Pack Properties
         public ushort Area { get; set; } // Added for MapPack parity (Pack only)
         public int G { get; set; }       // Mapping back to Grid cell index (Pack only)
+        
+        // Geographical
+        public int Haven { get; set; }   // Index of the closest water cell (for land cells)
+        public byte Harbor { get; set; } // Number of adjacent water cells
     }
 
     public class MapVertex
@@ -80,6 +100,13 @@ namespace MapGen.Core
         public bool IsLand { get; set; }
         public bool IsBorder { get; set; }
         public FeatureType Type { get; set; }
+
+        // Delta for markupPack
+        public int CellsCount { get; set; }
+        public int FirstCell { get; set; }
+        public List<int> Vertices { get; set; } = new List<int>();
+        public double Area { get; set; }
+        public List<int> Shoreline { get; set; } // Only for lakes/islands
     }
 
     public class MapCoordinates
