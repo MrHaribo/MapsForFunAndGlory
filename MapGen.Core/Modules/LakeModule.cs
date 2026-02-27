@@ -173,9 +173,9 @@ namespace MapGen.Core.Modules
                     {
                         if (checkedCells.Contains(n) || h[n] >= maxElevation) continue;
 
-                        if (h[n] < 20) // Water found
+                        if (h[n] < MapConstants.LAND_THRESHOLD) // Water found
                         {
-                            var nFeature = pack.Features[cells[n].FeatureId];
+                            var nFeature = pack.GetFeature(cells[n].FeatureId);
                             if (nFeature.Type == FeatureType.Ocean || feature.Height > nFeature.Height)
                             {
                                 isDeep = false; // Found an outlet path
@@ -193,34 +193,32 @@ namespace MapGen.Core.Modules
 
         public static Dictionary<int, int> DefineClimateData(MapPack pack, MapData grid, double[] h)
         {
-            var cells = pack.Cells;
             var lakeOutCells = new Dictionary<int, int>();
-            double heightExponent = 1.8; // Match the default from the JS UI
+            double heightExponent = 1.8;
 
             foreach (var feature in pack.Features)
             {
+                // Only process lakes
                 if (feature.Type != FeatureType.Lake) continue;
 
-                // JS: feature.flux = lake.shoreline.reduce((acc, c) => acc + grid.cells.prec[cells.g[c]], 0);
-                feature.Flux = feature.Shoreline.Sum(c => (double)grid.Cells[cells[c].GridId].Prec);
+                // 1. Calculate incoming water (Flux) from precipitation on the shoreline
+                feature.Flux = feature.Shoreline.Sum(c => (double)grid.Cells[pack.Cells[c].GridId].Prec);
 
-                // JS: getLakeTemp
+                // 2. Calculate average Temperature
                 if (feature.Vertices.Count < 6)
-                    feature.Temp = grid.Cells[cells[feature.FirstCell].GridId].Temp;
+                    feature.Temp = grid.Cells[pack.Cells[feature.FirstCell].GridId].Temp;
                 else
-                    feature.Temp = feature.Shoreline.Average(c => (double)grid.Cells[cells[c].GridId].Temp);
+                    feature.Temp = feature.Shoreline.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
 
-                // JS: getLakeEvaporation
+                // 3. Calculate Evaporation (Water loss)
                 double heightInMeters = Math.Pow(Math.Max(0, feature.Height - 18), heightExponent);
                 double evaporation = ((700 * (feature.Temp + 0.006 * heightInMeters)) / 50 + 75) / (80 - feature.Temp);
-
-                // Match JS: rn(evaporation * lake.cells)
-                // Note: feature.Vertices.Count corresponds to f.cells in the JS code
                 feature.Evaporation = NumberUtils.Round(evaporation * feature.Vertices.Count);
 
+                // 4. Determine Outlet (if not a closed/endorheic lake)
                 if (feature.IsClosed) continue;
 
-                // Outlet logic
+                // The lowest cell on the shore is where the river will start
                 feature.OutCell = feature.Shoreline.OrderBy(s => h[s]).First();
                 lakeOutCells[feature.OutCell] = feature.Id;
             }

@@ -67,6 +67,13 @@ namespace MapGen.Core
 
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
+
+        public MapFeature GetFeature(int id)
+        {
+            // If id is 0, it's 'No Feature'
+            if (id <= 0 || id > Features.Count) return null;
+            return Features[id - 1];
+        }
     }
 
     public class MapCell

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace MapGen.Core.Modules
 {
@@ -22,9 +24,13 @@ namespace MapGen.Core.Modules
             // 1. Initial Height modification (JS: alterHeights)
             double[] h = AlterHeights(pack);
 
+            //File.WriteAllText("D:\\Downloads\\lake_h_alterHeights_cs.json", JsonSerializer.Serialize(h, new JsonSerializerOptions { WriteIndented = true }));
+
             // 2. Hydrological preprocessing
             LakeModule.DetectCloseLakes(pack, h);
             ResolveDepressions(pack, h);
+
+            File.WriteAllText("D:\\Downloads\\lake_h_resolveDepressions_cs.json", JsonSerializer.Serialize(h, new JsonSerializerOptions { WriteIndented = true }));
 
             // 3. Core Simulation
             DrainWater();
@@ -309,16 +315,19 @@ namespace MapGen.Core.Modules
             var cells = pack.Cells;
             var features = pack.Features;
 
-            // Configurable iterations (matching JS defaults)
-            int maxIterations = 500;
+            int maxIterations = 250;
             int checkLakeMaxIteration = (int)(maxIterations * 0.85);
             int elevateLakeMaxIteration = (int)(maxIterations * 0.75);
 
-            double GetHeight(int i) => features[cells[i].FeatureId - 1].Type == FeatureType.Lake
-                ? features[cells[i].FeatureId].Height
-                : h[i];
+            double GetHeight(int i)
+            {
+                var f = pack.GetFeature(pack.Cells[i].FeatureId);
+                return (f != null && f.Type == FeatureType.Lake) ? f.Height : h[i];
+            }
 
             var lakes = features.Where(f => f.Type == FeatureType.Lake).ToList();
+
+            // JS sorts once at the beginning
             var land = Enumerable.Range(0, cells.Length)
                 .Where(i => h[i] >= 20 && cells[i].B == 0)
                 .OrderBy(i => h[i])
@@ -330,10 +339,8 @@ namespace MapGen.Core.Modules
 
             for (int iteration = 0; depressions > 0 && iteration < maxIterations; iteration++)
             {
-                // Abort if progress is stalling/reversing (sum of last 5 diffs > 0)
-                if (progress.Count > 5 && progress.TakeLast(5).Sum() > 0)
+                if (progress.Count > 5 && progress.Sum() > 0)
                 {
-                    // Reset to original-ish state and break to avoid infinite loops
                     double[] original = RiverModule.AlterHeights(pack);
                     Array.Copy(original, h, h.Length);
                     break;
@@ -341,7 +348,6 @@ namespace MapGen.Core.Modules
 
                 depressions = 0;
 
-                // 1. Resolve Lake Depressions
                 if (iteration < checkLakeMaxIteration)
                 {
                     foreach (var l in lakes)
@@ -352,7 +358,7 @@ namespace MapGen.Core.Modules
 
                         if (iteration > elevateLakeMaxIteration)
                         {
-                            foreach (int i in l.Shoreline) h[i] = cells[i].H; // Reset to raw
+                            foreach (int i in l.Shoreline) h[i] = cells[i].H;
                             l.Height = l.Shoreline.Min(s => h[s]) - 1;
                             l.IsClosed = true;
                             continue;
@@ -363,17 +369,21 @@ namespace MapGen.Core.Modules
                     }
                 }
 
-                // 2. Resolve Land Depressions
                 foreach (int i in land)
                 {
-                    double minNeighborHeight = cells[i].C.Min(c => GetHeight(c));
+                    // FIX 3: Neighbors in JS are cells.c[i]
+                    double minNeighborHeight = cells[i].C.Min(neighborIndex => GetHeight(neighborIndex));
+
                     if (minNeighborHeight >= 100 || h[i] > minNeighborHeight) continue;
 
                     depressions++;
                     h[i] = minNeighborHeight + 0.1;
                 }
 
-                if (prevDepressions.HasValue) progress.Add(depressions - prevDepressions.Value);
+                // JS: prevDepressions !== null && progress.push(depressions - prevDepressions);
+                if (prevDepressions.HasValue)
+                    progress.Add(depressions - prevDepressions.Value);
+
                 prevDepressions = depressions;
             }
         }
