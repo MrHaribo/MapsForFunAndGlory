@@ -191,10 +191,9 @@ namespace MapGen.Core.Modules
 
             MapFeature AddFeature(int firstCell, bool land, bool border, int featureId, int totalCells)
             {
-                var typeStr = land ? "island" : border ? "ocean" : "lake";
-                var typeEnum = land ? FeatureType.Island : border ? FeatureType.Ocean : FeatureType.Lake;
+                var featureType = land ? FeatureType.Island : border ? FeatureType.Ocean : FeatureType.Lake;
 
-                var (startCell, featureVertices) = GetCellsData(typeStr, firstCell);
+                var (startCell, featureVertices) = GetCellsData(featureType, firstCell);
                 
                 // Calculate Area
 
@@ -213,7 +212,7 @@ namespace MapGen.Core.Modules
                 var feature = new MapFeature
                 {
                     Id = featureId,
-                    Type = typeEnum,
+                    Type = featureType,
                     IsLand = land,
                     IsBorder = border,
                     CellsCount = totalCells,
@@ -222,7 +221,7 @@ namespace MapGen.Core.Modules
                     Area = absArea
                 };
 
-                if (typeEnum == FeatureType.Lake)
+                if (featureType == FeatureType.Lake)
                 {
                     if (area > 0) feature.Vertices.Reverse();
                     feature.Shoreline = feature.Vertices
@@ -236,9 +235,9 @@ namespace MapGen.Core.Modules
 
                 return feature;
 
-                (int, List<int>) GetCellsData(string featureType, int fCell)
+                (int, List<int>) GetCellsData(FeatureType featureType, int fCell)
                 {
-                    if (featureType == "ocean") return (fCell, new List<int>());
+                    if (featureType == FeatureType.Ocean) return (fCell, new List<int>());
 
                     // Bounds-safe predicates to match JS behavior
                     bool OfSameType(int cId) => cId >= 0 && cId < featureIds.Length && featureIds[cId] == featureId;
