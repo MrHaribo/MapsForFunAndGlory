@@ -5,8 +5,20 @@ namespace MapGen.Core.Helpers
     public static class NumberUtils
     {
         /// <summary>Equivalent to JS: rn(v, d)</summary>
-        public static double Round(double val, int precision = 0) =>
+        public static double RoundOld(double val, int precision = 0) =>
             Math.Round(val, precision, MidpointRounding.AwayFromZero);
+
+        public static double Round(double val, int precision = 0)
+        {
+            if (precision == 0)
+            {
+                // JavaScript Math.round behavior: rounds .5 towards +Infinity
+                return Math.Floor(val + 0.5);
+            }
+
+            double m = Math.Pow(10, precision);
+            return Math.Floor(val * m + 0.5) / m;
+        }
 
         /// <summary>Equivalent to JS: minmax(value, min, max)</summary>
         public static double MinMax(double value, double min, double max) =>

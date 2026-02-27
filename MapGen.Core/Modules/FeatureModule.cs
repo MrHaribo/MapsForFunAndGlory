@@ -77,128 +77,200 @@ namespace MapGen.Core.Modules
 
         public static void MarkupPack(MapPack pack)
         {
-            int cellCount = pack.Cells.Length;
-            if (cellCount == 0) return;
+            var cells = pack.Cells;
+            var vertices = pack.Vertices;
+            int packCellsNumber = cells.Length;
+            if (packCellsNumber == 0) return;
 
-            ushort[] featureIds = new ushort[cellCount];
-            var features = new List<MapFeature> { null }; // Feature 0 is null/dummy
-            var queue = new Stack<int>();
-            queue.Push(0);
+            // Use local arrays to match JS scope, then sync to MapCell properties at the end
+            sbyte[] distanceField = new sbyte[packCellsNumber]; // pack.cells.t
+            ushort[] featureIds = new ushort[packCellsNumber];  // pack.cells.f
+            int[] haven = new int[packCellsNumber];             // haven: opposite water cell
+            byte[] harbor = new byte[packCellsNumber];          // harbor: count of water neighbors
+            var features = new List<MapFeature> { null };
 
-            for (ushort featureId = 1; queue.Count > 0; featureId++)
+            // Helper: isLand check matching JS logic
+            bool IsLand(int id) => cells[id].H >= MapConstants.LAND_THRESHOLD;
+            bool IsWater(int id) => !IsLand(id);
+
+            List<int> queue = new List<int> { 0 };
+
+            for (ushort featureId = 1; queue.Count > 0 && queue[0] != -1; featureId++)
             {
-                int firstCell = queue.Pop();
+                int firstCell = queue[0];
                 featureIds[firstCell] = featureId;
 
-                bool land = pack.Cells[firstCell].H >= MapConstants.LAND_THRESHOLD;
-                bool border = pack.Cells[firstCell].B == 1;
-                int totalCells = 0;
+                bool land = IsLand(firstCell);
+                bool border = cells[firstCell].B == 1;
+                int totalCells = 1;
 
-                var featureQueue = new Queue<int>();
-                featureQueue.Enqueue(firstCell);
+                // Flood fill queue (JS uses the same array for outer and inner loops)
+                var floodQueue = new Stack<int>();
+                floodQueue.Push(firstCell);
 
-                // Temporary storage for this feature's growth
-                while (featureQueue.Count > 0)
+                while (floodQueue.Count > 0)
                 {
-                    int cellId = featureQueue.Dequeue();
-                    totalCells++;
-                    if (pack.Cells[cellId].B == 1) border = true;
+                    int cellId = floodQueue.Pop();
+                    if (cells[cellId].B == 1) border = true;
 
-                    foreach (int n in pack.Cells[cellId].C)
+                    foreach (int neighborId in cells[cellId].C)
                     {
-                        bool nLand = pack.Cells[n].H >= MapConstants.LAND_THRESHOLD;
+                        bool isNeibLand = IsLand(neighborId);
 
-                        // Mark coastal distances during flood fill
-                        if (land && !nLand)
+                        if (land && !isNeibLand)
                         {
-                            pack.Cells[cellId].Distance = MapConstants.LAND_COAST;
-                            pack.Cells[n].Distance = MapConstants.WATER_COAST;
-                            DefineHaven(pack, cellId);
+                            distanceField[cellId] = MapConstants.LAND_COAST;
+                            distanceField[neighborId] = MapConstants.WATER_COAST;
+                            if (haven[cellId] == 0) DefineHaven(cellId);
+                        }
+                        else if (land && isNeibLand)
+                        {
+                            if (distanceField[neighborId] == MapConstants.UNMARKED && distanceField[cellId] == MapConstants.LAND_COAST)
+                                distanceField[neighborId] = MapConstants.LANDLOCKED;
+                            else if (distanceField[cellId] == MapConstants.UNMARKED && distanceField[neighborId] == MapConstants.LAND_COAST)
+                                distanceField[cellId] = MapConstants.LANDLOCKED;
                         }
 
-                        if (featureIds[n] == 0 && land == nLand)
+                        if (featureIds[neighborId] == 0 && land == isNeibLand)
                         {
-                            featureIds[n] = featureId;
-                            featureQueue.Enqueue(n);
+                            floodQueue.Push(neighborId);
+                            featureIds[neighborId] = featureId;
+                            totalCells++;
                         }
                     }
                 }
 
-                features.Add(CreateFeature(pack, featureId, firstCell, land, border, totalCells, featureIds));
+                features.Add(AddFeature(firstCell, land, border, featureId, totalCells));
 
                 // Find next unmarked cell
-                int nextUnmarked = -1;
-                for (int j = 0; j < cellCount; j++)
-                {
-                    if (featureIds[j] == 0) { nextUnmarked = j; break; }
-                }
-                if (nextUnmarked != -1) queue.Push(nextUnmarked);
+                int nextIndex = -1;
+                for (int i = 0; i < packCellsNumber; i++)
+                    if (featureIds[i] == 0) { nextIndex = i; break; }
+
+                queue.Clear();
+                if (nextIndex != -1) queue.Add(nextIndex);
             }
 
-            // Apply secondary distance markup (Deep water/Inland)
-            MarkupDistance(pack.Cells, MapConstants.DEEPER_LAND, 1, 127);
-            MarkupDistance(pack.Cells, MapConstants.DEEP_WATER, -1, -110);
+            // Final Sync to MapCell and MapPack
+            for (int i = 0; i < packCellsNumber; i++)
+            {
+                cells[i].FeatureId = featureIds[i];
+                cells[i].Distance = distanceField[i];
+                cells[i].Haven = haven[i];
+                cells[i].Harbor = harbor[i];
+            }
+
+            // Secondary Distance Markup (Generalized helpers)
+            MarkupDistance(cells, MapConstants.DEEPER_LAND, 1, 127);
+            MarkupDistance(cells, MapConstants.DEEP_WATER, -1, -110);
 
             pack.Features = features;
-            // Sync feature IDs back to cells
-            for (int i = 0; i < cellCount; i++) pack.Cells[i].FeatureId = featureIds[i];
-        }
 
-        private static void DefineHaven(MapPack pack, int cellId)
-        {
-            var cell = pack.Cells[cellId];
-            var waterNeighbors = cell.C.Where(n => pack.Cells[n].H < MapConstants.LAND_THRESHOLD).ToList();
-            if (!waterNeighbors.Any()) return;
+            // --- Local Functions ---
 
-            var p1 = pack.Points[cellId];
-            int closest = waterNeighbors[0];
-            double minDist = double.MaxValue;
-
-            foreach (var wId in waterNeighbors)
+            void DefineHaven(int cellId)
             {
-                var p2 = pack.Points[wId];
-                double d2 = Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2);
-                if (d2 < minDist) { minDist = d2; closest = wId; }
+                var waterCells = cells[cellId].C.Where(IsWater).ToList();
+                if (waterCells.Count == 0) return;
+
+                var p1 = pack.Points[cellId];
+                int closest = waterCells[0];
+                double minDist = double.MaxValue;
+
+                foreach (var wId in waterCells)
+                {
+                    var p2 = pack.Points[wId];
+                    double d2 = Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2);
+                    if (d2 < minDist) { minDist = d2; closest = wId; }
+                }
+
+                haven[cellId] = closest;
+                harbor[cellId] = (byte)waterCells.Count;
             }
 
-            cell.Haven = closest;
-            cell.Harbor = (byte)waterNeighbors.Count;
-        }
-
-        private static MapFeature CreateFeature(MapPack pack, ushort id, int firstCell, bool land, bool border, int totalCells, ushort[] fIds)
-        {
-            var type = land ? FeatureType.Island : (border ? FeatureType.Ocean : FeatureType.Lake);
-
-            // Find a cell on the edge of the feature to start vertex tracing
-            int startCell = firstCell;
-            foreach (var cellId in Enumerable.Range(0, pack.Cells.Length).Where(i => fIds[i] == id))
+            MapFeature AddFeature(int firstCell, bool land, bool border, int featureId, int totalCells)
             {
-                if (pack.Cells[cellId].B == 1 || pack.Cells[cellId].C.Any(n => fIds[n] != id))
+                var typeStr = land ? "island" : border ? "ocean" : "lake";
+                var typeEnum = land ? FeatureType.Island : border ? FeatureType.Ocean : FeatureType.Lake;
+
+                var (startCell, featureVertices) = GetCellsData(typeStr, firstCell);
+                
+                // Calculate Area
+
+                // JS: const points = clipPoly(featureVertices.map(vertex => vertices.p[vertex]));
+                var points = featureVertices.Select(v => vertices[v].P).ToList();
+                var clippedPoints = PathUtils.ClipPolygon(points, pack.Width, pack.Height);
+
+                // D3 polygonArea equivalent logic
+                // IMPORTANT: Use the CLIPPED points for the area, but the ORIGINAL vertices for the feature metadata
+                double area = PathUtils.CalculateAreaFromPoints(clippedPoints);
+                double absArea = Math.Abs(NumberUtils.Round(area));
+
+                var feature = new MapFeature
                 {
-                    startCell = cellId;
-                    break;
+                    Id = featureId,
+                    Type = typeEnum,
+                    IsLand = land,
+                    IsBorder = border,
+                    CellsCount = totalCells,
+                    FirstCell = startCell,
+                    Vertices = featureVertices,
+                    Area = absArea
+                };
+
+                if (typeEnum == FeatureType.Lake)
+                {
+                    if (area > 0) feature.Vertices.Reverse();
+                    feature.Shoreline = feature.Vertices
+                        .SelectMany(v => vertices[v].C)
+                        .Where(IsLand)
+                        .Distinct()
+                        .ToList();
+                    // feature.height = Lakes.getHeight(feature); // To be implemented
+                }
+
+                return feature;
+
+                (int, List<int>) GetCellsData(string featureType, int fCell)
+                {
+                    if (featureType == "ocean") return (fCell, new List<int>());
+
+                    // Bounds-safe predicates to match JS behavior
+                    bool OfSameType(int cId) => cId >= 0 && cId < featureIds.Length && featureIds[cId] == featureId;
+                    bool OfDifferentType(int cId) => cId < 0 || cId >= featureIds.Length || featureIds[cId] != featureId;
+
+                    int startCellInternal = FindOnBorderCell(fCell);
+                    var verticesInternal = GetFeatureVertices(startCellInternal);
+                    return (startCellInternal, verticesInternal);
+
+                    int FindOnBorderCell(int currentCell)
+                    {
+                        bool IsOnBorder(int cId) => cells[cId].B == 1 || cells[cId].C.Any(OfDifferentType);
+                        if (IsOnBorder(currentCell)) return currentCell;
+
+                        for (int i = 0; i < packCellsNumber; i++)
+                            if (OfSameType(i) && IsOnBorder(i)) return i;
+
+                        throw new Exception($"Markup: firstCell {currentCell} is not on the feature or map border");
+                    }
+
+                    List<int> GetFeatureVertices(int sCell)
+                    {
+                        // Fix: Use Where + DefaultIfEmpty to safely handle the -1 default
+                        int startingVertex = cells[sCell].V
+                            .Where(v => vertices[v].C.Any(OfDifferentType))
+                            .DefaultIfEmpty(-1)
+                            .First();
+
+                        if (startingVertex == -1)
+                            throw new Exception($"Markup: startingVertex for cell {sCell} is not found");
+
+                        // Assuming PathUtils.ConnectVertices signature matches: 
+                        // (MapPack, int, Func<int, bool>, Func<int, bool>, bool)
+                        return PathUtils.ConnectVertices(pack, startingVertex, OfSameType, null, false);
+                    }
                 }
             }
-
-            // Trace vertices
-            var featureVertices = new List<int>();
-            if (type != FeatureType.Ocean)
-            {
-                int startVertex = pack.Cells[startCell].V.FirstOrDefault(v => pack.Vertices[v].C.Any(c => fIds[c] != id));
-                featureVertices = PathUtils.ConnectVertices(pack, startVertex, c => fIds[c] == id);
-            }
-
-            return new MapFeature
-            {
-                Id = id,
-                IsLand = land,
-                IsBorder = border,
-                Type = type,
-                CellsCount = totalCells,
-                FirstCell = startCell,
-                Vertices = featureVertices,
-                Area = 0 // PolygonArea logic can be added here
-            };
         }
 
         public static void MarkupDistance(MapCell[] cells, sbyte start, sbyte increment, sbyte limit)

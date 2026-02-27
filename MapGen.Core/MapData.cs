@@ -52,6 +52,11 @@ namespace MapGen.Core
 
     public class MapPack
     {
+        public int Width => Options.Width;
+        public int Height => Options.Height;
+        public int PointsCount => Options.PointsCount;
+        public string Seed => Options.Seed;
+
         public MapCell[] Cells { get; set; }
         public MapVertex[] Vertices { get; set; }
         public MapPoint[] Points { get; set; }

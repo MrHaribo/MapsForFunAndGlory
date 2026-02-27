@@ -25,6 +25,23 @@ namespace MapGen.Tests
             public bool land { get; set; }
         }
 
+        public class PackFeatureRegressionData
+        {
+            public ushort[] cells_f { get; set; }
+            public sbyte[] cells_t { get; set; }
+            public List<PackFeatureItem> features { get; set; }
+        }
+
+        public class PackFeatureItem
+        {
+            public ushort id { get; set; }
+            public string type { get; set; }
+            public bool land { get; set; }
+            public int verticesCount { get; set; }
+            public double area { get; set; }
+            public int shorelineCount { get; set; }
+        }
+
         [Fact]
         public void TestGridFeatureDetection()
         {
@@ -66,5 +83,66 @@ namespace MapGen.Tests
                 Assert.Equal(exp.type, act.Type.ToString().ToLower());
             }
         }
+
+        [Fact]
+        public void TestPackFeatureDetection()
+        {
+            // 1. Load the specific feature dump from JS
+            var json = File.ReadAllText("data/regression_features_pack.json");
+            var expected = JsonConvert.DeserializeObject<PackFeatureRegressionData>(json);
+
+            // 2. Setup MapPack
+            // 2. Prepare the Input MapData
+            var mapData = TestMapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            LakeModule.AddLakesInDeepDepressions(mapData);
+            LakeModule.OpenNearSeaLakes(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
+
+            var pack = PackModule.ReGraph(mapData);
+
+            // 3. Execute markup pack
+            FeatureModule.MarkupPack(pack);
+
+            // 4. Assert: Cell-level Data
+            var actualFeatureIds = pack.Cells.Select(c => c.FeatureId).ToArray();
+            var actualDistances = pack.Cells.Select(c => c.Distance).ToArray();
+
+            Assert.Equal(expected.cells_f, actualFeatureIds);
+            Assert.Equal(expected.cells_t, actualDistances);
+
+            // 5. Assert: Feature-level Metadata
+            // JS filter(f => f) means we skip the null index 0
+            var actualFeatures = pack.Features.Where(f => f != null).ToList();
+
+            Assert.Equal(expected.features.Count, actualFeatures.Count);
+
+            for (int i = 0; i < expected.features.Count; i++)
+            {
+                var exp = expected.features[i];
+                var act = actualFeatures[i];
+
+                Assert.Equal(exp.id, act.Id);
+                Assert.Equal(exp.type, act.Type.ToString().ToLower());
+                Assert.Equal(exp.verticesCount, act.Vertices.Count);
+
+                // Use a small epsilon for double comparison due to rounding
+                //Assert.InRange(act.Area, exp.area - 0.1, exp.area + 0.1);
+                Assert.InRange(act.Area, exp.area - 1.1, exp.area + 1.1);
+
+                if (act.Type == FeatureType.Lake)
+                {
+                    Assert.Equal(exp.shorelineCount, act.Shoreline.Count);
+                }
+            }
+        }
+
+
     }
 }

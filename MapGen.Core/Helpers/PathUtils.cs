@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Clipper2Lib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -55,6 +56,47 @@ namespace MapGen.Core.Helpers
                 area += (p1.X * p2.Y) - (p2.X * p1.Y);
             }
             return area / 2.0;
+        }
+
+        public static double CalculateAreaFromPoints(List<MapPoint> points)
+        {
+            if (points.Count < 3) return 0;
+            double area = 0;
+            var b = points[points.Count - 1];
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                var a = b;
+                b = points[i];
+                area += a.Y * b.X - a.X * b.Y;
+            }
+            return area / 2.0;
+        }
+
+        public static List<MapPoint> ClipPolygon(List<MapPoint> points, double width, double height)
+        {
+            if (points.Count < 2) return points;
+
+            // Define the Map Bounding Box as a clipping path
+            PathsD clipPath = new PathsD {
+                Clipper.MakePath(new double[] {
+                    0, 0,
+                    width, 0,
+                    width, height,
+                    0, height
+                })
+            };
+
+            PathsD subjectPath = new PathsD { Clipper.MakePath(points.SelectMany(p => new[] { p.X, p.Y }).ToArray()) };
+
+            // We use Intersect to keep only the part of the polygon inside the map bounds
+            // FillRule.EvenOdd matches standard SVG/D3 polygon rules
+            PathsD solution = Clipper.Intersect(subjectPath, clipPath, FillRule.EvenOdd);
+
+            if (solution.Count == 0) return new List<MapPoint>();
+
+            // Convert back to List<PointD>
+            return solution[0].Select(p => new MapPoint(p.x, p.y)).ToList();
         }
     }
 }
