@@ -31,6 +31,6 @@
         public const sbyte DEEP_WATER = -2;
 
         // Lake Constants
-        public const double LAKE_ELEVATION_DELTA = 0.01;
+        public const double LAKE_ELEVATION_DELTA = 0.1;
     }
 }

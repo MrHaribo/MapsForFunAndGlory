@@ -1,6 +1,7 @@
 ﻿using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -204,7 +205,10 @@ namespace MapGen.Core.Modules
                 // D3 polygonArea equivalent logic
                 // IMPORTANT: Use the CLIPPED points for the area, but the ORIGINAL vertices for the feature metadata
                 double area = PathUtils.CalculateAreaFromPoints(clippedPoints);
-                double absArea = Math.Abs(NumberUtils.Round(area));
+
+                // Simple fix to overcome the clipper winding order discrepancy
+                //double absArea = Math.Abs(NumberUtils.Round(area));
+                double absArea = NumberUtils.Round(Math.Abs(area));
 
                 var feature = new MapFeature
                 {
