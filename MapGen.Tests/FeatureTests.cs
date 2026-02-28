@@ -29,18 +29,21 @@ namespace MapGen.Tests
         {
             public ushort[] cells_f { get; set; }
             public sbyte[] cells_t { get; set; }
-            public List<PackFeatureItem> features { get; set; }
+            public List<PackFeatureRegressionItem> features { get; set; }
         }
 
-        public class PackFeatureItem
+        public class PackFeatureRegressionItem
         {
-            public ushort id { get; set; }
+            public int id { get; set; }
             public string type { get; set; }
             public bool land { get; set; }
-            public int verticesCount { get; set; }
+            public bool border { get; set; }
+            public int cells { get; set; }
+            public int firstCell { get; set; }
+            public List<int> vertices { get; set; } // Sequence matters!
             public double area { get; set; }
-            public int shorelineCount { get; set; }
             public double height { get; set; }
+            public List<int> shoreline { get; set; } // Sequence matters!
         }
 
         [Fact]
@@ -92,8 +95,7 @@ namespace MapGen.Tests
             var json = File.ReadAllText("data/regression_features_pack.json");
             var expected = JsonConvert.DeserializeObject<PackFeatureRegressionData>(json);
 
-            // 2. Setup MapPack
-            // 2. Prepare the Input MapData
+            // 2. Setup MapPack (Logic leading up to MarkupPack)
             var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
@@ -101,49 +103,40 @@ namespace MapGen.Tests
             FeatureModule.MarkupGrid(mapData);
             LakeModule.AddLakesInDeepDepressions(mapData);
             LakeModule.OpenNearSeaLakes(mapData);
-            GlobeModule.DefineMapSize(mapData);
-            GlobeModule.CalculateMapCoordinates(mapData);
-            ClimateModule.CalculateTemperatures(mapData);
-            ClimateModule.GeneratePrecipitation(mapData);
 
             var pack = PackModule.ReGraph(mapData);
 
-            // 3. Execute markup pack
+            // 3. Execute markup pack (The target of this test)
             FeatureModule.MarkupPack(pack);
 
-            // 4. Assert: Cell-level Data
-            var actualFeatureIds = pack.Cells.Select(c => c.FeatureId).ToArray();
-            var actualDistances = pack.Cells.Select(c => c.Distance).ToArray();
-
-            Assert.Equal(expected.cells_f, actualFeatureIds);
-            Assert.Equal(expected.cells_t, actualDistances);
+            // 4. Assert: Cell-level Data (Feature IDs and Distance to Shore)
+            Assert.Equal(expected.cells_f, pack.Cells.Select(c => c.FeatureId).ToArray());
+            Assert.Equal(expected.cells_t, pack.Cells.Select(c => c.Distance).ToArray());
 
             // 5. Assert: Feature-level Metadata
-            // JS filter(f => f) means we skip the null index 0
             var actualFeatures = pack.Features;
-
-            Assert.Equal(expected.features.Count, pack.Features.Count);
-            Assert.Equal(expected.features[0].id, pack.Features[0].Id); // Both should be 1
-
+            Assert.Equal(expected.features.Count, actualFeatures.Count);
 
             for (int i = 0; i < expected.features.Count; i++)
             {
                 var exp = expected.features[i];
                 var act = actualFeatures[i];
 
+                // Metadata
                 Assert.Equal(exp.id, act.Id);
                 Assert.Equal(exp.type, act.Type.ToString().ToLower());
-                Assert.Equal(exp.verticesCount, act.Vertices.Count);
+                Assert.Equal(exp.land, act.IsLand);
+                Assert.Equal(exp.border, act.IsBorder);
+                Assert.Equal(exp.cells, act.CellsCount);
+                Assert.Equal(exp.firstCell, act.FirstCell);
 
-                // Use a small epsilon for double comparison due to rounding
-                //Assert.InRange(act.Area, exp.area - 0.1, exp.area + 0.1);
-                Assert.InRange(act.Area, exp.area - 1.1, exp.area + 1.1);
+                // Geometry (The sequence check is vital for the winding order fix)
+                Assert.Equal(exp.vertices, act.Vertices);
+                Assert.Equal(exp.area, act.Area); // Bitwise parity expected here now!
+                Assert.Equal(exp.height, act.Height);
 
-                if (act.Type == FeatureType.Lake)
-                {
-                    Assert.Equal(exp.shorelineCount, act.Shoreline.Count);
-                    Assert.InRange(act.Height, exp.height - 0.001, exp.height + 0.001);
-                }
+                // Shoreline sequence affects how rivers/neighbors interact later
+                Assert.Equal(exp.shoreline, act.Shoreline);
             }
         }
 

@@ -24,16 +24,23 @@ namespace MapGen.Core.Modules
             // 1. Initial Height modification (JS: alterHeights)
             double[] h = AlterHeights(pack);
 
-            //File.WriteAllText("D:\\Downloads\\lake_h_alterHeights_cs.json", JsonSerializer.Serialize(h, new JsonSerializerOptions { WriteIndented = true }));
-
             // 2. Hydrological preprocessing
             LakeModule.DetectCloseLakes(pack, h);
             ResolveDepressions(pack, h);
 
-            File.WriteAllText("D:\\Downloads\\lake_h_resolveDepressions_cs.json", JsonSerializer.Serialize(h, new JsonSerializerOptions { WriteIndented = true }));
-
             // 3. Core Simulation
             DrainWater();
+
+            // Assuming your MapCell has .Flux and .Drainage (or whatever you named 't')
+            var waterData = new
+            {
+                flux = pack.Cells.Select(c => c.Flux).ToArray(),
+                t = pack.Cells.Select(c => c.Distance).ToArray(),
+                h = h
+            };
+
+            File.WriteAllText("D:\\Downloads\\lake_h_drainWater_cs.json", JsonSerializer.Serialize(waterData, new JsonSerializerOptions { WriteIndented = true }));
+
             DefineRivers();
             CalculateConfluenceFlux();
             LakeModule.CleanupLakeData(pack);
@@ -56,11 +63,13 @@ namespace MapGen.Core.Modules
 
             void DrainWater()
             {
-                const int MIN_FLUX_TO_FORM_RIVER = 30;
-                // Simplified modifier calculation
-                double cellsNumberModifier = Math.Pow(cellsCount / 10000.0, 0.25);
+                double cellsNumberModifier = Math.Pow(pack.PointsCount / 10000.0, 0.25);
 
-                // Sort land cells by height descending
+                // 1. Create a temporary high-precision flux array to avoid ushort truncation
+                double[] tempFlux = new double[cellsCount];
+                // Copy existing flux (if any) or just leave at 0 if starting fresh
+                for (int i = 0; i < cellsCount; i++) tempFlux[i] = cells[i].Flux;
+
                 var land = Enumerable.Range(0, cellsCount)
                     .Where(i => h[i] >= 20)
                     .OrderByDescending(i => h[i])
@@ -70,100 +79,127 @@ namespace MapGen.Core.Modules
 
                 foreach (int i in land)
                 {
-                    // Add precipitation flux (from grid data)
+                    // Add precipitation with double precision
                     byte prec = grid.Cells[pack.Cells[i].GridId].Prec;
-                    cells[i].Flux += (ushort)(prec / cellsNumberModifier);
+                    tempFlux[i] += prec / cellsNumberModifier;
 
-                    // Handle Lakes as water sources
-                    var lakes = lakeOutCells.ContainsKey(i)
-                        ? features.Where(f => i == f.OutCell && f.Flux > f.Evaporation).ToList()
-                        : new List<MapFeature>();
-
-                    foreach (var lake in lakes)
+                    // Handle Lakes
+                    if (lakeOutCells.TryGetValue(i, out int featureId))
                     {
-                        int lakeCell = cells[i].C.Find(c => h[c] < 20 && cells[c].FeatureId == lake.Id);
-                        cells[lakeCell].Flux += (ushort)Math.Max(lake.Flux - lake.Evaporation, 0);
-
-                        // Handle river continuity through lakes
-                        if (cells[lakeCell].RiverId != lake.RiverId)
+                        var lake = pack.GetFeature(featureId);
+                        if (lake != null && lake.Flux > lake.Evaporation)
                         {
-                            bool sameRiver = cells[lakeCell].C.Any(c => cells[c].RiverId == lake.RiverId);
-                            if (sameRiver)
+                            int lakeCell = cells[i].C.Find(c => h[c] < 20 && cells[c].FeatureId == lake.Id);
+
+                            // Accumulate lake flux into the temporary array
+                            tempFlux[lakeCell] += Math.Max(lake.Flux - lake.Evaporation, 0);
+
+                            // Hierarchy Fix: Logic for chain lakes
+                            if (cells[lakeCell].RiverId != lake.RiverId)
                             {
-                                cells[lakeCell].RiverId = lake.RiverId;
-                                AddCellToRiver(lakeCell, lake.RiverId);
+                                bool sameRiver = cells[lakeCell].C.Any(c => cells[c].RiverId == lake.RiverId);
+                                if (sameRiver)
+                                {
+                                    cells[lakeCell].RiverId = lake.RiverId;
+                                    AddCellToRiver(lakeCell, lake.RiverId);
+                                }
+                                else
+                                {
+                                    cells[lakeCell].RiverId = (ushort)riverNext;
+                                    AddCellToRiver(lakeCell, (ushort)riverNext);
+                                    riverNext++;
+                                }
                             }
-                            else
+
+                            lake.RiverId = cells[lakeCell].RiverId;
+
+                            // Call FlowDown with the high-precision flux
+                            FlowDown(i, tempFlux[lakeCell], lake.RiverId, tempFlux);
+
+                            // FIX: River Hierarchy Logic
+                            // All rivers entering the lake now become tributaries of the lake's outlet river
+                            if (lake.Inlets != null)
                             {
-                                cells[lakeCell].RiverId = riverNext;
-                                AddCellToRiver(lakeCell, riverNext);
-                                riverNext++;
+                                foreach (var inletId in lake.Inlets)
+                                {
+                                    riverParents[inletId] = lake.RiverId;
+                                }
                             }
                         }
-                        lake.RiverId = cells[lakeCell].RiverId;
-                        FlowDown(i, cells[lakeCell].Flux, lake.RiverId);
                     }
 
-                    // Pour water out if near border
+                    // Near-border logic
                     if (cells[i].B == 1 && cells[i].RiverId > 0)
                     {
                         AddCellToRiver(-1, cells[i].RiverId);
                         continue;
                     }
 
-                    // Determine Downhill path (min height)
-                    int min;
-                    if (lakeOutCells.ContainsKey(i))
-                    {
-                        var lakeIds = lakes.Select(l => l.Id).ToList();
-                        min = cells[i].C.Where(c => !lakeIds.Contains(cells[c].FeatureId))
-                                       .OrderBy(c => h[c]).FirstOrDefault();
-                    }
-                    else if (cells[i].Haven > 0)
-                    {
-                        min = cells[i].Haven;
-                    }
-                    else
-                    {
-                        min = cells[i].C.OrderBy(c => h[c]).FirstOrDefault();
-                    }
+                    // Determine Downhill
+                    int min = GetLowestNeighbor(i);
+                    if (h[i] <= h[min]) continue;
 
-                    if (h[i] <= h[min]) continue; // Depressed
-
-                    if (cells[i].Flux < MIN_FLUX_TO_FORM_RIVER)
+                    if (tempFlux[i] < MapConstants.MIN_FLUX_TO_FORM_RIVER)
                     {
-                        if (h[min] >= 20) cells[min].Flux += cells[i].Flux;
+                        if (h[min] >= 20) tempFlux[min] += tempFlux[i];
                         continue;
                     }
 
-                    // Proclaim new river if none exists
                     if (cells[i].RiverId == 0)
                     {
-                        cells[i].RiverId = riverNext;
-                        AddCellToRiver(i, riverNext);
+                        cells[i].RiverId = (ushort)riverNext;
+                        AddCellToRiver(i, (ushort)riverNext);
                         riverNext++;
                     }
 
-                    FlowDown(min, cells[i].Flux, cells[i].RiverId);
+                    FlowDown(min, tempFlux[i], cells[i].RiverId, tempFlux);
+                }
+
+                // 2. Final Step: Sync the high-precision tempFlux back to the ushort properties
+                for (int i = 0; i < cellsCount; i++)
+                {
+                    cells[i].Flux = (ushort)Math.Round(tempFlux[i]);
                 }
             }
 
-            void FlowDown(int toCell, int fromFlux, ushort riverId)
+            int GetLowestNeighbor(int i)
             {
-                int toFlux = cells[toCell].Flux - cells[toCell].Confluence;
+                List<int> neighbors = pack.Cells[i].C;
+                int bestNeighbor = neighbors[0];
+                double minH = h[bestNeighbor];
+
+                for (int j = 1; j < neighbors.Count; j++)
+                {
+                    int current = neighbors[j];
+                    double currentH = h[current];
+
+                    if (currentH < minH || (Math.Abs(currentH - minH) < 1e-9 && current < bestNeighbor))
+                    {
+                        minH = currentH;
+                        bestNeighbor = current;
+                    }
+                }
+                return bestNeighbor;
+            }
+
+        void FlowDown(int toCell, double fromFlux, ushort riverId, double[] tempFlux)
+            {
+                // Subtract confluence to get 'base' flux for comparison
+                double toFlux = tempFlux[toCell] - cells[toCell].Confluence;
                 ushort toRiver = cells[toCell].RiverId;
 
                 if (toRiver != 0)
                 {
                     if (fromFlux > toFlux)
                     {
-                        cells[toCell].Confluence += (byte)cells[toCell].Flux;
+                        // Mark confluence with precision
+                        cells[toCell].Confluence += (byte)Math.Min(255, Math.Round(tempFlux[toCell]));
                         if (h[toCell] >= 20) riverParents[toRiver] = riverId;
                         cells[toCell].RiverId = riverId;
                     }
                     else
                     {
-                        cells[toCell].Confluence += (byte)fromFlux;
+                        cells[toCell].Confluence += (byte)Math.Min(255, Math.Round(fromFlux));
                         if (h[toCell] >= 20) riverParents[riverId] = toRiver;
                     }
                 }
@@ -174,8 +210,8 @@ namespace MapGen.Core.Modules
 
                 if (h[toCell] < 20)
                 {
-                    var waterBody = features[cells[toCell].FeatureId];
-                    if (waterBody.Type == FeatureType.Lake)
+                    var waterBody = pack.GetFeature(cells[toCell].FeatureId);
+                    if (waterBody != null && waterBody.Type == FeatureType.Lake)
                     {
                         if (waterBody.RiverId == 0 || fromFlux > waterBody.EnteringFlux)
                         {
@@ -188,8 +224,9 @@ namespace MapGen.Core.Modules
                 }
                 else
                 {
-                    cells[toCell].Flux += (ushort)fromFlux;
+                    tempFlux[toCell] += fromFlux;
                 }
+
                 AddCellToRiver(toCell, riverId);
             }
 
@@ -208,7 +245,7 @@ namespace MapGen.Core.Modules
 
                     int downcut = (int)Math.Floor(cells[i].Flux / higherFlux);
                     if (downcut > 0)
-                        cells[i].H = (byte)Math.Max(cells[i].H - Math.Min(downcut, MAX_DOWNCUT), 20);
+                        cells[i].H = (byte)Math.Max(cells[i].H - Math.Min(downcut, MAX_DOWNCUT), MapConstants.LAND_THRESHOLD);
                 }
             }
 
@@ -237,7 +274,7 @@ namespace MapGen.Core.Modules
                     // 2. Mark real confluences and re-assign final river IDs to cells
                     foreach (int cellIdx in riverCells)
                     {
-                        if (cellIdx < 0 || cells[cellIdx].H < 20) continue;
+                        if (cellIdx < 0 || cells[cellIdx].H < MapConstants.LAND_THRESHOLD) continue;
 
                         if (cells[cellIdx].RiverId != 0 && cells[cellIdx].RiverId != riverId)
                             cells[cellIdx].Confluence = 1; // It's a junction
@@ -300,7 +337,7 @@ namespace MapGen.Core.Modules
         private static double[] AlterHeights(MapPack pack)
         {
             return pack.Cells.Select((c, i) => {
-                if (c.H < 20 || c.Distance < 1) return (double)c.H;
+                if (c.H < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.H;
                 double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
                 return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
             }).ToArray();
@@ -329,7 +366,7 @@ namespace MapGen.Core.Modules
 
             // JS sorts once at the beginning
             var land = Enumerable.Range(0, cells.Length)
-                .Where(i => h[i] >= 20 && cells[i].B == 0)
+                .Where(i => h[i] >= MapConstants.LAND_THRESHOLD && cells[i].B == 0)
                 .OrderBy(i => h[i])
                 .ToList();
 
@@ -400,7 +437,7 @@ namespace MapGen.Core.Modules
 
             // Convert cell IDs to Coordinates
             var points = GetRiverPoints(pack, riverCells);
-            int step = pack.Cells[riverCells[0]].H < 20 ? 1 : 10;
+            int step = pack.Cells[riverCells[0]].H < MapConstants.LAND_THRESHOLD ? 1 : 10;
 
             for (int i = 0; i <= lastStep; i++, step++)
             {
@@ -430,7 +467,7 @@ namespace MapGen.Core.Modules
                 double sinMeander = Math.Sin(angle) * meander;
                 double cosMeander = Math.Cos(angle) * meander;
 
-                if (step < 20 && (dist2 > 64 || (dist2 > 36 && riverCells.Count < 5)))
+                if (step < MapConstants.LAND_THRESHOLD && (dist2 > 64 || (dist2 > 36 && riverCells.Count < 5)))
                 {
                     // Add two intermediate points at 1/3 and 2/3
                     meandered.Add(new PointFlux((p1.X * 2 + p2.X) / 3.0 - sinMeander, (p1.Y * 2 + p2.Y) / 3.0 + cosMeander, 0));

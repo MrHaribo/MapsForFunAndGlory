@@ -145,15 +145,13 @@ namespace MapGen.Core.Modules
         public static void DetectCloseLakes(MapPack pack, double[] h)
         {
             var cells = pack.Cells;
-            // Standard Azgaar default for lake elevation limit
-            double elevationLimit = 10;
 
             foreach (var feature in pack.Features)
             {
                 if (feature.Type != FeatureType.Lake) continue;
                 feature.IsClosed = false;
 
-                double maxElevation = feature.Height + elevationLimit;
+                double maxElevation = feature.Height + MapConstants.LAKE_ELEVATION_LIMIT;
                 if (maxElevation > 99) continue;
 
                 bool isDeep = true;
@@ -179,7 +177,6 @@ namespace MapGen.Core.Modules
                             if (nFeature.Type == FeatureType.Ocean || feature.Height > nFeature.Height)
                             {
                                 isDeep = false; // Found an outlet path
-                                break;
                             }
                         }
 

@@ -123,7 +123,7 @@ namespace MapGen.Core
         public List<int> Vertices { get; set; } = new List<int>();
         public double Area { get; set; }
         public double Height { get; set; }
-        public List<int> Shoreline { get; set; } // Only for lakes/islands
+        public List<int> Shoreline { get; set; } = new List<int>(); // Only for lakes/islands
 
         // Added for Lake-River interactions
         public ushort RiverId { get; set; }     // The main river associated with this lake

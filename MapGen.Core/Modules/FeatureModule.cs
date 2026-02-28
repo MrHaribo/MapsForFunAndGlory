@@ -194,20 +194,19 @@ namespace MapGen.Core.Modules
                 var featureType = land ? FeatureType.Island : border ? FeatureType.Ocean : FeatureType.Lake;
 
                 var (startCell, featureVertices) = GetCellsData(featureType, firstCell);
-                
+
                 // Calculate Area
 
-                // JS: const points = clipPoly(featureVertices.map(vertex => vertices.p[vertex]));
+
+                // 1. Convert vertex indices to MapPoints
                 var points = featureVertices.Select(v => vertices[v].P).ToList();
-                var clippedPoints = PathUtils.ClipPolygon(points, pack.Width, pack.Height);
 
-                // D3 polygonArea equivalent logic
-                // IMPORTANT: Use the CLIPPED points for the area, but the ORIGINAL vertices for the feature metadata
-                double area = PathUtils.CalculateAreaFromPoints(clippedPoints);
+                // 2. Use our new LineClip port
+                var clippedPoints = LineClip.PolygonClip(points, pack.Width, pack.Height);
 
-                // Simple fix to overcome the clipper winding order discrepancy
-                //double absArea = Math.Abs(NumberUtils.Round(area));
-                double absArea = NumberUtils.Round(Math.Abs(area));
+                // 3. Calculate Area (Signed)
+                double area = PathUtils.CalculatePolygonArea(clippedPoints);
+                double absArea = Math.Abs(NumberUtils.Round(area));
 
                 var feature = new MapFeature
                 {
