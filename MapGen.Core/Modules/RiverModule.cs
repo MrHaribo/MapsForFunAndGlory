@@ -40,10 +40,20 @@ namespace MapGen.Core.Modules
             // 4. Erosion / Finalize
             if (allowErosion)
             {
-                // Apply modified heights back to the cell data
-                for (int i = 0; i < cellsCount; i++) cells[i].H = (byte)Math.Clamp(h[i], 0, 255);
-                DowncutRivers(pack, h);
+                for (int i = 0; i < pack.Cells.Length; i++)
+                {
+                    pack.Cells[i].H = (byte)Math.Floor(h[i]);
+                }
+                DowncutRivers(pack);
             }
+
+
+            //if (allowErosion)
+            //{
+            //    // Apply modified heights back to the cell data
+            //    for (int i = 0; i < cellsCount; i++) cells[i].H = (byte)Math.Clamp(h[i], 0, 255);
+            //    DowncutRivers(pack, h);
+            //}
 
             // --- Local Functions (Closures) ---
 
@@ -360,33 +370,51 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static void DowncutRivers(MapPack pack, double[] h)
+        public static void DowncutRivers(MapPack pack)
         {
-            foreach (var cell in pack.Cells)
-            {
-                // 1. Optimization: Only erode land above a certain height with actual water flow
-                if (h[cell.Index] < 35 || cell.Flux == 0) continue;
+            var cells = pack.Cells;
 
-                // 2. Find neighbors that are higher (upstream)
-                var higherNeighbors = cell.C
-                    .Where(nIdx => h[nIdx] > h[cell.Index])
+            // JS: for (const i of pack.cells.i)
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = cells[i];
+
+                // 1. Threshold check: must match JS integer comparison exactly
+                // JS: if (cells.h[i] < 35) continue; 
+                if (cell.H < 35 || cell.Flux == 0) continue;
+
+                // 2. Filter higher neighbors using the current state of the byte array
+                // JS: const higherCells = cells.c[i].filter(c => cells.h[c] > cells.h[i]);
+                byte currentH = cell.H;
+                var higherCellIndices = cell.C
+                    .Where(nIdx => cells[nIdx].H > currentH)
                     .ToList();
 
-                if (higherNeighbors.Count == 0) continue;
+                if (higherCellIndices.Count == 0) continue;
 
-                // 3. Calculate average flux of upstream cells
-                double higherFlux = higherNeighbors.Average(nIdx => (double)pack.Cells[nIdx].Flux);
+                // 3. Average Flux calculation
+                double sumFlux = 0;
+                foreach (int nIdx in higherCellIndices)
+                {
+                    sumFlux += cells[nIdx].Flux;
+                }
+                double higherFlux = sumFlux / higherCellIndices.Count;
+
                 if (higherFlux == 0) continue;
 
-                // 4. Calculate erosion amount
-                // If a cell has much more flux than its neighbors, it cuts deeper.
+                // 4. Calculate integer downcut amount
+                // JS: const downcut = Math.floor(cells.fl[i] / higherFlux);
                 int downcut = (int)Math.Floor(cell.Flux / higherFlux);
 
                 if (downcut > 0)
                 {
-                    double erosion = Math.Min(downcut, MapConstants.MAX_DOWNCUT);
-                    // Ensure we don't erode below the land threshold
-                    h[cell.Index] = Math.Max(h[cell.Index] - erosion, MapConstants.LAND_THRESHOLD);
+                    // 5. Apply erosion in-place
+                    // JS: cells.h[i] -= Math.min(downcut, MAX_DOWNCUT);
+                    int erosion = Math.Min(downcut, MapConstants.MAX_DOWNCUT);
+
+                    // Re-assigning to the byte property ensures the next cell in the loop
+                    // sees the updated height if it considers this cell a 'neighbor'.
+                    cell.H = (byte)Math.Max(0, cell.H - erosion);
                 }
             }
         }

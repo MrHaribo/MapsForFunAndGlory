@@ -78,26 +78,20 @@ namespace MapGen.Tests
             Assert.Equal(expected.RiverCount, pack.Rivers.Count);
             Assert.Equal(expected.ConfluenceCount, pack.Cells.Count(c => c.Confluence > 0));
 
-            var expectedConfluences = expected.Cells.Select(c => c.Confluence);
-            var actualConfluences = pack.Cells.Select(c => c.Confluence);
-
-            File.WriteAllText("D:\\Downloads\\expectedConfluences_js.json", JsonConvert.SerializeObject(expectedConfluences, Formatting.Indented));
-            File.WriteAllText("D:\\Downloads\\actualConfluences_cs.json", JsonConvert.SerializeObject(actualConfluences, Formatting.Indented));
-
             // B. Cell-Level Hydrology (The "Engine" of the river system)
             foreach (var expCell in expected.Cells)
             {
                 var actCell = pack.Cells[expCell.Index];
 
                 // Verify River Assignment & Logic Flow
-                Assert.Equal(expCell.RiverId, (int)actCell.RiverId);
+                Assert.Equal(expCell.RiverId, actCell.RiverId);
 
                 // Note: If this fails, ensure C# uses Math.Round(flux, MidpointRounding.AwayFromZero) 
                 // to match JS Math.round() behavior for confluences
                 Assert.Equal(expCell.Confluence, (double)actCell.Confluence);
 
                 // Verify Downcutting (Erosion) results
-                Assert.Equal(expCell.Height, (double)actCell.H);
+                Assert.Equal((byte)expCell.Height, actCell.H);
 
                 // Verify Precipitation/Lake Drainage Flux
                 Assert.Equal(expCell.Flux, (double)actCell.Flux);
