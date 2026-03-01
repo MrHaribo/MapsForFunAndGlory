@@ -34,6 +34,7 @@
         public const int MIN_FLUX_TO_FORM_RIVER = 30;
         public const double LAKE_ELEVATION_DELTA = 0.1;
         public const double LAKE_ELEVATION_LIMIT = 20;
+        public const double LAKE_HEIGHT_EXPONENT = 2;
         public const int MAX_DOWNCUT = 5;
 
         // River Geometry

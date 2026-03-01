@@ -202,32 +202,41 @@ namespace MapGen.Core.Modules
         public static Dictionary<int, int> DefineClimateData(MapPack pack, MapData grid, double[] h)
         {
             var lakeOutCells = new Dictionary<int, int>();
-            double heightExponent = 1.8;
 
             foreach (var feature in pack.Features)
             {
-                // Only process lakes
                 if (feature.Type != FeatureType.Lake) continue;
 
-                // 1. Calculate incoming water (Flux) from precipitation on the shoreline
+                // 1. Flux (Precipitation on shoreline)
                 feature.Flux = feature.Shoreline.Sum(c => (double)grid.Cells[pack.Cells[c].GridId].Prec);
 
-                // 2. Calculate average Temperature
-                if (feature.Vertices.Count < 6)
+                // 2. Temperature (Rounded to 1 decimal, threshold based on CellsCount)
+                if (feature.CellsCount < 6)
+                {
                     feature.Temp = grid.Cells[pack.Cells[feature.FirstCell].GridId].Temp;
+                }
                 else
-                    feature.Temp = feature.Shoreline.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
+                {
+                    double avgTemp = feature.Shoreline.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
+                    feature.Temp = Math.Round(avgTemp, 1);
+                }
 
-                // 3. Calculate Evaporation (Water loss)
-                double heightInMeters = Math.Pow(Math.Max(0, feature.Height - 18), heightExponent);
-                double evaporation = ((700 * (feature.Temp + 0.006 * heightInMeters)) / 50 + 75) / (80 - feature.Temp);
-                feature.Evaporation = NumberUtils.Round(evaporation * feature.Vertices.Count);
+                // 3. Evaporation (Multiplier must be CellsCount, result rounded to integer)
+                double heightInMeters = Math.Pow(Math.Max(0, feature.Height - 18), MapConstants.LAKE_HEIGHT_EXPONENT);
+                double evaporationFactor = ((700 * (feature.Temp + 0.006 * heightInMeters)) / 50 + 75) / (80 - feature.Temp);
 
-                // 4. Determine Outlet (if not a closed/endorheic lake)
+                // Match JS: rn(evaporation * lake.cells)
+                feature.Evaporation = Math.Round(evaporationFactor * feature.CellsCount);
+
+                // 4. Outlet and Shoreline Mutation
                 if (feature.IsClosed) continue;
 
-                // The lowest cell on the shore is where the river will start
-                feature.OutCell = feature.Shoreline.OrderBy(s => h[s]).First();
+                // CRITICAL: Sort in-place to match JS side-effect
+                // This reorders the actual list on the feature object
+                feature.Shoreline.Sort((a, b) => h[a].CompareTo(h[b]));
+
+                // After sorting, the lowest cell is at index 0
+                feature.OutCell = feature.Shoreline[0];
                 lakeOutCells[feature.OutCell] = feature.Id;
             }
 
