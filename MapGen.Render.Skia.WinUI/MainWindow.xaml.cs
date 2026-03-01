@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
 using System;
+using System.Collections.Generic;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -182,18 +183,7 @@ namespace MapGen.Render.Skia.WinUI
                 // This returns a List<MapPoint> forming a closed loop
                 var polygonPoints = RiverModule.GetRiverPolygon(meanderedData, river.WidthFactor, river.SourceWidth);
 
-                if (polygonPoints.Count < 3) continue;
-
-                // 3. Construct the SkiaSharp path from the domain points
-                using var path = new SKPath();
-                path.MoveTo((float)polygonPoints[0].X, (float)polygonPoints[0].Y);
-
-                for (int i = 1; i < polygonPoints.Count; i++)
-                {
-                    path.LineTo((float)polygonPoints[i].X, (float)polygonPoints[i].Y);
-                }
-
-                path.Close();
+                using var path = CreateRiverPath(polygonPoints);
 
                 // 4. Render as a filled shape
                 canvas.DrawPath(path, riverFill);
@@ -257,6 +247,33 @@ namespace MapGen.Render.Skia.WinUI
                 path.LineTo((float)v.X, (float)v.Y);
             }
             path.Close();
+            return path;
+        }
+
+        private SKPath CreateRiverPath(List<MapPoint> polygonPoints)
+        {
+            var path = new SKPath();
+            if (polygonPoints.Count > 0)
+            {
+                path.MoveTo((float)polygonPoints[0].X, (float)polygonPoints[0].Y);
+
+                for (int i = 1; i < polygonPoints.Count - 1; i++)
+                {
+                    var current = polygonPoints[i];
+                    var next = polygonPoints[i + 1];
+
+                    // Calculate midpoint between current and next
+                    float midX = (float)(current.X + next.X) / 2;
+                    float midY = (float)(current.Y + next.Y) / 2;
+
+                    // Use current point as control point, and midpoint as the end
+                    path.QuadTo((float)current.X, (float)current.Y, midX, midY);
+                }
+
+                path.LineTo((float)polygonPoints[^1].X, (float)polygonPoints[^1].Y);
+                path.Close();
+            }
+
             return path;
         }
     }
