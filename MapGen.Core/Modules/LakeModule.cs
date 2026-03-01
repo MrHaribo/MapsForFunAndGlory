@@ -152,20 +152,28 @@ namespace MapGen.Core.Modules
                 feature.IsClosed = false;
 
                 double maxElevation = feature.Height + MapConstants.LAKE_ELEVATION_LIMIT;
-                if (maxElevation > 99) continue;
+                if (maxElevation > 99)
+                {
+                    feature.IsClosed = false;
+                    continue;
+                }
+
+                // 1. MATCH JS SIDE-EFFECT: Sort the shoreline in-place by height
+                feature.Shoreline.Sort((a, b) => h[a].CompareTo(h[b]));
 
                 bool isDeep = true;
-                int lowestShoreCell = feature.Shoreline.OrderBy(s => h[s]).First();
+                int lowestShoreCell = feature.Shoreline[0];
 
-                var queue = new Queue<int>();
-                queue.Enqueue(lowestShoreCell);
+                // 2. MATCH JS STACK BEHAVIOR: Use Stack (LIFO) instead of Queue
+                var stack = new Stack<int>();
+                stack.Push(lowestShoreCell);
 
                 var checkedCells = new HashSet<int>();
                 checkedCells.Add(lowestShoreCell);
 
-                while (queue.Count > 0 && isDeep)
+                while (stack.Count > 0 && isDeep)
                 {
-                    int cellId = queue.Dequeue();
+                    int cellId = stack.Pop();
 
                     foreach (int n in cells[cellId].C)
                     {
@@ -176,12 +184,15 @@ namespace MapGen.Core.Modules
                             var nFeature = pack.GetFeature(cells[n].FeatureId);
                             if (nFeature.Type == FeatureType.Ocean || feature.Height > nFeature.Height)
                             {
-                                isDeep = false; // Found an outlet path
+                                isDeep = false;
                             }
                         }
 
-                        checkedCells.Add(n);
-                        queue.Enqueue(n);
+                        if (isDeep) // Only add to stack if we haven't found an outlet yet
+                        {
+                            checkedCells.Add(n);
+                            stack.Push(n);
+                        }
                     }
                 }
                 feature.IsClosed = isDeep;
