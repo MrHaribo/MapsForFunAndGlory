@@ -8,14 +8,6 @@ using System.Xml;
 
 namespace MapGen.Core.Modules
 {
-    public class FlowDownLogEntry
-    {
-        public string source { get; set; } // "lake" or "land"
-        public int cell { get; set; }     // The 'toCell' or 'min' index
-        public double flux { get; set; }   // The 'fromFlux' or 'tempFlux[i]'
-        public int riverId { get; set; }
-    }
-
     public static class RiverModule
     {
         #region Generate
@@ -38,22 +30,8 @@ namespace MapGen.Core.Modules
             LakeModule.DetectCloseLakes(pack, h);
             ResolveDepressions(pack, h);
 
-            List<FlowDownLogEntry> logs = new List<FlowDownLogEntry>();
-
             // 3. Core Simulation
             DrainWater();
-
-            File.WriteAllText("D:\\Downloads\\flowDownLog_cs.json", JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
-
-            // Assuming your MapCell has .Flux and .Drainage (or whatever you named 't')
-            var waterData = new
-            {
-                flux = pack.Cells.Select(c => c.Flux).ToArray(),
-                t = pack.Cells.Select(c => c.Distance).ToArray(),
-                h = h
-            };
-
-            File.WriteAllText("D:\\Downloads\\lake_h_drainWater_cs.json", JsonSerializer.Serialize(waterData, new JsonSerializerOptions { WriteIndented = true }));
 
             DefineRivers(pack, riversData, riverParents);
             CalculateConfluenceFlux(pack, h);
@@ -136,15 +114,6 @@ namespace MapGen.Core.Modules
                             // using the flux that just arrived from the lake
                             FlowDown(i, tempFlux[lakeCell], lake.RiverId, tempFlux);
 
-                            logs.Add(new FlowDownLogEntry
-                            {
-                                source = "lake",
-                                cell = i,
-                                flux = tempFlux[lakeCell],
-                                riverId = lake.RiverId
-                            });
-
-
                             // Assign tributary parents
                             if (lake.Inlets != null)
                             {
@@ -182,15 +151,6 @@ namespace MapGen.Core.Modules
                     }
 
                     FlowDown(min, tempFlux[i], cells[i].RiverId, tempFlux);
-
-                    // LOG CALL SITE 2: Standard Land Flow
-                    logs.Add(new FlowDownLogEntry
-                    {
-                        source = "land",
-                        cell = min,
-                        flux = tempFlux[i],
-                        riverId = pack.Cells[i].RiverId
-                    });
                 }
 
                 // Final Sync
