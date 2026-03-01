@@ -93,8 +93,8 @@ namespace MapGen.Core
         public int GridId { get; set; }       // Mapping back to Grid cell index (Pack only)
         
         // Geographical
-        public int Haven { get; set; }   // Index of the closest water cell (for land cells)
-        public byte Harbor { get; set; } // Number of adjacent water cells
+        public ushort Haven { get; set; }   // Index of the closest water cell (for land cells)
+        public ushort Harbor { get; set; } // Number of adjacent water cells
 
         // Rivers
         public ushort Flux { get; set; }        // cells.fl: water flow volume

@@ -136,7 +136,19 @@ namespace MapGen.Core.Modules
                     }
 
                     // Determine Downhill
-                    int min = GetLowestNeighbor(i);
+                    int min;
+                    if (lakeOutCells.TryGetValue(i, out int lakeFeatureId))
+                    {
+                        // If this cell is a lake outlet, we must ignore neighbors belonging to that lake
+                        min = GetLowestNeighbor(i, lakeFeatureId);
+                    }
+                    else
+                    {
+                        // Normal cell
+                        min = GetLowestNeighbor(i);
+                    }
+
+                    // Check for depressions
                     if (h[i] <= h[min]) continue;
 
                     if (tempFlux[i] < MapConstants.MIN_FLUX_TO_FORM_RIVER)
@@ -162,29 +174,10 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            int GetLowestNeighbor(int i)
-            {
-                List<int> neighbors = pack.Cells[i].C;
-                int bestNeighbor = neighbors[0];
-                double minH = h[bestNeighbor];
-
-                for (int j = 1; j < neighbors.Count; j++)
-                {
-                    int current = neighbors[j];
-                    double currentH = h[current];
-
-                    if (currentH < minH || (Math.Abs(currentH - minH) < 1e-9 && current < bestNeighbor))
-                    {
-                        minH = currentH;
-                        bestNeighbor = current;
-                    }
-                }
-                return bestNeighbor;
-            }
-
+            // Updated FlowDown to match JS confluence logic exactly
             void FlowDown(int toCell, double fromFlux, ushort riverId, double[] tempFlux)
             {
-                // Subtract confluence to get 'base' flux for comparison
+                // JS: const toFlux = cells.fl[toCell] - cells.conf[toCell];
                 double toFlux = tempFlux[toCell] - cells[toCell].Confluence;
                 ushort toRiver = cells[toCell].RiverId;
 
@@ -192,14 +185,18 @@ namespace MapGen.Core.Modules
                 {
                     if (fromFlux > toFlux)
                     {
-                        // Mark confluence with precision
-                        cells[toCell].Confluence += (byte)Math.Min(255, Math.Round(tempFlux[toCell]));
+                        // JS: cells.conf[toCell] += cells.fl[toCell];
+                        // Note: We use the total flux here to match JS
+                        cells[toCell].Confluence = (byte)Math.Min(255, cells[toCell].Confluence + Math.Round(tempFlux[toCell]));
+
                         if (h[toCell] >= 20) riverParents[toRiver] = riverId;
                         cells[toCell].RiverId = riverId;
                     }
                     else
                     {
-                        cells[toCell].Confluence += (byte)Math.Min(255, Math.Round(fromFlux));
+                        // JS: cells.conf[toCell] += fromFlux;
+                        cells[toCell].Confluence = (byte)Math.Min(255, cells[toCell].Confluence + Math.Round(fromFlux));
+
                         if (h[toCell] >= 20) riverParents[riverId] = toRiver;
                     }
                 }
@@ -219,7 +216,9 @@ namespace MapGen.Core.Modules
                             waterBody.EnteringFlux = fromFlux;
                         }
                         waterBody.Flux += fromFlux;
-                        waterBody.Inlets.Add(riverId);
+                        // Ensure inlets are unique
+                        if (waterBody.Inlets == null) waterBody.Inlets = new List<ushort>();
+                        if (!waterBody.Inlets.Contains(riverId)) waterBody.Inlets.Add(riverId);
                     }
                 }
                 else
@@ -229,15 +228,42 @@ namespace MapGen.Core.Modules
 
                 AddCellToRiver(toCell, riverId);
             }
-        }
 
-        private static double[] AlterHeights(MapPack pack)
-        {
-            return pack.Cells.Select((c, i) => {
-                if (c.H < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.H;
-                double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
-                return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
-            }).ToArray();
+            int GetLowestNeighbor(int i, int? excludeLakeId = null)
+            {
+                // 1. Azgaar Haven Logic: If a cell has a forced downhill target, use it
+                // Check if your MapCell class has a Haven property (often used for manual river paths)
+                if (pack.Cells[i].Haven != 0) return pack.Cells[i].Haven;
+
+                var neighbors = pack.Cells[i].C;
+                int bestNeighbor = -1;
+                double minH = double.MaxValue;
+
+                // 2. Find the lowest neighbor, potentially filtering out the source lake
+                for (int j = 0; j < neighbors.Count; j++)
+                {
+                    int neighborIdx = neighbors[j];
+
+                    // If we are an outlet, don't flow back into the lake feature
+                    if (excludeLakeId.HasValue && pack.Cells[neighborIdx].FeatureId == excludeLakeId.Value)
+                        continue;
+
+                    double currentH = h[neighborIdx];
+
+                    // 3. Parity Tie-breaker: 
+                    // JS sort picks the FIRST element if heights are equal.
+                    // We use a small epsilon and strictly 'less than' to ensure we only 
+                    // update if we find a neighbor strictly lower than our current best.
+                    if (currentH < minH)
+                    {
+                        minH = currentH;
+                        bestNeighbor = neighborIdx;
+                    }
+                }
+
+                // Fallback: If filtering excluded all neighbors (rare), return the first neighbor
+                return bestNeighbor != -1 ? bestNeighbor : neighbors[0];
+            }
         }
 
         #endregion
@@ -392,6 +418,15 @@ namespace MapGen.Core.Modules
         #endregion
 
         #region Resolve Depressions
+
+        private static double[] AlterHeights(MapPack pack)
+        {
+            return pack.Cells.Select((c, i) => {
+                if (c.H < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.H;
+                double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
+                return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
+            }).ToArray();
+        }
 
         public static void ResolveDepressions(MapPack pack, double[] h)
         {

@@ -29,6 +29,8 @@ namespace MapGen.Tests
         {
             public ushort[] cells_f { get; set; }
             public sbyte[] cells_t { get; set; }
+            public ushort[] cells_haven { get; set; }
+            public ushort[] cells_harbor { get; set; }
             public List<PackFeatureRegressionItem> features { get; set; }
         }
 
@@ -112,6 +114,13 @@ namespace MapGen.Tests
             // 4. Assert: Cell-level Data (Feature IDs and Distance to Shore)
             Assert.Equal(expected.cells_f, pack.Cells.Select(c => c.FeatureId).ToArray());
             Assert.Equal(expected.cells_t, pack.Cells.Select(c => c.Distance).ToArray());
+
+            // Haven (Forced River flow targets)
+            // If these diverge, rivers will flow to different neighbors even if heights are the same
+            Assert.Equal(expected.cells_haven, pack.Cells.Select(c => c.Haven).ToArray());
+
+            // Harbor (Forced port/coastal targets)
+            Assert.Equal(expected.cells_harbor, pack.Cells.Select(c => c.Harbor).ToArray());
 
             // 5. Assert: Feature-level Metadata
             var actualFeatures = pack.Features;

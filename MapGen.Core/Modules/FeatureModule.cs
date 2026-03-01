@@ -86,7 +86,7 @@ namespace MapGen.Core.Modules
             // Use local arrays to match JS scope, then sync to MapCell properties at the end
             sbyte[] distanceField = new sbyte[packCellsNumber]; // pack.cells.t
             ushort[] featureIds = new ushort[packCellsNumber];  // pack.cells.f
-            int[] haven = new int[packCellsNumber];             // haven: opposite water cell
+            ushort[] haven = new ushort[packCellsNumber];             // haven: opposite water cell
             byte[] harbor = new byte[packCellsNumber];          // harbor: count of water neighbors
             var features = new List<MapFeature>();
 
@@ -185,7 +185,7 @@ namespace MapGen.Core.Modules
                     if (d2 < minDist) { minDist = d2; closest = wId; }
                 }
 
-                haven[cellId] = closest;
+                haven[cellId] = (ushort)closest;
                 harbor[cellId] = (byte)waterCells.Count;
             }
 
