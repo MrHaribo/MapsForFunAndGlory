@@ -331,32 +331,30 @@ namespace MapGen.Core.Modules
 
         public static void CalculateConfluenceFlux(MapPack pack, double[] h)
         {
-            // We iterate through all cells to find marked confluence points
             foreach (var cell in pack.Cells)
             {
+                // Check if there is any confluence marked (JS: if (!cells.conf[i]) continue)
                 if (cell.Confluence == 0) continue;
 
-                // Find all neighboring cells that:
-                // 1. Have a river assigned
-                // 2. Are higher than the current cell (meaning they flow INTO this cell)
                 var sortedInflux = cell.C
                     .Select(neighborIdx => pack.Cells[neighborIdx])
+                    // JS: cells.r[c] && h[c] > h[i]
                     .Where(n => n.RiverId > 0 && h[n.Index] > h[cell.Index])
-                    .Select(n => (int)n.Flux)
+                    // JS: .map(c => cells.fl[c])
+                    .Select(n => n.Flux)
+                    // JS: .sort((a, b) => b - a)
                     .OrderByDescending(f => f)
                     .ToList();
 
-                // If we have multiple streams meeting:
-                // The largest flux is the 'main' river.
-                // The sum of all other (smaller) fluxes is stored in Confluence.
+                // JS: sortedInflux.reduce((acc, flux, index) => (index ? acc + flux : acc), 0)
+                // This sums all elements EXCEPT the first one (index 0).
                 if (sortedInflux.Count > 1)
                 {
-                    cell.Confluence = (byte)Math.Min(255, sortedInflux.Skip(1).Sum());
+                    cell.Confluence = sortedInflux.Skip(1).Sum();
                 }
                 else
                 {
-                    // If only one (or zero) influx was found after height check, 
-                    // reset the flag to 0
+                    // If only one stream flows in, it's not a confluence visually
                     cell.Confluence = 0;
                 }
             }

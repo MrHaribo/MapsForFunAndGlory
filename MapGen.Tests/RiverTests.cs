@@ -1,22 +1,20 @@
-﻿using MapGen.Core;
-using MapGen.Core.Modules;
+﻿using MapGen.Core.Modules;
+using MapGen.Tests;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static MapGen.Tests.FeatureTests;
+
 
 namespace MapGen.Tests
 {
     public class RiverTests
     {
+        // --- Test Data Schema ---
+
         public class RiverRegressionData
         {
             public int RiverCount { get; set; }
             public int ConfluenceCount { get; set; }
             public List<RiverEntry> Rivers { get; set; }
+            public List<CellHydrologyEntry> Cells { get; set; }
         }
 
         public class RiverEntry
@@ -31,17 +29,31 @@ namespace MapGen.Tests
             public double WidthFactor { get; set; }
             public double SourceWidth { get; set; }
             public int CellCount { get; set; }
-            public List<int> CellSample { get; set; }
+            public int[] CellSample { get; set; }
+        }
+
+        public class CellHydrologyEntry
+        {
+            [JsonProperty("i")]
+            public int Index { get; set; }
+            [JsonProperty("r")]
+            public int RiverId { get; set; }
+            [JsonProperty("c")]
+            public double Confluence { get; set; }
+            [JsonProperty("h")]
+            public double Height { get; set; }
+            [JsonProperty("f")]
+            public double Flux { get; set; }
         }
 
         [Fact]
-        public void TestRiverParity()
+        public void TestRiverFullBitwiseParity()
         {
-            // 1. Load the specific feature dump from JS
+            // 1. Load Data
             var json = File.ReadAllText("data/regression_rivers.json");
             var expected = JsonConvert.DeserializeObject<RiverRegressionData>(json);
 
-            // 2. Prepare MapData (Existing pipeline)
+            // 2. Setup (Ensure this matches the JS state exactly)
             var mapData = TestMapData.TestData;
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
@@ -57,45 +69,67 @@ namespace MapGen.Tests
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
 
-            // 3. Run the target module
-            RiverModule.Generate(pack, mapData); // Passing the grid for Prec/Temp access
+            // 3. Run
+            RiverModule.Generate(pack, mapData, allowErosion: true);
 
-            // --- ASSERTIONS ---
+            // --- STRICT ASSERTIONS ---
 
             // A. Global Counts
-            Assert.True(expected.RiverCount == pack.Rivers.Count,
-                $"River count mismatch. Expected {expected.RiverCount}, got {pack.Rivers.Count}");
+            Assert.Equal(expected.RiverCount, pack.Rivers.Count);
+            Assert.Equal(expected.ConfluenceCount, pack.Cells.Count(c => c.Confluence > 0));
 
-            int actualConfluences = pack.Cells.Count(c => c.Confluence > 0);
-            Assert.True(expected.ConfluenceCount == actualConfluences,
-                $"Confluence count mismatch. Expected {expected.ConfluenceCount}, got {actualConfluences}");
+            var expectedConfluences = expected.Cells.Select(c => c.Confluence);
+            var actualConfluences = pack.Cells.Select(c => c.Confluence);
 
-            // B. Deep Dive into River logic
+            File.WriteAllText("D:\\Downloads\\expectedConfluences_js.json", JsonConvert.SerializeObject(expectedConfluences, Formatting.Indented));
+            File.WriteAllText("D:\\Downloads\\actualConfluences_cs.json", JsonConvert.SerializeObject(actualConfluences, Formatting.Indented));
+
+            // B. Cell-Level Hydrology (The "Engine" of the river system)
+            foreach (var expCell in expected.Cells)
+            {
+                var actCell = pack.Cells[expCell.Index];
+
+                // Verify River Assignment & Logic Flow
+                Assert.Equal(expCell.RiverId, (int)actCell.RiverId);
+
+                // Note: If this fails, ensure C# uses Math.Round(flux, MidpointRounding.AwayFromZero) 
+                // to match JS Math.round() behavior for confluences
+                Assert.Equal(expCell.Confluence, (double)actCell.Confluence);
+
+                // Verify Downcutting (Erosion) results
+                Assert.Equal(expCell.Height, (double)actCell.H);
+
+                // Verify Precipitation/Lake Drainage Flux
+                Assert.Equal(expCell.Flux, (double)actCell.Flux);
+            }
+
+            // C. River Metadata (The "Output" of the river system)
             foreach (var expRiver in expected.Rivers)
             {
                 var actRiver = pack.Rivers.FirstOrDefault(r => r.Id == expRiver.Id);
-                Assert.True(actRiver != null, $"River ID {expRiver.Id} missing in C# output");
+                Assert.NotNull(actRiver);
 
-                // Hierarchy and Connectivity
-                Assert.Equal(expRiver.Parent, actRiver.Parent);
+                Assert.Equal(expRiver.Parent, (int)actRiver.Parent);
                 Assert.Equal(expRiver.Source, actRiver.Source);
                 Assert.Equal(expRiver.Mouth, actRiver.Mouth);
                 Assert.Equal(expRiver.CellCount, actRiver.Cells.Count);
 
-                // Simulation Data (Hydrology) - Tolerance allowed for floating point
-                Assert.InRange(actRiver.Discharge, expRiver.Discharge - 0.1, expRiver.Discharge + 0.1);
+                // Discharge must be exact bitwise match
+                Assert.Equal(expRiver.Discharge, actRiver.Discharge);
 
-                // Geometric Data (Meandering result)
-                // Note: Width and Length depend on the meandering path being identical
-                Assert.InRange(actRiver.Length, expRiver.Length - 0.5, expRiver.Length + 0.5);
-                Assert.InRange(actRiver.Width, expRiver.Width - 0.05, expRiver.Width + 0.05);
-                Assert.InRange(actRiver.SourceWidth, expRiver.SourceWidth - 0.01, expRiver.SourceWidth + 0.01);
+                // Physical attributes derived from Meandering path
+                Assert.Equal(expRiver.Length, actRiver.Length);
+                Assert.Equal(expRiver.Width, actRiver.Width);
+                Assert.Equal(expRiver.SourceWidth, actRiver.SourceWidth);
 
-                // Path Sample Integrity
-                // Ensuring the first and last parts of the river follow the same cell sequence
-                for (int i = 0; i < 3; i++)
+                // Path sequence verification
+                for (int i = 0; i < expRiver.CellSample.Length; i++)
                 {
-                    Assert.Equal(expRiver.CellSample[i], actRiver.Cells[i]);
+                    int actCellId = i < 3
+                        ? actRiver.Cells[i]
+                        : actRiver.Cells[actRiver.Cells.Count - (6 - i)];
+
+                    Assert.Equal(expRiver.CellSample[i], actCellId);
                 }
             }
         }
