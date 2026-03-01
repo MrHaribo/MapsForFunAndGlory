@@ -175,9 +175,11 @@ namespace MapGen.Render.Skia.WinUI
             foreach (var river in _pack.Rivers)
             {
                 // 1. Get the meandered points (X, Y, Flux) from your module
-                var meanderedData = RiverModule.AddMeandering(river.Cells, river.Points);
+                // We pass the pack to resolve Flux and the river's list of Cell IDs
+                var meanderedData = RiverModule.AddMeandering(_pack, river.Cells);
 
                 // 2. Generate the polygon coordinates using our domain logic
+                // This returns a List<MapPoint> forming a closed loop
                 var polygonPoints = RiverModule.GetRiverPolygon(meanderedData, river.WidthFactor, river.SourceWidth);
 
                 if (polygonPoints.Count < 3) continue;

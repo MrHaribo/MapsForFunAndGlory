@@ -521,48 +521,49 @@ namespace MapGen.Core.Modules
             var meandered = new List<PointFlux>();
             int lastStep = riverCells.Count - 1;
 
-            // Convert cell IDs to Coordinates
+            // Convert cell IDs to Coordinates (MapPoint list)
             var points = GetRiverPoints(pack, riverCells);
-            int step = pack.Cells[riverCells[0]].H < MapConstants.LAND_THRESHOLD ? 1 : 10;
+
+            // Initial step logic based on height (Lowland vs Highland)
+            int step = pack.Cells[riverCells[0]].H < 20 ? 1 : 10;
 
             for (int i = 0; i <= lastStep; i++, step++)
             {
-                int cell = riverCells[i];
+                int cellIdx = riverCells[i];
                 var p1 = points[i];
+                double currentFlux = cells[cellIdx].Flux;
 
-                // Add the actual cell center first
-                meandered.Add(new PointFlux(p1.X, p1.Y, cells[cell >= 0 ? cell : riverCells[i - 1]].Flux));
+                // 1. Add the actual cell center
+                meandered.Add(new PointFlux(p1.X, p1.Y, currentFlux));
 
                 if (i == lastStep) break;
 
-                int nextCell = riverCells[i + 1];
                 var p2 = points[i + 1];
-
-                if (nextCell == -1) // Flowing off-map
-                {
-                    meandered.Add(new PointFlux(p2.X, p2.Y, cells[riverCells[i]].Flux));
-                    break;
-                }
-
                 double dist2 = Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2);
+
+                // Skip jitter if points are too close and river is long
                 if (dist2 <= 25 && riverCells.Count >= 6) continue;
 
-                // Calculate Meander offset
-                double meander = meandering + 1.0 / step + Math.Max(meandering - step / 100.0, 0);
+                // 2. Calculate Meander offset (Perpendicular jitter)
+                double meanderAmount = meandering + 1.0 / step + Math.Max(meandering - step / 100.0, 0);
                 double angle = Math.Atan2(p2.Y - p1.Y, p2.X - p1.X);
-                double sinMeander = Math.Sin(angle) * meander;
-                double cosMeander = Math.Cos(angle) * meander;
 
-                if (step < MapConstants.LAND_THRESHOLD && (dist2 > 64 || (dist2 > 36 && riverCells.Count < 5)))
+                // Perpendicular vectors
+                double sinMeander = Math.Sin(angle) * meanderAmount;
+                double cosMeander = Math.Cos(angle) * meanderAmount;
+
+                // 3. Add Intermediate Jitter Points
+                // We pass 'currentFlux' to these points so the river width is maintained
+                if (step < 20 && (dist2 > 64 || (dist2 > 36 && riverCells.Count < 5)))
                 {
-                    // Add two intermediate points at 1/3 and 2/3
-                    meandered.Add(new PointFlux((p1.X * 2 + p2.X) / 3.0 - sinMeander, (p1.Y * 2 + p2.Y) / 3.0 + cosMeander, 0));
-                    meandered.Add(new PointFlux((p1.X + p2.X * 2) / 3.0 + sinMeander / 2.0, (p1.Y + p2.Y * 2) / 3.0 - cosMeander / 2.0, 0));
+                    // Two intermediate points at 1/3 and 2/3
+                    meandered.Add(new PointFlux((p1.X * 2 + p2.X) / 3.0 - sinMeander, (p1.Y * 2 + p2.Y) / 3.0 + cosMeander, currentFlux));
+                    meandered.Add(new PointFlux((p1.X + p2.X * 2) / 3.0 + sinMeander / 2.0, (p1.Y + p2.Y * 2) / 3.0 - cosMeander / 2.0, currentFlux));
                 }
                 else if (dist2 > 25 || riverCells.Count < 6)
                 {
-                    // Add one midpoint
-                    meandered.Add(new PointFlux((p1.X + p2.X) / 2.0 - sinMeander, (p1.Y + p2.Y) / 2.0 + cosMeander, 0));
+                    // One midpoint
+                    meandered.Add(new PointFlux((p1.X + p2.X) / 2.0 - sinMeander, (p1.Y + p2.Y) / 2.0 + cosMeander, currentFlux));
                 }
             }
             return meandered;
@@ -631,7 +632,7 @@ namespace MapGen.Core.Modules
 
         #region River Rendering
 
-        public static List<MapPoint> GetRiverPolygon(List<(MapPoint P, double Flux)> meanderedPoints, double widthFactor, double startingWidth)
+        public static List<MapPoint> GetRiverPolygon(List<PointFlux> meanderedPoints, double widthFactor, double startingWidth)
         {
             var riverPointsLeft = new List<MapPoint>();
             var riverPointsRight = new List<MapPoint>();
@@ -639,37 +640,28 @@ namespace MapGen.Core.Modules
 
             for (int i = 0; i < meanderedPoints.Count; i++)
             {
-                // p0 (previous), p1 (current), p2 (next)
-                var p0 = i == 0 ? meanderedPoints[i].P : meanderedPoints[i - 1].P;
-                var p1 = meanderedPoints[i].P;
-                var p2 = i == meanderedPoints.Count - 1 ? meanderedPoints[i].P : meanderedPoints[i + 1].P;
+                var p1 = meanderedPoints[i];
+                var p0 = i == 0 ? p1 : meanderedPoints[i - 1];
+                var p2 = i == meanderedPoints.Count - 1 ? p1 : meanderedPoints[i + 1];
 
-                double pointFlux = meanderedPoints[i].Flux;
-                if (pointFlux > maxFlux) maxFlux = pointFlux;
+                // Track max flux encountered so far (rivers only get wider)
+                if (p1.Flux > maxFlux) maxFlux = p1.Flux;
 
-                // 1. Calculate dynamic width (offset) per FGM logic
-                // (Math.sqrt(flux) * widthFactor * 0.1) + startingWidth + (pointIndex * 0.1)
+                // FGM Width Logic
                 double offset = (Math.Sqrt(maxFlux) * widthFactor * 0.1) + startingWidth + (i * 0.1);
 
-                // 2. Calculate the angle perpendicular to the flow
-                // atan2(y0 - y2, x0 - x2)
+                // Perpendicular angle
                 double angle = Math.Atan2(p0.Y - p2.Y, p0.X - p2.X);
                 double sinOffset = Math.Sin(angle) * offset;
                 double cosOffset = Math.Cos(angle) * offset;
 
-                // 3. Project points to create the "banks"
                 riverPointsLeft.Add(new MapPoint(p1.X - sinOffset, p1.Y + cosOffset));
                 riverPointsRight.Add(new MapPoint(p1.X + sinOffset, p1.Y - cosOffset));
             }
 
-            // 4. Create a single closed loop for the polygon
             var polygon = new List<MapPoint>();
-
-            // Right bank: Source -> Mouth
-            polygon.AddRange(riverPointsRight);
-
-            // Left bank: Mouth -> Source (Reversed)
-            for (int i = riverPointsLeft.Count - 1; i >= 0; i--)
+            polygon.AddRange(riverPointsRight); // Source to Mouth
+            for (int i = riverPointsLeft.Count - 1; i >= 0; i--) // Mouth back to Source
             {
                 polygon.Add(riverPointsLeft[i]);
             }
