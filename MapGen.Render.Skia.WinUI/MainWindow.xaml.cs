@@ -80,13 +80,29 @@ namespace MapGen.Render.Skia.WinUI
             canvas.Save();
             canvas.Scale(finalScale);
 
-            // --- Toggle Layers Here ---
+            // 1. Render the base layers (Heightmap, etc.)
             RenderHeightmap(canvas);
-            //RenderTemperature(canvas);
-            //RenderPrecipitation(canvas);
-            RenderRivers(canvas);
 
-            canvas.Restore();
+            // 2. Start a new layer for the clipped rivers
+            // We use a SaveLayer so the blending only affects the rivers and the mask
+            canvas.SaveLayer();
+
+            // 3. Draw the Land Mask (The "Destination" for the blend)
+            RenderLandMask(canvas);
+
+            // 4. Draw the Rivers using SrcIn blend mode
+            // This tells Skia: "Only keep the River pixels that overlap with the Land Mask"
+            using (var paint = new SKPaint { BlendMode = SKBlendMode.SrcIn })
+            {
+                canvas.SaveLayer(paint);
+                RenderRivers(canvas);
+                canvas.Restore();
+            }
+
+            // 5. Cleanup the layers
+            canvas.Restore(); // Restore from the initial SaveLayer
+
+            canvas.Restore(); // Restore the scale/transform
         }
 
         private void RenderHeightmap(SKCanvas canvas)
@@ -112,6 +128,43 @@ namespace MapGen.Render.Skia.WinUI
 
                 using var path = CreateCellPath(cell);
                 canvas.DrawPath(path, fillPaint);
+            }
+        }
+
+        private void RenderLandMask(SKCanvas canvas)
+        {
+            // We use a solid color (it doesn't matter which, as long as it's not transparent)
+            using var maskPaint = new SKPaint
+            {
+                Color = SKColors.Black,
+                Style = SKPaintStyle.Fill,
+                IsAntialias = false // No need for AA on a mask usually
+            };
+
+            // Draw every cell that is NOT water
+            // Note: If you have a pre-calculated 'landPath' (concatenated polygons), 
+            // it's much faster to DrawPath once than looping here.
+            foreach (var cell in _map.Cells)
+            {
+                if (cell.H < 20) continue; // Skip water
+
+                // Draw the polygon for this cell
+                using var cellPath = new SKPath();
+                var vertices = cell.V; // Using your cell model's Vertex indices
+                if (vertices == null || vertices.Count == 0) continue;
+
+                // Assuming _map.Vertices contains MapPoint coordinates
+                var startV = _map.Vertices[vertices[0]];
+                cellPath.MoveTo((float)startV.P.X, (float)startV.P.Y);
+
+                for (int i = 1; i < vertices.Count; i++)
+                {
+                    var v = _map.Vertices[vertices[i]];
+                    cellPath.LineTo((float)v.P.X, (float)v.P.Y);
+                }
+                cellPath.Close();
+
+                canvas.DrawPath(cellPath, maskPaint);
             }
         }
 
