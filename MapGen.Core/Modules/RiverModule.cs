@@ -41,8 +41,8 @@ namespace MapGen.Core.Modules
 
             File.WriteAllText("D:\\Downloads\\lake_h_drainWater_cs.json", JsonSerializer.Serialize(waterData, new JsonSerializerOptions { WriteIndented = true }));
 
-            DefineRivers();
-            CalculateConfluenceFlux();
+            DefineRivers(pack, riversData, riverParents);
+            CalculateConfluenceFlux(pack, h);
             LakeModule.CleanupLakeData(pack);
 
             // 4. Erosion / Finalize
@@ -50,7 +50,7 @@ namespace MapGen.Core.Modules
             {
                 // Apply modified heights back to the cell data
                 for (int i = 0; i < cellsCount; i++) cells[i].H = (byte)Math.Clamp(h[i], 0, 255);
-                DowncutRivers(pack);
+                DowncutRivers(pack, h);
             }
 
             // --- Local Functions (Closures) ---
@@ -182,7 +182,7 @@ namespace MapGen.Core.Modules
                 return bestNeighbor;
             }
 
-        void FlowDown(int toCell, double fromFlux, ushort riverId, double[] tempFlux)
+            void FlowDown(int toCell, double fromFlux, ushort riverId, double[] tempFlux)
             {
                 // Subtract confluence to get 'base' flux for comparison
                 double toFlux = tempFlux[toCell] - cells[toCell].Confluence;
@@ -229,109 +229,6 @@ namespace MapGen.Core.Modules
 
                 AddCellToRiver(toCell, riverId);
             }
-
-            // JS logic for downcutting (erosion)
-            void DowncutRivers(MapPack pack)
-            {
-                const int MAX_DOWNCUT = 5;
-                for (int i = 0; i < cellsCount; i++)
-                {
-                    if (cells[i].H < 35 || cells[i].Flux == 0) continue;
-                    var higherCells = cells[i].C.Where(c => cells[c].H > cells[i].H).ToList();
-                    if (higherCells.Count == 0) continue;
-
-                    double higherFlux = higherCells.Average(c => (double)cells[c].Flux);
-                    if (higherFlux == 0) continue;
-
-                    int downcut = (int)Math.Floor(cells[i].Flux / higherFlux);
-                    if (downcut > 0)
-                        cells[i].H = (byte)Math.Max(cells[i].H - Math.Min(downcut, MAX_DOWNCUT), MapConstants.LAND_THRESHOLD);
-                }
-            }
-
-            // Logic for defining River objects (Metadata)
-            void DefineRivers()
-            {
-                // 1. Re-initialize arrays to ensure we only have data from the final simulation
-                foreach (var cell in cells)
-                {
-                    cell.RiverId = 0;
-                    cell.Confluence = 0;
-                }
-                pack.Rivers = new List<MapRiver>();
-
-                double cellsFactor = Math.Pow(cellsCount / 10000.0, 0.25);
-                double defaultWidthFactor = Math.Round(1.0 / cellsFactor, 2);
-                double mainStemWidthFactor = defaultWidthFactor * 1.2;
-
-                foreach (var kvp in riversData)
-                {
-                    var riverCells = kvp.Value;
-                    if (riverCells.Count < 3) continue;
-
-                    int riverId = kvp.Key;
-
-                    // 2. Mark real confluences and re-assign final river IDs to cells
-                    foreach (int cellIdx in riverCells)
-                    {
-                        if (cellIdx < 0 || cells[cellIdx].H < MapConstants.LAND_THRESHOLD) continue;
-
-                        if (cells[cellIdx].RiverId != 0 && cells[cellIdx].RiverId != riverId)
-                            cells[cellIdx].Confluence = 1; // It's a junction
-                        else
-                            cells[cellIdx].RiverId = (ushort)riverId;
-                    }
-
-                    int source = riverCells[0];
-                    int mouth = riverCells[riverCells.Count - 2]; // Last land cell
-                    riverParents.TryGetValue(riverId, out int parentId);
-
-                    // 3. Determine width factor based on hierarchy
-                    double widthFactor = (parentId == 0 || parentId == riverId) ? mainStemWidthFactor : defaultWidthFactor;
-
-                    // 4. Generate Geometric Path (The wiggle)
-                    var meanderedPoints = AddMeandering(pack, riverCells);
-
-                    // 5. Calculate Physical Attributes
-                    double discharge = cells[mouth].Flux;
-                    double length = GetApproximateLength(meanderedPoints);
-                    double sourceWidth = GetSourceWidth(cells[source].Flux);
-
-                    // Use the formula to get the mouth width
-                    double offset = GetOffset(discharge, meanderedPoints.Count, widthFactor, sourceWidth);
-                    double width = Math.Round(Math.Pow(offset / 1.5, 1.8), 2);
-
-                    pack.Rivers.Add(new MapRiver
-                    {
-                        Id = riverId,
-                        Source = source,
-                        Mouth = mouth,
-                        Discharge = discharge,
-                        Length = length,
-                        Width = width,
-                        WidthFactor = widthFactor,
-                        SourceWidth = sourceWidth,
-                        Parent = parentId,
-                        Cells = riverCells
-                    });
-                }
-            }
-
-            void CalculateConfluenceFlux()
-            {
-                for (int i = 0; i < cellsCount; i++)
-                {
-                    if (cells[i].Confluence == 0) continue;
-                    var sortedInflux = cells[i].C
-                        .Where(c => cells[c].RiverId > 0 && h[c] > h[i])
-                        .Select(c => (int)cells[c].Flux)
-                        .OrderByDescending(f => f)
-                        .ToList();
-
-                    // Skip the first (main) influx, add the rest to confluence property
-                    cells[i].Confluence = (byte)sortedInflux.Skip(1).Sum();
-                }
-            }
         }
 
         private static double[] AlterHeights(MapPack pack)
@@ -341,6 +238,155 @@ namespace MapGen.Core.Modules
                 double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
                 return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
             }).ToArray();
+        }
+
+        #endregion
+
+        #region DefineRivers
+
+        // Logic for defining River objects (Metadata)
+        public static void DefineRivers(MapPack pack, Dictionary<int, List<int>> riversData, Dictionary<int, int> riverParents)
+        {
+            // 1. Reset cell-level river metadata to ensure a clean slate
+            foreach (var cell in pack.Cells)
+            {
+                cell.RiverId = 0;
+                cell.Confluence = 0;
+            }
+            pack.Rivers = new List<MapRiver>();
+
+            // Constants for width scaling based on map density
+            // JS: const cellsFactor = Math.pow(pack.cells.i.length / 10000, 0.25);
+            double cellsFactor = Math.Pow(pack.PointsCount / 10000.0, 0.25);
+            double defaultWidthFactor = Math.Round(1.0 / cellsFactor, 2);
+            double mainStemWidthFactor = Math.Round(defaultWidthFactor * 1.2, 2);
+
+            foreach (var kvp in riversData)
+            {
+                var riverCells = kvp.Value;
+                // Azgaar requirement: A river must have at least 3 cells to be "visible"
+                if (riverCells.Count < 3) continue;
+
+                int riverId = kvp.Key;
+
+                // 2. Map cell-to-river relationship and detect confluences
+                foreach (int cellIdx in riverCells)
+                {
+                    var cell = pack.Cells[cellIdx];
+                    if (cell.H < MapConstants.LAND_THRESHOLD) continue;
+
+                    // If the cell already has a different RiverId, it's a confluence point
+                    if (cell.RiverId != 0 && cell.RiverId != riverId)
+                    {
+                        cell.Confluence = 1;
+                    }
+                    else
+                    {
+                        cell.RiverId = (ushort)riverId;
+                    }
+                }
+
+                int source = riverCells[0];
+                int mouth = riverCells[riverCells.Count - 2]; // Last land cell before water
+
+                riverParents.TryGetValue(riverId, out int parentId);
+
+                // 3. Determine width factor (Main stems are thicker than tributaries)
+                double widthFactor = (parentId == 0 || parentId == riverId)
+                    ? mainStemWidthFactor
+                    : defaultWidthFactor;
+
+                // 4. Generate Geometric Path (Add wiggle/meandering based on terrain)
+                // This usually involves looking at the vertices of the Voronoi cells
+                var meanderedPoints = AddMeandering(pack, riverCells);
+
+                // 5. Calculate Physical Attributes for Rendering/Simulation
+                double discharge = pack.Cells[mouth].Flux;
+                double length = GetApproximateLength(meanderedPoints);
+                double sourceWidth = GetSourceWidth(pack.Cells[source].Flux);
+
+                // Calculate visual width using the Azgaar power formula
+                double offset = GetOffset(discharge, meanderedPoints.Count, widthFactor, sourceWidth);
+                double width = Math.Round(Math.Pow(offset / 1.5, 1.8), 2);
+
+                pack.Rivers.Add(new MapRiver
+                {
+                    Id = riverId,
+                    Source = source,
+                    Mouth = mouth,
+                    Discharge = discharge,
+                    Length = length,
+                    Width = width,
+                    WidthFactor = widthFactor,
+                    SourceWidth = sourceWidth,
+                    Parent = (ushort)parentId,
+                    Cells = riverCells
+                });
+            }
+        }
+
+        public static void CalculateConfluenceFlux(MapPack pack, double[] h)
+        {
+            // We iterate through all cells to find marked confluence points
+            foreach (var cell in pack.Cells)
+            {
+                if (cell.Confluence == 0) continue;
+
+                // Find all neighboring cells that:
+                // 1. Have a river assigned
+                // 2. Are higher than the current cell (meaning they flow INTO this cell)
+                var sortedInflux = cell.C
+                    .Select(neighborIdx => pack.Cells[neighborIdx])
+                    .Where(n => n.RiverId > 0 && h[n.Index] > h[cell.Index])
+                    .Select(n => (int)n.Flux)
+                    .OrderByDescending(f => f)
+                    .ToList();
+
+                // If we have multiple streams meeting:
+                // The largest flux is the 'main' river.
+                // The sum of all other (smaller) fluxes is stored in Confluence.
+                if (sortedInflux.Count > 1)
+                {
+                    cell.Confluence = (byte)Math.Min(255, sortedInflux.Skip(1).Sum());
+                }
+                else
+                {
+                    // If only one (or zero) influx was found after height check, 
+                    // reset the flag to 0
+                    cell.Confluence = 0;
+                }
+            }
+        }
+
+        public static void DowncutRivers(MapPack pack, double[] h)
+        {
+            foreach (var cell in pack.Cells)
+            {
+                // 1. Optimization: Only erode land above a certain height with actual water flow
+                if (h[cell.Index] < 35 || cell.Flux == 0) continue;
+
+                // 2. Find neighbors that are higher (upstream)
+                var higherNeighbors = cell.C
+                    .Where(nIdx => h[nIdx] > h[cell.Index])
+                    .ToList();
+
+                if (higherNeighbors.Count == 0) continue;
+
+                // 3. Calculate average flux of upstream cells
+                double higherFlux = higherNeighbors.Average(nIdx => (double)pack.Cells[nIdx].Flux);
+                if (higherFlux == 0) continue;
+
+                // 4. Calculate erosion amount
+                // If a cell has much more flux than its neighbors, it cuts deeper.
+                int downcut = (int)Math.Floor(cell.Flux / higherFlux);
+
+                if (downcut > 0)
+                {
+                    double erosion = Math.Min(downcut, MapConstants.MAX_DOWNCUT);
+                    // Ensure we don't erode below the land threshold
+                    h[cell.Index] = Math.Max(h[cell.Index] - erosion, MapConstants.LAND_THRESHOLD);
+                }
+            }
         }
 
         #endregion
