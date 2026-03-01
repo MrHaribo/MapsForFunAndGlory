@@ -97,7 +97,7 @@ namespace MapGen.Core
         public ushort Harbor { get; set; } // Number of adjacent water cells
 
         // Rivers
-        public ushort Flux { get; set; }        // cells.fl: water flow volume
+        public double Flux { get; set; }        // cells.fl: water flow volume
         public ushort RiverId { get; set; }     // cells.r: ID of the river passing through
         public byte Confluence { get; set; }    // cells.conf: marking confluence points
     }

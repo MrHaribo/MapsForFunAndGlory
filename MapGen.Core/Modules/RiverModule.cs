@@ -57,11 +57,6 @@ namespace MapGen.Core.Modules
             {
                 double cellsNumberModifier = Math.Pow(pack.PointsCount / 10000.0, 0.25);
 
-                // 1. High-precision flux accumulation
-                double[] tempFlux = new double[cellsCount];
-                // JS initializes with 0, but we sync existing if needed
-                for (int i = 0; i < cellsCount; i++) tempFlux[i] = cells[i].Flux;
-
                 // Sorting land by height descending (JS: h[b] - h[a])
                 var land = Enumerable.Range(0, cellsCount)
                     .Where(i => h[i] >= 20)
@@ -75,7 +70,7 @@ namespace MapGen.Core.Modules
                     // Add precipitation flux
                     byte prec = grid.Cells[pack.Cells[i].GridId].Prec;
                     //tempFlux[i] += prec / cellsNumberModifier;
-                    tempFlux[i] += Math.Floor(prec / cellsNumberModifier);
+                    cells[i].Flux += Math.Floor(prec / cellsNumberModifier);
 
                     // 2. Lake Outlet Logic
                     // In JS, 'lakes' is a list of features where i is the outCell
@@ -89,7 +84,7 @@ namespace MapGen.Core.Modules
 
                             // Water from lake drains to outlet
                             double lakeDrainage = Math.Max(lake.Flux - lake.Evaporation, 0);
-                            tempFlux[lakeCell] += lakeDrainage;
+                            cells[lakeCell].Flux += lakeDrainage;
 
                             // Chain lakes: maintain river identity or proclaim new one
                             if (cells[lakeCell].RiverId != lake.RiverId)
@@ -112,7 +107,7 @@ namespace MapGen.Core.Modules
 
                             // IMPORTANT: Flow water down from the outlet point 'i' 
                             // using the flux that just arrived from the lake
-                            FlowDown(i, tempFlux[lakeCell], lake.RiverId, tempFlux);
+                            FlowDown(i, cells[lakeCell].Flux, lake.RiverId);
 
                             // Assign tributary parents
                             if (lake.Inlets != null)
@@ -137,9 +132,9 @@ namespace MapGen.Core.Modules
                     if (h[i] <= h[min]) continue;
 
                     // 5. River Formation
-                    if (tempFlux[i] < MapConstants.MIN_FLUX_TO_FORM_RIVER)
+                    if (cells[i].Flux < MapConstants.MIN_FLUX_TO_FORM_RIVER)
                     {
-                        if (h[min] >= 20) tempFlux[min] += tempFlux[i];
+                        if (h[min] >= 20) cells[min].Flux += cells[i].Flux;
                         continue;
                     }
 
@@ -150,21 +145,15 @@ namespace MapGen.Core.Modules
                         riverNext++;
                     }
 
-                    FlowDown(min, tempFlux[i], cells[i].RiverId, tempFlux);
-                }
-
-                // Final Sync
-                for (int i = 0; i < cellsCount; i++)
-                {
-                    cells[i].Flux = (ushort)Math.Round(tempFlux[i]);
+                    FlowDown(min, cells[i].Flux, cells[i].RiverId);
                 }
             }
 
             // Updated FlowDown to match JS confluence logic exactly
-            void FlowDown(int toCell, double fromFlux, ushort riverId, double[] tempFlux)
+            void FlowDown(int toCell, double fromFlux, ushort riverId)
             {
                 // JS: const toFlux = cells.fl[toCell] - cells.conf[toCell];
-                double toFlux = tempFlux[toCell] - cells[toCell].Confluence;
+                double toFlux = cells[toCell].Flux - cells[toCell].Confluence;
                 ushort toRiver = cells[toCell].RiverId;
 
                 if (toRiver != 0)
@@ -173,7 +162,7 @@ namespace MapGen.Core.Modules
                     {
                         // JS: cells.conf[toCell] += cells.fl[toCell];
                         // Note: We use the total flux here to match JS
-                        cells[toCell].Confluence = (byte)Math.Min(255, cells[toCell].Confluence + Math.Round(tempFlux[toCell]));
+                        cells[toCell].Confluence = (byte)Math.Min(255, cells[toCell].Confluence + Math.Round(cells[toCell].Flux));
 
                         if (h[toCell] >= 20) riverParents[toRiver] = riverId;
                         cells[toCell].RiverId = riverId;
@@ -209,7 +198,7 @@ namespace MapGen.Core.Modules
                 }
                 else
                 {
-                    tempFlux[toCell] += fromFlux;
+                    cells[toCell].Flux += fromFlux;
                 }
 
                 AddCellToRiver(toCell, riverId);
