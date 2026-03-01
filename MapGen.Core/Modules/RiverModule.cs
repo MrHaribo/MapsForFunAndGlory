@@ -3,9 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Xml;
 
 namespace MapGen.Core.Modules
 {
+    public class FlowDownLogEntry
+    {
+        public string source { get; set; } // "lake" or "land"
+        public int cell { get; set; }     // The 'toCell' or 'min' index
+        public double flux { get; set; }   // The 'fromFlux' or 'tempFlux[i]'
+        public int riverId { get; set; }
+    }
+
     public static class RiverModule
     {
         #region Generate
@@ -28,8 +38,12 @@ namespace MapGen.Core.Modules
             LakeModule.DetectCloseLakes(pack, h);
             ResolveDepressions(pack, h);
 
+            List<FlowDownLogEntry> logs = new List<FlowDownLogEntry>();
+
             // 3. Core Simulation
             DrainWater();
+
+            File.WriteAllText("D:\\Downloads\\flowDownLog_cs.json", JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
 
             // Assuming your MapCell has .Flux and .Drainage (or whatever you named 't')
             var waterData = new
@@ -65,11 +79,12 @@ namespace MapGen.Core.Modules
             {
                 double cellsNumberModifier = Math.Pow(pack.PointsCount / 10000.0, 0.25);
 
-                // 1. Create a temporary high-precision flux array to avoid ushort truncation
+                // 1. High-precision flux accumulation
                 double[] tempFlux = new double[cellsCount];
-                // Copy existing flux (if any) or just leave at 0 if starting fresh
+                // JS initializes with 0, but we sync existing if needed
                 for (int i = 0; i < cellsCount; i++) tempFlux[i] = cells[i].Flux;
 
+                // Sorting land by height descending (JS: h[b] - h[a])
                 var land = Enumerable.Range(0, cellsCount)
                     .Where(i => h[i] >= 20)
                     .OrderByDescending(i => h[i])
@@ -79,22 +94,26 @@ namespace MapGen.Core.Modules
 
                 foreach (int i in land)
                 {
-                    // Add precipitation with double precision
+                    // Add precipitation flux
                     byte prec = grid.Cells[pack.Cells[i].GridId].Prec;
-                    tempFlux[i] += prec / cellsNumberModifier;
+                    //tempFlux[i] += prec / cellsNumberModifier;
+                    tempFlux[i] += Math.Floor(prec / cellsNumberModifier);
 
-                    // Handle Lakes
+                    // 2. Lake Outlet Logic
+                    // In JS, 'lakes' is a list of features where i is the outCell
                     if (lakeOutCells.TryGetValue(i, out int featureId))
                     {
                         var lake = pack.GetFeature(featureId);
                         if (lake != null && lake.Flux > lake.Evaporation)
                         {
+                            // Find the specific water cell belonging to this lake neighbor
                             int lakeCell = cells[i].C.Find(c => h[c] < 20 && cells[c].FeatureId == lake.Id);
 
-                            // Accumulate lake flux into the temporary array
-                            tempFlux[lakeCell] += Math.Max(lake.Flux - lake.Evaporation, 0);
+                            // Water from lake drains to outlet
+                            double lakeDrainage = Math.Max(lake.Flux - lake.Evaporation, 0);
+                            tempFlux[lakeCell] += lakeDrainage;
 
-                            // Hierarchy Fix: Logic for chain lakes
+                            // Chain lakes: maintain river identity or proclaim new one
                             if (cells[lakeCell].RiverId != lake.RiverId)
                             {
                                 bool sameRiver = cells[lakeCell].C.Any(c => cells[c].RiverId == lake.RiverId);
@@ -113,44 +132,42 @@ namespace MapGen.Core.Modules
 
                             lake.RiverId = cells[lakeCell].RiverId;
 
-                            // Call FlowDown with the high-precision flux
+                            // IMPORTANT: Flow water down from the outlet point 'i' 
+                            // using the flux that just arrived from the lake
                             FlowDown(i, tempFlux[lakeCell], lake.RiverId, tempFlux);
 
-                            // FIX: River Hierarchy Logic
-                            // All rivers entering the lake now become tributaries of the lake's outlet river
+                            logs.Add(new FlowDownLogEntry
+                            {
+                                source = "lake",
+                                cell = i,
+                                flux = tempFlux[lakeCell],
+                                riverId = lake.RiverId
+                            });
+
+
+                            // Assign tributary parents
                             if (lake.Inlets != null)
                             {
                                 foreach (var inletId in lake.Inlets)
-                                {
                                     riverParents[inletId] = lake.RiverId;
-                                }
                             }
                         }
                     }
 
-                    // Near-border logic
+                    // 3. Near-border logic
                     if (cells[i].B == 1 && cells[i].RiverId > 0)
                     {
                         AddCellToRiver(-1, cells[i].RiverId);
                         continue;
                     }
 
-                    // Determine Downhill
-                    int min;
-                    if (lakeOutCells.TryGetValue(i, out int lakeFeatureId))
-                    {
-                        // If this cell is a lake outlet, we must ignore neighbors belonging to that lake
-                        min = GetLowestNeighbor(i, lakeFeatureId);
-                    }
-                    else
-                    {
-                        // Normal cell
-                        min = GetLowestNeighbor(i);
-                    }
+                    // 4. Determine Downhill (Min)
+                    int min = GetLowestNeighbor(i, lakeOutCells.ContainsKey(i) ? (int?)lakeOutCells[i] : null);
 
-                    // Check for depressions
+                    // Depression check
                     if (h[i] <= h[min]) continue;
 
+                    // 5. River Formation
                     if (tempFlux[i] < MapConstants.MIN_FLUX_TO_FORM_RIVER)
                     {
                         if (h[min] >= 20) tempFlux[min] += tempFlux[i];
@@ -165,9 +182,18 @@ namespace MapGen.Core.Modules
                     }
 
                     FlowDown(min, tempFlux[i], cells[i].RiverId, tempFlux);
+
+                    // LOG CALL SITE 2: Standard Land Flow
+                    logs.Add(new FlowDownLogEntry
+                    {
+                        source = "land",
+                        cell = min,
+                        flux = tempFlux[i],
+                        riverId = pack.Cells[i].RiverId
+                    });
                 }
 
-                // 2. Final Step: Sync the high-precision tempFlux back to the ushort properties
+                // Final Sync
                 for (int i = 0; i < cellsCount; i++)
                 {
                     cells[i].Flux = (ushort)Math.Round(tempFlux[i]);
@@ -231,38 +257,41 @@ namespace MapGen.Core.Modules
 
             int GetLowestNeighbor(int i, int? excludeLakeId = null)
             {
-                // 1. Azgaar Haven Logic: If a cell has a forced downhill target, use it
-                // Check if your MapCell class has a Haven property (often used for manual river paths)
-                if (pack.Cells[i].Haven != 0) return pack.Cells[i].Haven;
-
                 var neighbors = pack.Cells[i].C;
-                int bestNeighbor = -1;
-                double minH = double.MaxValue;
 
-                // 2. Find the lowest neighbor, potentially filtering out the source lake
-                for (int j = 0; j < neighbors.Count; j++)
+                // 1. Lake Outlet Logic: Filter neighbors first if an exclusion ID is provided.
+                // This prevents rivers from flowing back into the lake they just exited.
+                if (excludeLakeId.HasValue)
                 {
-                    int neighborIdx = neighbors[j];
+                    var filtered = neighbors.Where(n => pack.Cells[n].FeatureId != excludeLakeId.Value).ToList();
 
-                    // If we are an outlet, don't flow back into the lake feature
-                    if (excludeLakeId.HasValue && pack.Cells[neighborIdx].FeatureId == excludeLakeId.Value)
-                        continue;
-
-                    double currentH = h[neighborIdx];
-
-                    // 3. Parity Tie-breaker: 
-                    // JS sort picks the FIRST element if heights are equal.
-                    // We use a small epsilon and strictly 'less than' to ensure we only 
-                    // update if we find a neighbor strictly lower than our current best.
-                    if (currentH < minH)
+                    if (filtered.Count > 0)
                     {
-                        minH = currentH;
-                        bestNeighbor = neighborIdx;
+                        // Stable Sort: matches JS Array.sort((a,b) => h[a] - h[b])
+                        return filtered
+                            .OrderBy(n => h[n])
+                            .ThenBy(n => neighbors.IndexOf(n))
+                            .First();
                     }
+
+                    // Fallback if all neighbors were filtered (edge case)
+                    return neighbors[0];
                 }
 
-                // Fallback: If filtering excluded all neighbors (rare), return the first neighbor
-                return bestNeighbor != -1 ? bestNeighbor : neighbors[0];
+                // 2. Haven Logic: If no lake filter, check for forced downhill paths.
+                // Havens are pre-calculated to guide rivers toward the sea in flat areas.
+                if (pack.Cells[i].Haven > 0)
+                {
+                    return pack.Cells[i].Haven;
+                }
+
+                // 3. Standard Downhill: Find the neighbor with the minimum height.
+                // We use the index in the original neighbor list as a tie-breaker 
+                // to maintain 1:1 parity with the JS sort stability.
+                return neighbors
+                    .OrderBy(n => h[n])
+                    .ThenBy(n => neighbors.IndexOf(n))
+                    .First();
             }
         }
 
