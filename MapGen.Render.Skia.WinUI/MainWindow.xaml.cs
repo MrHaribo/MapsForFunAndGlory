@@ -18,6 +18,7 @@ namespace MapGen.Render.Skia.WinUI
     public sealed partial class MainWindow : Window
     {
         private MapData _map;
+        private MapPack _pack;
 
         public MainWindow()
         {
@@ -56,6 +57,12 @@ namespace MapGen.Render.Skia.WinUI
             ClimateModule.GeneratePrecipitation(mapData);
 
             _map = mapData;
+
+            var pack = PackModule.ReGraph(mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack, mapData, allowErosion: true);
+
+            _pack = pack;
         }
 
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
@@ -75,7 +82,8 @@ namespace MapGen.Render.Skia.WinUI
             // --- Toggle Layers Here ---
             RenderHeightmap(canvas);
             //RenderTemperature(canvas);
-            RenderPrecipitation(canvas);
+            //RenderPrecipitation(canvas);
+            RenderRivers(canvas);
 
             canvas.Restore();
         }
@@ -150,6 +158,87 @@ namespace MapGen.Render.Skia.WinUI
                 float radius = (float)(Math.Sqrt(cell.Prec) * 0.85);
 
                 canvas.DrawCircle((float)point.X, (float)point.Y, radius, precPaint);
+            }
+        }
+
+        private void RenderRivers(SKCanvas canvas)
+        {
+            if (_pack?.Rivers == null) return;
+
+            using var riverFill = new SKPaint
+            {
+                Color = new SKColor(49, 116, 173),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+
+            foreach (var river in _pack.Rivers)
+            {
+                // 1. Get the meandered points (X, Y, Flux) from your module
+                var meanderedData = RiverModule.AddMeandering(river.Cells, river.Points);
+
+                // 2. Generate the polygon coordinates using our domain logic
+                var polygonPoints = RiverModule.GetRiverPolygon(meanderedData, river.WidthFactor, river.SourceWidth);
+
+                if (polygonPoints.Count < 3) continue;
+
+                // 3. Construct the SkiaSharp path from the domain points
+                using var path = new SKPath();
+                path.MoveTo((float)polygonPoints[0].X, (float)polygonPoints[0].Y);
+
+                for (int i = 1; i < polygonPoints.Count; i++)
+                {
+                    path.LineTo((float)polygonPoints[i].X, (float)polygonPoints[i].Y);
+                }
+
+                path.Close();
+
+                // 4. Render as a filled shape
+                canvas.DrawPath(path, riverFill);
+            }
+        }
+
+        private void RenderRiversSimple(SKCanvas canvas)
+        {
+            if (_pack?.Rivers == null || _map?.Points == null) return;
+
+            // Adjust this value to make rivers thicker or thinner globally
+            // Start with 2.0f or 3.0f and adjust to your preference.
+            float riverScale = 5.5f;
+            float minVisibleWidth = 2.5f;
+
+            using var paint = new SKPaint
+            {
+                Color = new SKColor(49, 116, 173),
+                Style = SKPaintStyle.Stroke,
+                StrokeJoin = SKStrokeJoin.Round,
+                StrokeCap = SKStrokeCap.Round,
+                IsAntialias = true
+            };
+
+            foreach (var river in _pack.Rivers)
+            {
+                if (river.Cells == null || river.Cells.Count < 2) continue;
+
+                for (int i = 1; i < river.Cells.Count; i++)
+                {
+                    var cell = _pack.Cells[river.Cells[i]];
+                    var prevCell = _pack.Cells[river.Cells[i - 1]];
+
+                    var p1X = (float)_map.Points[prevCell.GridId].X;
+                    var p1Y = (float)_map.Points[prevCell.GridId].Y;
+                    var p2X = (float)_map.Points[cell.GridId].X;
+                    var p2Y = (float)_map.Points[cell.GridId].Y;
+
+                    // Interpolate base width
+                    float t = (float)i / (river.Cells.Count - 1);
+                    float baseWidth = (float)(river.SourceWidth + (river.Width - river.SourceWidth) * t);
+
+                    // Apply scaling and ensure it doesn't disappear
+                    paint.StrokeWidth = Math.Max(minVisibleWidth, baseWidth * riverScale);
+
+                    canvas.DrawLine(p1X, p1Y, p2X, p2Y, paint);
+                }
             }
         }
 

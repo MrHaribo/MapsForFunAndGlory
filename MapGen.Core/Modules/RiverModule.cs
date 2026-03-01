@@ -425,7 +425,8 @@ namespace MapGen.Core.Modules
 
         private static double[] AlterHeights(MapPack pack)
         {
-            return pack.Cells.Select((c, i) => {
+            return pack.Cells.Select((c, i) =>
+            {
                 if (c.H < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.H;
                 double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
                 return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
@@ -593,7 +594,8 @@ namespace MapGen.Core.Modules
 
         private static List<MapPoint> GetRiverPoints(MapPack pack, List<int> riverCells)
         {
-            return riverCells.Select((cell, i) => {
+            return riverCells.Select((cell, i) =>
+            {
                 if (cell == -1) return GetBorderPoint(pack, riverCells[i - 1]);
 
                 // Use the pack-level coordinate array
@@ -623,6 +625,56 @@ namespace MapGen.Core.Modules
                 length += Math.Sqrt(dx * dx + dy * dy);
             }
             return Math.Round(length, 2);
+        }
+
+        #endregion
+
+        #region River Rendering
+
+        public static List<MapPoint> GetRiverPolygon(List<(MapPoint P, double Flux)> meanderedPoints, double widthFactor, double startingWidth)
+        {
+            var riverPointsLeft = new List<MapPoint>();
+            var riverPointsRight = new List<MapPoint>();
+            double maxFlux = 0;
+
+            for (int i = 0; i < meanderedPoints.Count; i++)
+            {
+                // p0 (previous), p1 (current), p2 (next)
+                var p0 = i == 0 ? meanderedPoints[i].P : meanderedPoints[i - 1].P;
+                var p1 = meanderedPoints[i].P;
+                var p2 = i == meanderedPoints.Count - 1 ? meanderedPoints[i].P : meanderedPoints[i + 1].P;
+
+                double pointFlux = meanderedPoints[i].Flux;
+                if (pointFlux > maxFlux) maxFlux = pointFlux;
+
+                // 1. Calculate dynamic width (offset) per FGM logic
+                // (Math.sqrt(flux) * widthFactor * 0.1) + startingWidth + (pointIndex * 0.1)
+                double offset = (Math.Sqrt(maxFlux) * widthFactor * 0.1) + startingWidth + (i * 0.1);
+
+                // 2. Calculate the angle perpendicular to the flow
+                // atan2(y0 - y2, x0 - x2)
+                double angle = Math.Atan2(p0.Y - p2.Y, p0.X - p2.X);
+                double sinOffset = Math.Sin(angle) * offset;
+                double cosOffset = Math.Cos(angle) * offset;
+
+                // 3. Project points to create the "banks"
+                riverPointsLeft.Add(new MapPoint(p1.X - sinOffset, p1.Y + cosOffset));
+                riverPointsRight.Add(new MapPoint(p1.X + sinOffset, p1.Y - cosOffset));
+            }
+
+            // 4. Create a single closed loop for the polygon
+            var polygon = new List<MapPoint>();
+
+            // Right bank: Source -> Mouth
+            polygon.AddRange(riverPointsRight);
+
+            // Left bank: Mouth -> Source (Reversed)
+            for (int i = riverPointsLeft.Count - 1; i >= 0; i--)
+            {
+                polygon.Add(riverPointsLeft[i]);
+            }
+
+            return polygon;
         }
 
         #endregion
