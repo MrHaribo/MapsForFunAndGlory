@@ -30,7 +30,9 @@ namespace MapGen.Render.Skia.WinUI
         {
             var mapOptions = new MapOptions
             {
-                Seed = "42",
+                //Seed = "42",
+                Seed = "1114678237",
+                //Seed = new Random().Next().ToString(),
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 2000,

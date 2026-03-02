@@ -286,6 +286,9 @@ namespace MapGen.Core.Modules
                 // 2. Map cell-to-river relationship and detect confluences
                 foreach (int cellIdx in riverCells)
                 {
+                    // FIX: Skip invalid indices like -1
+                    if (cellIdx < 0 || cellIdx >= pack.Cells.Length) continue;
+
                     var cell = pack.Cells[cellIdx];
                     if (cell.H < MapConstants.LAND_THRESHOLD) continue;
 
@@ -517,6 +520,11 @@ namespace MapGen.Core.Modules
 
         public static List<PointFlux> AddMeandering(MapPack pack, List<int> riverCells, double meandering = 0.5)
         {
+            // FIX: Clean the input list immediately so all subsequent logic (and indices) are safe
+            riverCells = riverCells.Where(idx => idx >= 0 && idx < pack.Cells.Length).ToList();
+
+            if (riverCells.Count < 2) return new List<PointFlux>();
+
             var cells = pack.Cells;
             var meandered = new List<PointFlux>();
             int lastStep = riverCells.Count - 1;
