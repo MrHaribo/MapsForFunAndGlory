@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MapGen.Core.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -83,7 +84,7 @@ namespace MapGen.Core.Modules
             }
         }
 
-        private static double CalculateMoisture(MapPack pack, MapData grid, int cellId)
+        public static double CalculateMoisture(MapPack pack, MapData grid, int cellId)
         {
             var cell = pack.Cells[cellId];
 
@@ -108,7 +109,7 @@ namespace MapGen.Core.Modules
             // Calculate mean and add constant 4 (Azgaar's logic)
             // 'rn' in JS is typically a rounding function, usually to 0 or 1 decimal places
             double mean = landNeighborPrec.Average();
-            return Math.Round(4.0 + mean);
+            return NumberUtils.Round(4.0 + mean);
         }
 
         public static byte GetBiomeId(double moisture, double temperature, byte height, bool hasRiver)

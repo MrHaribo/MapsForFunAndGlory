@@ -5,7 +5,7 @@ namespace MapGen.Core.Helpers
     public static class NumberUtils
     {
         /// <summary>Equivalent to JS: rn(v, d)</summary>
-        public static double RoundOld(double val, int precision = 0) =>
+        public static double RoundDefault(double val, int precision = 0) =>
             Math.Round(val, precision, MidpointRounding.AwayFromZero);
 
         public static double Round(double val, int precision = 0)
