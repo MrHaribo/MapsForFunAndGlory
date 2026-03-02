@@ -62,6 +62,7 @@ namespace MapGen.Render.Skia.WinUI
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
             RiverModule.Generate(pack, mapData, allowErosion: true);
+            BiomModule.Define(pack, mapData);
 
             _pack = pack;
         }
@@ -82,6 +83,7 @@ namespace MapGen.Render.Skia.WinUI
 
             // 1. Render the base layers (Heightmap, etc.)
             RenderHeightmap(canvas);
+            RenderBiomes(canvas);
 
             // 2. Start a new layer for the clipped rivers
             // We use a SaveLayer so the blending only affects the rivers and the mask
@@ -165,6 +167,41 @@ namespace MapGen.Render.Skia.WinUI
                 cellPath.Close();
 
                 canvas.DrawPath(cellPath, maskPaint);
+            }
+        }
+
+        private void RenderBiomes(SKCanvas canvas)
+        {
+            if (_pack?.Cells == null || _map?.Cells == null) return;
+
+            var biomeDefs = BiomModule.GetDefaultBiomes();
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+
+            // Iterate through the PACK cells (where BiomeId lives)
+            foreach (var packCell in _pack.Cells)
+            {
+                // 1. Skip Water
+                if (packCell.H < MapConstants.LAND_THRESHOLD) continue;
+
+                // 2. Map back to the GRID cell to get the physical geometry
+                // packCell.GridId is the index of the corresponding cell in _map.Cells
+                if (packCell.GridId < 0 || packCell.GridId >= _map.Cells.Length) continue;
+                var gridCell = _map.Cells[packCell.GridId];
+
+                // 3. Lookup Biome Color
+                int biomeId = packCell.BiomeId;
+                if (biomeId < 0 || biomeId >= biomeDefs.Count) continue;
+
+                if (SKColor.TryParse(biomeDefs[biomeId].Color, out var color))
+                {
+                    // We use a slight transparency so the underlying heightmap shading 
+                    // from RenderHeightmap creates a "3D" effect.
+                    fillPaint.Color = color.WithAlpha(170);
+                }
+
+                // 4. Draw the geometry from the GRID cell
+                using var path = CreateCellPath(gridCell);
+                canvas.DrawPath(path, fillPaint);
             }
         }
 

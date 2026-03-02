@@ -100,6 +100,9 @@ namespace MapGen.Core
         public double Flux { get; set; }        // cells.fl: water flow volume
         public ushort RiverId { get; set; }     // cells.r: ID of the river passing through
         public double Confluence { get; set; }    // cells.conf: marking confluence points
+
+        // Bioms
+        public byte BiomeId { get; set; }
     }
 
     public class MapVertex
