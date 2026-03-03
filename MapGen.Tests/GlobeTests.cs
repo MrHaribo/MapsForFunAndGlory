@@ -13,7 +13,17 @@ namespace MapGen.Tests
         public double Size { get; set; }
         public double Lat { get; set; }
         public double Lon { get; set; }
-        public MapCoordinates Coords { get; set; }
+        public RegressionMapCoordinates Coords { get; set; }
+    }
+
+    public class RegressionMapCoordinates
+    {
+        public double LatT { get; set; } // Total Latitude span
+        public double LatN { get; set; } // Northern Latitude
+        public double LatS { get; set; } // Southern Latitude
+        public double LonT { get; set; } // Total Longitude span
+        public double LonW { get; set; } // Western Longitude
+        public double LonE { get; set; } // Eastern Longitude
     }
 
     public class GlobeTests
@@ -72,12 +82,12 @@ namespace MapGen.Tests
             GlobeModule.CalculateMapCoordinates(data);
 
             // 4. Assert (The "Degrees" on the globe)
-            Assert.Equal(expected.Coords.LatT, data.Coords.LatT);
-            Assert.Equal(expected.Coords.LatN, data.Coords.LatN);
-            Assert.Equal(expected.Coords.LatS, data.Coords.LatS);
-            Assert.Equal(expected.Coords.LonT, data.Coords.LonT);
-            Assert.Equal(expected.Coords.LonE, data.Coords.LonE);
-            Assert.Equal(expected.Coords.LonW, data.Coords.LonW);
+            Assert.Equal(expected.Coords.LatT, data.Coords.LatTotal);
+            Assert.Equal(expected.Coords.LatN, data.Coords.LatNorth);
+            Assert.Equal(expected.Coords.LatS, data.Coords.LatSouth);
+            Assert.Equal(expected.Coords.LonT, data.Coords.LonTotal);
+            Assert.Equal(expected.Coords.LonE, data.Coords.LonEast);
+            Assert.Equal(expected.Coords.LonW, data.Coords.LonWest);
         }
     }
 }

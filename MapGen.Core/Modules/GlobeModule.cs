@@ -73,12 +73,12 @@ namespace MapGen.Core.Modules
 
             data.Coords = new MapCoordinates
             {
-                LatT = latT,
-                LatN = latN,
-                LatS = latS,
-                LonT = lonT,
-                LonW = lonW,
-                LonE = lonE
+                LatTotal = latT,
+                LatNorth = latN,
+                LatSouth = latS,
+                LonTotal = lonT,
+                LonWest = lonW,
+                LonEast = lonE
             };
         }
     }

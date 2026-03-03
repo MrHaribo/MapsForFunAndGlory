@@ -29,7 +29,7 @@ namespace MapGen.Core.Modules
                 double y = data.Points[rowStartId].Y;
 
                 double relativeY = y / data.Height;
-                double rowLatitude = data.Coords.LatN - (relativeY * data.Coords.LatT);
+                double rowLatitude = data.Coords.LatNorth - (relativeY * data.Coords.LatTotal);
 
                 double tempSeaLevel = CalculateSeaLevelTemp(rowLatitude, opt.TemperatureEquator, tempNorthTropic, tempSouthTropic, northernGradient, southernGradient);
 
@@ -90,7 +90,7 @@ namespace MapGen.Core.Modules
             for (int i = 0; i < data.CellsCountY; i++)
             {
                 int c = i * data.CellsCountX;
-                double lat = data.Coords.LatN - (i / (double)data.CellsCountY) * data.Coords.LatT;
+                double lat = data.Coords.LatNorth - (i / (double)data.CellsCountY) * data.Coords.LatTotal;
 
                 int latBand = (int)Math.Floor((Math.Abs(lat) - 1) / 5.0);
                 latBand = Math.Clamp(latBand, 0, latitudeModifier.Length - 1);
@@ -115,9 +115,9 @@ namespace MapGen.Core.Modules
             int vertT = southerly + northerly;
             if (northerly > 0)
             {
-                int bandN = (int)Math.Floor((Math.Abs(data.Coords.LatN) - 1) / 5.0);
+                int bandN = (int)Math.Floor((Math.Abs(data.Coords.LatNorth) - 1) / 5.0);
                 bandN = Math.Clamp(bandN, 0, latitudeModifier.Length - 1);
-                double latModN = data.Coords.LatT > 60 ? latitudeModifier.Average() : latitudeModifier[bandN];
+                double latModN = data.Coords.LatTotal > 60 ? latitudeModifier.Average() : latitudeModifier[bandN];
                 double maxPrecN = (northerly / (double)vertT) * 60 * modifier * latModN;
 
                 var northSource = Enumerable.Range(0, data.CellsCountX).Select(idx => (idx, 1.0)).ToList();
@@ -126,9 +126,9 @@ namespace MapGen.Core.Modules
 
             if (southerly > 0)
             {
-                int bandS = (int)Math.Floor((Math.Abs(data.Coords.LatS) - 1) / 5.0);
+                int bandS = (int)Math.Floor((Math.Abs(data.Coords.LatSouth) - 1) / 5.0);
                 bandS = Math.Clamp(bandS, 0, latitudeModifier.Length - 1);
-                double latModS = data.Coords.LatT > 60 ? latitudeModifier.Average() : latitudeModifier[bandS];
+                double latModS = data.Coords.LatTotal > 60 ? latitudeModifier.Average() : latitudeModifier[bandS];
                 double maxPrecS = (southerly / (double)vertT) * 60 * modifier * latModS;
 
                 int startIdx = data.Cells.Length - data.CellsCountX;

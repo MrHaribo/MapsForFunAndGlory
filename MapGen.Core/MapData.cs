@@ -141,12 +141,12 @@ namespace MapGen.Core
 
     public class MapCoordinates
     {
-        public double LatT { get; set; } // Total Latitude span
-        public double LatN { get; set; } // Northern Latitude
-        public double LatS { get; set; } // Southern Latitude
-        public double LonT { get; set; } // Total Longitude span
-        public double LonW { get; set; } // Western Longitude
-        public double LonE { get; set; } // Eastern Longitude
+        public double LatTotal { get; set; } // Total Latitude span
+        public double LatNorth { get; set; } // Northern Latitude
+        public double LatSouth { get; set; } // Southern Latitude
+        public double LonTotal { get; set; } // Total Longitude span
+        public double LonWest { get; set; } // Western Longitude
+        public double LonEast { get; set; } // Eastern Longitude
     }
 
     public class MapRiver
@@ -163,17 +163,16 @@ namespace MapGen.Core
         public List<int> Cells { get; set; } = new List<int>();
     }
 
-    public struct PointFlux
+    public readonly struct PointFlux
     {
-        public double X, Y, Flux;
+        public readonly double X, Y, Flux;
         public PointFlux(double x, double y, double f) { X = x; Y = y; Flux = f; }
+        public override string ToString() => $"[{X}, {Y}][{Flux}]";
     }
 
     public readonly struct MapPoint
     {
-        public readonly double X;
-        public readonly double Y;
-
+        public readonly double X, Y;
         public MapPoint(double x, double y) => (X, Y) = (x, y);
         public override string ToString() => $"[{X}, {Y}]";
     }
