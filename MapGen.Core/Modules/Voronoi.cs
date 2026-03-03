@@ -23,7 +23,7 @@ namespace MapGen.Core.Modules
 
             // 1. Initialize the Object Arrays
             Cells = new MapCell[PointsN];
-            for (int i = 0; i < PointsN; i++) Cells[i] = new MapCell { Index = i };
+            for (int i = 0; i < PointsN; i++) Cells[i] = new MapCell { Index = i, Point = points[i] };
 
             int triangleCount = Delaunay.Triangles.Length / 3;
             Vertices = new MapVertex[triangleCount];

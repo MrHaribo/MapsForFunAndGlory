@@ -86,6 +86,7 @@ namespace MapGen.Render.Skia.WinUI
             // 1. Render the base layers (Heightmap, etc.)
             RenderHeightmap(canvas);
             RenderBiomes(canvas);
+            RenderPrecipitation(canvas);
 
             // 2. Start a new layer for the clipped rivers
             // We use a SaveLayer so the blending only affects the rivers and the mask
@@ -247,10 +248,9 @@ namespace MapGen.Render.Skia.WinUI
                 // Filter: Only render if it's land and has precipitation
                 if (cell.Height < MapConstants.LAND_THRESHOLD || cell.Prec == 0) continue;
 
-                var point = _map.Points[cell.Index];
                 float radius = (float)(Math.Sqrt(cell.Prec) * 0.85);
 
-                canvas.DrawCircle((float)point.X, (float)point.Y, radius, precPaint);
+                canvas.DrawCircle((float)cell.Point.X, (float)cell.Point.Y, radius, precPaint);
             }
         }
 

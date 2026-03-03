@@ -79,6 +79,7 @@ namespace MapGen.Core
     public class MapCell
     {
         public int Index { get; set; }
+        public MapPoint Point { get; set; }
         public List<int> Verticies { get; set; } = new List<int>(); // Indices of vertices forming this cell
         public List<int> NeighborCells { get; set; } = new List<int>(); // Indices of neighboring cells (Adjacency)
         public byte Border { get; set; }               // Border flag (1 if it touches the edge)
