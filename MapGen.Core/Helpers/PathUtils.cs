@@ -20,7 +20,7 @@ namespace MapGen.Core.Helpers
                 int current = next;
                 chain.Add(current);
 
-                var neibCells = vertices[current].C;
+                var neibCells = vertices[current].AdjacentCells;
                 if (addToChecked != null)
                 {
                     foreach (var c in neibCells)
@@ -30,7 +30,7 @@ namespace MapGen.Core.Helpers
                 // D3 vertices usually have 3 adjacent cells and 3 adjacent vertices
                 // We check the 'type' of the 3 cells to decide which vertex to follow
                 var cTypes = neibCells.Select(ofSameType).ToArray();
-                var vNeighbors = vertices[current].V;
+                var vNeighbors = vertices[current].NeighborVertices;
 
                 // Logic: Follow the boundary where the cell type changes
                 if (vNeighbors.Count > 0 && vNeighbors[0] != previous && cTypes[0] != cTypes[1]) next = vNeighbors[0];
@@ -50,8 +50,8 @@ namespace MapGen.Core.Helpers
             double area = 0;
             for (int i = 0; i < cell.V.Count; i++)
             {
-                var p1 = vertices[cell.V[i]].P;
-                var p2 = vertices[cell.V[(i + 1) % cell.V.Count]].P;
+                var p1 = vertices[cell.V[i]].Point;
+                var p2 = vertices[cell.V[(i + 1) % cell.V.Count]].Point;
                 area += (p1.X * p2.Y) - (p2.X * p1.Y);
             }
             return area / 2.0;

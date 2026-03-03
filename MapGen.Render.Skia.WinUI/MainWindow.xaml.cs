@@ -159,12 +159,12 @@ namespace MapGen.Render.Skia.WinUI
 
                 // Assuming _map.Vertices contains MapPoint coordinates
                 var startV = _map.Vertices[vertices[0]];
-                cellPath.MoveTo((float)startV.P.X, (float)startV.P.Y);
+                cellPath.MoveTo((float)startV.Point.X, (float)startV.Point.Y);
 
                 for (int i = 1; i < vertices.Count; i++)
                 {
                     var v = _map.Vertices[vertices[i]];
-                    cellPath.LineTo((float)v.P.X, (float)v.P.Y);
+                    cellPath.LineTo((float)v.Point.X, (float)v.Point.Y);
                 }
                 cellPath.Close();
 
@@ -330,12 +330,12 @@ namespace MapGen.Render.Skia.WinUI
         private SKPath CreateCellPath(MapCell cell)
         {
             var path = new SKPath();
-            var v0 = _map.Vertices[cell.V[0]].P;
+            var v0 = _map.Vertices[cell.V[0]].Point;
             path.MoveTo((float)v0.X, (float)v0.Y);
 
             for (int j = 1; j < cell.V.Count; j++)
             {
-                var v = _map.Vertices[cell.V[j]].P;
+                var v = _map.Vertices[cell.V[j]].Point;
                 path.LineTo((float)v.X, (float)v.Y);
             }
             path.Close();

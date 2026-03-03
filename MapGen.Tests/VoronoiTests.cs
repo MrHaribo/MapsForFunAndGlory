@@ -77,7 +77,7 @@ namespace MapGen.Tests
             Assert.Equal(expected.vertices.p.Length, mapData.Vertices.Length);
             for (int i = 0; i < mapData.Vertices.Length; i++)
             {
-                var actualP = mapData.Vertices[i].P;
+                var actualP = mapData.Vertices[i].Point;
                 var expectedP = expected.vertices.p[i];
 
                 // Geometry: Use precision 0 for snapped coordinates, or 2 for exact
@@ -85,8 +85,8 @@ namespace MapGen.Tests
                 Assert.Equal(expectedP[1], actualP.Y, 0);
 
                 // Topology: Vertex-to-cell and Vertex-to-vertex
-                Assert.Equal(expected.vertices.c[i], mapData.Vertices[i].C.ToArray());
-                Assert.Equal(expected.vertices.v[i], mapData.Vertices[i].V.ToArray());
+                Assert.Equal(expected.vertices.c[i], mapData.Vertices[i].AdjacentCells.ToArray());
+                Assert.Equal(expected.vertices.v[i], mapData.Vertices[i].NeighborVertices.ToArray());
             }
         }
 

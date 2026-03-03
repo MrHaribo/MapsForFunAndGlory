@@ -53,15 +53,15 @@ namespace MapGen.Core.Modules
 
                 // Fill Vertex Data (Circumcenters and Relationships)
                 int t = TriangleOfEdge(e);
-                if (Vertices[t].P.X == 0 && Vertices[t].P.Y == 0) // Check if uninitialized
+                if (Vertices[t].Point.X == 0 && Vertices[t].Point.Y == 0) // Check if uninitialized
                 {
-                    Vertices[t].P = GetTriangleCenter(t);
+                    Vertices[t].Point = GetTriangleCenter(t);
 
                     // MapVertex.V = Neighboring triangles
-                    Vertices[t].V = TrianglesAdjacentToTriangle(t);
+                    Vertices[t].NeighborVertices = TrianglesAdjacentToTriangle(t);
 
                     // MapVertex.C = Points forming the triangle
-                    Vertices[t].C = PointsOfTriangle(t).ToList();
+                    Vertices[t].AdjacentCells = PointsOfTriangle(t).ToList();
                 }
             }
         }

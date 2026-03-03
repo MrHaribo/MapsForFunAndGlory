@@ -108,9 +108,9 @@ namespace MapGen.Core
     public class MapVertex
     {
         public int Index { get; set; }
-        public MapPoint P { get; set; }           // The actual coordinate [x, y]
-        public List<int> V { get; set; } = new List<int>(); // Neighboring vertex indices
-        public List<int> C { get; set; } = new List<int>(); // Adjacent cell indices
+        public MapPoint Point { get; set; }           // The actual coordinate [x, y]
+        public List<int> NeighborVertices { get; set; } = new List<int>(); // Neighboring vertex indices
+        public List<int> AdjacentCells { get; set; } = new List<int>(); // Adjacent cell indices
     }
 
     public class MapFeature

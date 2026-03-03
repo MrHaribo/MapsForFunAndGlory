@@ -199,7 +199,7 @@ namespace MapGen.Core.Modules
 
 
                 // 1. Convert vertex indices to MapPoints
-                var points = featureVertices.Select(v => vertices[v].P).ToList();
+                var points = featureVertices.Select(v => vertices[v].Point).ToList();
 
                 // 2. Use our new LineClip port
                 var clippedPoints = LineClip.PolygonClip(points, pack.Width, pack.Height);
@@ -224,7 +224,7 @@ namespace MapGen.Core.Modules
                 {
                     if (area > 0) feature.Vertices.Reverse();
                     feature.Shoreline = feature.Vertices
-                        .SelectMany(v => vertices[v].C)
+                        .SelectMany(v => vertices[v].AdjacentCells)
                         .Where(IsLand)
                         .Distinct()
                         .ToList();
@@ -261,7 +261,7 @@ namespace MapGen.Core.Modules
                     {
                         // Fix: Use Where + DefaultIfEmpty to safely handle the -1 default
                         int startingVertex = cells[sCell].V
-                            .Where(v => vertices[v].C.Any(OfDifferentType))
+                            .Where(v => vertices[v].AdjacentCells.Any(OfDifferentType))
                             .DefaultIfEmpty(-1)
                             .First();
 
