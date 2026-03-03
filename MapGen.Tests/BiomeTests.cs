@@ -69,7 +69,7 @@ namespace MapGen.Tests
 
                 // Check Moisture Calculation Parity (Intermediate)
                 // This is where most logic errors occur due to river flux or averaging
-                double actMoisture = actCell.H < 20 ? 0 : BiomModule.CalculateMoisture(pack, mapData, exp.Index);
+                double actMoisture = actCell.Height < 20 ? 0 : BiomModule.CalculateMoisture(pack, mapData, exp.Index);
                 Assert.Equal(exp.Moisture, actMoisture);
 
                 // Check Biome ID Parity (Final Output)
@@ -109,7 +109,7 @@ namespace MapGen.Tests
                     t = mapData.Cells[c.GridId].Temp,
                     p = mapData.Cells[c.GridId].Prec,
                     // Capture intermediate moisture calculation
-                    m = c.H < 20 ? (int)0 : (int)BiomModule.CalculateMoisture(pack, mapData, c.Index),
+                    m = c.Height < 20 ? (int)0 : (int)BiomModule.CalculateMoisture(pack, mapData, c.Index),
                     //h = c.H,
                     //r = c.RiverId != 0
                 }).ToList()

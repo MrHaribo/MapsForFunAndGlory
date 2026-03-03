@@ -42,7 +42,7 @@ namespace MapGen.Core.Modules
             {
                 for (int i = 0; i < pack.Cells.Length; i++)
                 {
-                    pack.Cells[i].H = (byte)Math.Floor(h[i]);
+                    pack.Cells[i].Height = (byte)Math.Floor(h[i]);
                 }
                 DowncutRivers(pack);
             }
@@ -90,7 +90,7 @@ namespace MapGen.Core.Modules
                         if (lake != null && lake.Flux > lake.Evaporation)
                         {
                             // Find the specific water cell belonging to this lake neighbor
-                            int lakeCell = cells[i].C.Find(c => h[c] < 20 && cells[c].FeatureId == lake.Id);
+                            int lakeCell = cells[i].NeighborCells.Find(c => h[c] < 20 && cells[c].FeatureId == lake.Id);
 
                             // Water from lake drains to outlet
                             double lakeDrainage = Math.Max(lake.Flux - lake.Evaporation, 0);
@@ -99,7 +99,7 @@ namespace MapGen.Core.Modules
                             // Chain lakes: maintain river identity or proclaim new one
                             if (cells[lakeCell].RiverId != lake.RiverId)
                             {
-                                bool sameRiver = cells[lakeCell].C.Any(c => cells[c].RiverId == lake.RiverId);
+                                bool sameRiver = cells[lakeCell].NeighborCells.Any(c => cells[c].RiverId == lake.RiverId);
                                 if (sameRiver)
                                 {
                                     cells[lakeCell].RiverId = lake.RiverId;
@@ -129,7 +129,7 @@ namespace MapGen.Core.Modules
                     }
 
                     // 3. Near-border logic
-                    if (cells[i].B == 1 && cells[i].RiverId > 0)
+                    if (cells[i].Border == 1 && cells[i].RiverId > 0)
                     {
                         AddCellToRiver(-1, cells[i].RiverId);
                         continue;
@@ -216,7 +216,7 @@ namespace MapGen.Core.Modules
 
             int GetLowestNeighbor(int i, int? excludeLakeId = null)
             {
-                var neighbors = pack.Cells[i].C;
+                var neighbors = pack.Cells[i].NeighborCells;
 
                 // 1. Lake Outlet Logic: Filter neighbors first if an exclusion ID is provided.
                 // This prevents rivers from flowing back into the lake they just exited.
@@ -290,7 +290,7 @@ namespace MapGen.Core.Modules
                     if (cellIdx < 0 || cellIdx >= pack.Cells.Length) continue;
 
                     var cell = pack.Cells[cellIdx];
-                    if (cell.H < MapConstants.LAND_THRESHOLD) continue;
+                    if (cell.Height < MapConstants.LAND_THRESHOLD) continue;
 
                     // If the cell already has a different RiverId, it's a confluence point
                     if (cell.RiverId != 0 && cell.RiverId != riverId)
@@ -349,7 +349,7 @@ namespace MapGen.Core.Modules
                 // Check if there is any confluence marked (JS: if (!cells.conf[i]) continue)
                 if (cell.Confluence == 0) continue;
 
-                var sortedInflux = cell.C
+                var sortedInflux = cell.NeighborCells
                     .Select(neighborIdx => pack.Cells[neighborIdx])
                     // JS: cells.r[c] && h[c] > h[i]
                     .Where(n => n.RiverId > 0 && h[n.Index] > h[cell.Index])
@@ -384,13 +384,13 @@ namespace MapGen.Core.Modules
 
                 // 1. Threshold check: must match JS integer comparison exactly
                 // JS: if (cells.h[i] < 35) continue; 
-                if (cell.H < 35 || cell.Flux == 0) continue;
+                if (cell.Height < 35 || cell.Flux == 0) continue;
 
                 // 2. Filter higher neighbors using the current state of the byte array
                 // JS: const higherCells = cells.c[i].filter(c => cells.h[c] > cells.h[i]);
-                byte currentH = cell.H;
-                var higherCellIndices = cell.C
-                    .Where(nIdx => cells[nIdx].H > currentH)
+                byte currentH = cell.Height;
+                var higherCellIndices = cell.NeighborCells
+                    .Where(nIdx => cells[nIdx].Height > currentH)
                     .ToList();
 
                 if (higherCellIndices.Count == 0) continue;
@@ -417,7 +417,7 @@ namespace MapGen.Core.Modules
 
                     // Re-assigning to the byte property ensures the next cell in the loop
                     // sees the updated height if it considers this cell a 'neighbor'.
-                    cell.H = (byte)Math.Max(0, cell.H - erosion);
+                    cell.Height = (byte)Math.Max(0, cell.Height - erosion);
                 }
             }
         }
@@ -430,9 +430,9 @@ namespace MapGen.Core.Modules
         {
             return pack.Cells.Select((c, i) =>
             {
-                if (c.H < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.H;
-                double meanDist = c.C.Average(n => (double)pack.Cells[n].Distance);
-                return c.H + (c.Distance / 100.0) + (meanDist / 10000.0);
+                if (c.Height < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.Height;
+                double meanDist = c.NeighborCells.Average(n => (double)pack.Cells[n].Distance);
+                return c.Height + (c.Distance / 100.0) + (meanDist / 10000.0);
             }).ToArray();
         }
 
@@ -455,7 +455,7 @@ namespace MapGen.Core.Modules
 
             // JS sorts once at the beginning
             var land = Enumerable.Range(0, cells.Length)
-                .Where(i => h[i] >= MapConstants.LAND_THRESHOLD && cells[i].B == 0)
+                .Where(i => h[i] >= MapConstants.LAND_THRESHOLD && cells[i].Border == 0)
                 .OrderBy(i => h[i])
                 .ToList();
 
@@ -484,7 +484,7 @@ namespace MapGen.Core.Modules
 
                         if (iteration > elevateLakeMaxIteration)
                         {
-                            foreach (int i in l.Shoreline) h[i] = cells[i].H;
+                            foreach (int i in l.Shoreline) h[i] = cells[i].Height;
                             l.Height = l.Shoreline.Min(s => h[s]) - 1;
                             l.IsClosed = true;
                             continue;
@@ -498,7 +498,7 @@ namespace MapGen.Core.Modules
                 foreach (int i in land)
                 {
                     // FIX 3: Neighbors in JS are cells.c[i]
-                    double minNeighborHeight = cells[i].C.Min(neighborIndex => GetHeight(neighborIndex));
+                    double minNeighborHeight = cells[i].NeighborCells.Min(neighborIndex => GetHeight(neighborIndex));
 
                     if (minNeighborHeight >= 100 || h[i] > minNeighborHeight) continue;
 
@@ -533,7 +533,7 @@ namespace MapGen.Core.Modules
             var points = GetRiverPoints(pack, riverCells);
 
             // Initial step logic based on height (Lowland vs Highland)
-            int step = pack.Cells[riverCells[0]].H < 20 ? 1 : 10;
+            int step = pack.Cells[riverCells[0]].Height < 20 ? 1 : 10;
 
             for (int i = 0; i <= lastStep; i++, step++)
             {

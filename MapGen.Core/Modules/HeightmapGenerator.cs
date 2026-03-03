@@ -31,7 +31,7 @@ namespace MapGen.Core.Modules
             data.Rng.Init(data.Seed);
 
             // Reset heights to 0 before applying tools
-            foreach (var cell in data.Cells) cell.H = 0;
+            foreach (var cell in data.Cells) cell.Height = 0;
 
             var lines = recipe.Split(new[] { "\n", "\r\n", ";" }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
@@ -110,7 +110,7 @@ namespace MapGen.Core.Modules
                 double y = GetPointInRange(rangeY, data.Height, rng);
                 start = FindGridCell(data, x, y);
                 limit++;
-            } while (data.Cells[start].H + h > 90 && limit < 50);
+            } while (data.Cells[start].Height + h > 90 && limit < 50);
 
             // 3. BFS Hill Generation
             change[start] = h;
@@ -120,7 +120,7 @@ namespace MapGen.Core.Modules
             while (queue.Count > 0)
             {
                 int q = queue.Dequeue();
-                foreach (int c in data.Cells[q].C)
+                foreach (int c in data.Cells[q].NeighborCells)
                 {
                     if (c == -1 || change[c] > 0) continue;
 
@@ -146,8 +146,8 @@ namespace MapGen.Core.Modules
 
                 // JS: heights[i] = lim(heights[i] + change[i])
                 // Assignment to Uint8Array always floors in JS.
-                double mergedHeight = Math.Floor(data.Cells[i].H + change[i]);
-                data.Cells[i].H = (byte)Math.Clamp(mergedHeight, 0, 100);
+                double mergedHeight = Math.Floor(data.Cells[i].Height + change[i]);
+                data.Cells[i].Height = (byte)Math.Clamp(mergedHeight, 0, 100);
             }
         }
 
@@ -175,7 +175,7 @@ namespace MapGen.Core.Modules
                 double y = GetPointInRange(rangeY, data.Height, rng);
                 start = FindGridCell(data, x, y);
                 limit++;
-            } while (data.Cells[start].H < 20 && limit < 50);
+            } while (data.Cells[start].Height < 20 && limit < 50);
 
             // 2. BFS Mutation Loop
             Queue<int> queue = new Queue<int>();
@@ -192,7 +192,7 @@ namespace MapGen.Core.Modules
                 h = Math.Pow(h, blobPower) * (rng.Next() * 0.2 + 0.9);
                 if (h < 1) return;
 
-                foreach (int c in data.Cells[q].C)
+                foreach (int c in data.Cells[q].NeighborCells)
                 {
                     // Skip border cells and already processed cells
                     if (c == -1 || used[c] == 1) continue;
@@ -201,9 +201,9 @@ namespace MapGen.Core.Modules
                     double reduction = h * (rng.Next() * 0.2 + 0.9);
 
                     // Apply reduction with Floor to match JS Uint8Array behavior
-                    double currentH = data.Cells[c].H;
+                    double currentH = data.Cells[c].Height;
                     double newH = Math.Floor(currentH - reduction);
-                    data.Cells[c].H = (byte)Math.Clamp(newH, 0, 100);
+                    data.Cells[c].Height = (byte)Math.Clamp(newH, 0, 100);
 
                     used[c] = 1;
                     queue.Enqueue(c);
@@ -252,7 +252,7 @@ namespace MapGen.Core.Modules
                     {
                         double min = double.PositiveInfinity;
                         int nextStep = -1;
-                        foreach (int e in data.Cells[cur].C)
+                        foreach (int e in data.Cells[cur].NeighborCells)
                         {
                             if (e == -1 || used[e] == 1) continue;
                             double diff = Math.Pow(data.Points[end].X - data.Points[e].X, 2) +
@@ -281,14 +281,14 @@ namespace MapGen.Core.Modules
                     foreach (int idx in frontier)
                     {
                         double noise = rng.Next() * 0.3 + 0.85;
-                        double newH = data.Cells[idx].H + h * noise;
-                        data.Cells[idx].H = (byte)Lim(Math.Floor(newH));
+                        double newH = data.Cells[idx].Height + h * noise;
+                        data.Cells[idx].Height = (byte)Lim(Math.Floor(newH));
                     }
                     h = Math.Pow(h, linePower) - 1;
                     if (h < 2) break;
                     foreach (int f in frontier)
                     {
-                        foreach (int n in data.Cells[f].C)
+                        foreach (int n in data.Cells[f].NeighborCells)
                         {
                             if (n != -1 && used[n] == 0) { queue.Add(n); used[n] = 1; }
                         }
@@ -304,14 +304,14 @@ namespace MapGen.Core.Modules
                     {
                         int minCell = -1;
                         double minH = double.PositiveInfinity;
-                        foreach (int n in data.Cells[cur].C)
+                        foreach (int n in data.Cells[cur].NeighborCells)
                         {
                             if (n == -1) continue;
-                            if (data.Cells[n].H < minH) { minH = data.Cells[n].H; minCell = n; }
+                            if (data.Cells[n].Height < minH) { minH = data.Cells[n].Height; minCell = n; }
                         }
                         if (minCell == -1) break;
-                        double avgH = (data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0;
-                        data.Cells[minCell].H = (byte)Lim(Math.Floor(avgH));
+                        double avgH = (data.Cells[cur].Height * 2.0 + data.Cells[minCell].Height) / 3.0;
+                        data.Cells[minCell].Height = (byte)Lim(Math.Floor(avgH));
                         cur = minCell;
                     }
                 }
@@ -343,7 +343,7 @@ namespace MapGen.Core.Modules
                         startY = GetPointInRange(rY, data.Height, rng);
                         startCell = FindGridCell(data, startX, startY);
                         limit++;
-                    } while (data.Cells[startCell].H < 20 && limit < 50);
+                    } while (data.Cells[startCell].Height < 20 && limit < 50);
 
                     limit = 0;
                     double dist = 0;
@@ -369,7 +369,7 @@ namespace MapGen.Core.Modules
                         double min = double.MaxValue;
                         int next = -1;
 
-                        foreach (int e in data.Cells[cur].C)
+                        foreach (int e in data.Cells[cur].NeighborCells)
                         {
                             if (e == -1 || used[e] == 1) continue;
 
@@ -409,7 +409,7 @@ namespace MapGen.Core.Modules
 
                     foreach (int cellIdx in frontier)
                     {
-                        data.Cells[cellIdx].H = (byte)Lim(data.Cells[cellIdx].H - h * (rng.Next() * 0.3 + 0.85));
+                        data.Cells[cellIdx].Height = (byte)Lim(data.Cells[cellIdx].Height - h * (rng.Next() * 0.3 + 0.85));
                     }
 
                     h = Math.Pow(h, linePower) - 1;
@@ -417,7 +417,7 @@ namespace MapGen.Core.Modules
 
                     foreach (int f in frontier)
                     {
-                        foreach (int n in data.Cells[f].C)
+                        foreach (int n in data.Cells[f].NeighborCells)
                         {
                             if (n != -1 && used[n] == 0)
                             {
@@ -439,18 +439,18 @@ namespace MapGen.Core.Modules
                         int minCell = -1;
                         double minH = double.MaxValue;
 
-                        foreach (int n in data.Cells[cur].C)
+                        foreach (int n in data.Cells[cur].NeighborCells)
                         {
-                            if (n != -1 && data.Cells[n].H < minH)
+                            if (n != -1 && data.Cells[n].Height < minH)
                             {
-                                minH = data.Cells[n].H;
+                                minH = data.Cells[n].Height;
                                 minCell = n;
                             }
                         }
 
                         if (minCell == -1) break;
 
-                        data.Cells[minCell].H = (byte)Lim((data.Cells[cur].H * 2.0 + data.Cells[minCell].H) / 3.0);
+                        data.Cells[minCell].Height = (byte)Lim((data.Cells[cur].Height * 2.0 + data.Cells[minCell].Height) / 3.0);
                         cur = minCell;
                     }
                 }
@@ -480,7 +480,7 @@ namespace MapGen.Core.Modules
             {
                 double minD = double.MaxValue;
                 int next = -1;
-                foreach (int e in data.Cells[cur].C)
+                foreach (int e in data.Cells[cur].NeighborCells)
                 {
                     if (e == -1) continue;
                     double d = Math.Pow(data.Points[end].X - data.Points[e].X, 2) + Math.Pow(data.Points[end].Y - data.Points[e].Y, 2);
@@ -499,14 +499,14 @@ namespace MapGen.Core.Modules
                 List<int> query = new List<int>();
                 foreach (int r in range)
                 {
-                    foreach (int e in data.Cells[r].C)
+                    foreach (int e in data.Cells[r].NeighborCells)
                     {
                         if (e == -1 || used[e] == 1) continue;
                         used[e] = 1;
                         query.Add(e);
 
-                        double newH = Math.Pow(data.Cells[e].H, exp);
-                        data.Cells[e].H = newH > 100 ? (byte)5 : (byte)Lim(newH);
+                        double newH = Math.Pow(data.Cells[e].Height, exp);
+                        data.Cells[e].Height = newH > 100 ? (byte)5 : (byte)Lim(newH);
                     }
                 }
                 range = query;
@@ -530,7 +530,7 @@ namespace MapGen.Core.Modules
             byte[] oldHeights = new byte[data.Cells.Length];
             for (int i = 0; i < data.Cells.Length; i++)
             {
-                oldHeights[i] = data.Cells[i].H;
+                oldHeights[i] = data.Cells[i].Height;
             }
 
             // 2. Map the snapped heights back to the cells using inverted coordinates
@@ -545,7 +545,7 @@ namespace MapGen.Core.Modules
                 int invertedI = nx + ny * cellsX;
 
                 // Parity Check: JS returns heights[invertedI]
-                data.Cells[i].H = oldHeights[invertedI];
+                data.Cells[i].Height = oldHeights[invertedI];
             }
         }
 
@@ -562,7 +562,7 @@ namespace MapGen.Core.Modules
 
             foreach (var cell in data.Cells)
             {
-                double h = cell.H;
+                double h = cell.Height;
 
                 // JS: if (h < min || h > max) return h;
                 if (h < min || h > max) continue;
@@ -579,7 +579,7 @@ namespace MapGen.Core.Modules
                 if (power != 0)
                     h = isLand ? Math.Pow(h - 20, power) + 20 : Math.Pow(h, power);
 
-                cell.H = (byte)Lim(h);
+                cell.Height = (byte)Lim(h);
             }
         }
 
@@ -590,14 +590,14 @@ namespace MapGen.Core.Modules
             for (int i = 0; i < data.Cells.Length; i++)
             {
                 // Calculate the mean of self + neighbors
-                double sum = data.Cells[i].H;
-                foreach (int n in data.Cells[i].C)
+                double sum = data.Cells[i].Height;
+                foreach (int n in data.Cells[i].NeighborCells)
                 {
                     if (n == -1) continue;
-                    sum += data.Cells[n].H;
+                    sum += data.Cells[n].Height;
                 }
 
-                double mean = sum / (data.Cells[i].C.Count + 1);
+                double mean = sum / (data.Cells[i].NeighborCells.Count + 1);
                 double finalValue;
 
                 if (Math.Abs(fr - 1.0) < 0.0001)
@@ -607,7 +607,7 @@ namespace MapGen.Core.Modules
                 else
                 {
                     // JS: lim((h * (fr - 1) + d3.mean(a) + add) / fr)
-                    finalValue = (data.Cells[i].H * (fr - 1) + mean + add) / fr;
+                    finalValue = (data.Cells[i].Height * (fr - 1) + mean + add) / fr;
                 }
 
                 // Apply Lim and Floor to match JS Uint8Array behavior
@@ -617,7 +617,7 @@ namespace MapGen.Core.Modules
             // Apply the buffer back to the map
             for (int i = 0; i < data.Cells.Length; i++)
             {
-                data.Cells[i].H = result[i];
+                data.Cells[i].Height = result[i];
             }
         }
 
@@ -650,12 +650,12 @@ namespace MapGen.Core.Modules
                     distance = 1.0 - distance;
                 }
 
-                double h = data.Cells[i].H;
+                double h = data.Cells[i].Height;
                 double masked = h * distance;
 
                 // Blend the original height with the masked height based on fr
                 // JS: lim((h * (fr - 1) + masked) / fr)
-                data.Cells[i].H = (byte)Lim((h * (fr - 1.0) + masked) / fr);
+                data.Cells[i].Height = (byte)Lim((h * (fr - 1.0) + masked) / fr);
             }
         }
 

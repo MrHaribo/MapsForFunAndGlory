@@ -38,7 +38,7 @@ namespace MapGen.Core.Modules
                     int cellId = rowStartId + c;
                     var cell = data.Cells[cellId];
 
-                    double tempAltitudeDrop = GetAltitudeTemperatureDrop(cell.H, heightExponent);
+                    double tempAltitudeDrop = GetAltitudeTemperatureDrop(cell.Height, heightExponent);
                     double finalTemp = tempSeaLevel - tempAltitudeDrop;
 
                     cell.Temp = (sbyte)MinMax(finalTemp, -128, 127);
@@ -153,7 +153,7 @@ namespace MapGen.Core.Modules
             {
                 double maxPrec = Math.Min(maxPrecBase * start.latMod, 255);
                 int current = start.index;
-                double humidity = maxPrec - data.Cells[current].H;
+                double humidity = maxPrec - data.Cells[current].Height;
 
                 if (humidity <= 0) continue;
 
@@ -164,11 +164,11 @@ namespace MapGen.Core.Modules
 
                     if (cell.Temp < -5) { current += next; continue; }
 
-                    if (cell.H < MapConstants.LAND_THRESHOLD)
+                    if (cell.Height < MapConstants.LAND_THRESHOLD)
                     {
                         // Water cell logic
                         int nextIdx = current + next;
-                        if (nextIdx >= 0 && nextIdx < data.Cells.Length && data.Cells[nextIdx].H >= MapConstants.LAND_THRESHOLD)
+                        if (nextIdx >= 0 && nextIdx < data.Cells.Length && data.Cells[nextIdx].Height >= MapConstants.LAND_THRESHOLD)
                         {
                             // Coastal precipitation: Add to next cell (the land)
                             data.Cells[nextIdx].Prec = (byte)MinMax(data.Cells[nextIdx].Prec + Math.Max(humidity / data.Rng.Next(10, 20), 1), 0, 255);
@@ -183,7 +183,7 @@ namespace MapGen.Core.Modules
                     {
                         // Land cell logic
                         int nextIdx = current + next;
-                        bool isPassable = nextIdx >= 0 && nextIdx < data.Cells.Length && data.Cells[nextIdx].H <= MapConstants.MAX_PASSABLE_ELEVATION;
+                        bool isPassable = nextIdx >= 0 && nextIdx < data.Cells.Length && data.Cells[nextIdx].Height <= MapConstants.MAX_PASSABLE_ELEVATION;
 
                         double precipitation = isPassable
                             ? GetPrecipitation(data, humidity, current, nextIdx, modifier)
@@ -202,8 +202,8 @@ namespace MapGen.Core.Modules
         private static double GetPrecipitation(MapData data, double humidity, int i, int n, double modifier)
         {
             double normalLoss = Math.Max(humidity / (10 * modifier), 1);
-            double diff = Math.Max(data.Cells[n].H - data.Cells[i].H, 0);
-            double mod = Math.Pow(data.Cells[n].H / 70.0, 2);
+            double diff = Math.Max(data.Cells[n].Height - data.Cells[i].Height, 0);
+            double mod = Math.Pow(data.Cells[n].Height / 70.0, 2);
 
             double result = normalLoss + diff * mod;
             // Instead of a strict MinMax(result, 1, humidity), 

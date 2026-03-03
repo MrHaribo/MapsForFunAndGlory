@@ -91,7 +91,7 @@ namespace MapGen.Tests
                 Assert.Equal(expCell.Confluence, (double)actCell.Confluence);
 
                 // Verify Downcutting (Erosion) results
-                Assert.Equal((byte)expCell.Height, actCell.H);
+                Assert.Equal((byte)expCell.Height, actCell.Height);
 
                 // Verify Precipitation/Lake Drainage Flux
                 Assert.Equal(expCell.Flux, (double)actCell.Flux);

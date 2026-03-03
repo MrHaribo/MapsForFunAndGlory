@@ -72,7 +72,7 @@ namespace MapGen.Core.Modules
                 var cell = pack.Cells[i];
 
                 // 1. Calculate Moisture
-                double moisture = cell.H < 20 ? 0 : CalculateMoisture(pack, grid, i);
+                double moisture = cell.Height < 20 ? 0 : CalculateMoisture(pack, grid, i);
 
                 // 2. Get Temperature from Grid Reference
                 // GridId is the link between the 'Pack' cell and the 'Grid' cell
@@ -80,7 +80,7 @@ namespace MapGen.Core.Modules
 
                 // 3. Determine and assign Biome ID
                 // getId helper we created previously
-                cell.BiomeId = GetBiomeId(moisture, temperature, cell.H, cell.RiverId != 0);
+                cell.BiomeId = GetBiomeId(moisture, temperature, cell.Height, cell.RiverId != 0);
             }
         }
 
@@ -99,8 +99,8 @@ namespace MapGen.Core.Modules
 
             // Neighbors Smoothing
             // Filter to only land neighbors, get their precipitation, and include current moisture
-            var landNeighborPrec = cell.C
-                .Where(nIdx => pack.Cells[nIdx].H >= 20)
+            var landNeighborPrec = cell.NeighborCells
+                .Where(nIdx => pack.Cells[nIdx].Height >= 20)
                 .Select(nIdx => (double)grid.Cells[pack.Cells[nIdx].GridId].Prec)
                 .ToList();
 

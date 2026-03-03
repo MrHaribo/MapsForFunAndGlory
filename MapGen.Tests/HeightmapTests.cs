@@ -53,7 +53,7 @@ namespace MapGen.Tests
             {
                 // We use 0 tolerance because heights are bytes (0-100)
                 // If the RNG or BFS decay math is off by even 1, this fails.
-                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].Height);
             }
         }
 
@@ -83,7 +83,7 @@ namespace MapGen.Tests
             // 6. Verify Height Parity
             for (int i = 0; i < expected.Heights.Length; i++)
             {
-                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].Height);
             }
         }
 
@@ -114,7 +114,7 @@ namespace MapGen.Tests
             // 6. Verify Height Parity
             for (int i = 0; i < expected.Heights.Length; i++)
             {
-                Assert.Equal(expected.Heights[i], mapData.Cells[i].H);
+                Assert.Equal(expected.Heights[i], mapData.Cells[i].Height);
             }
         }
 

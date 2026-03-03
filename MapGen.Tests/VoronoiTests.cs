@@ -64,13 +64,13 @@ namespace MapGen.Tests
             for (int i = 0; i < mapData.Cells.Length; i++)
             {
                 // Verify adjacent cells (c)
-                Assert.Equal(expected.cells.c[i], mapData.Cells[i].C.ToArray());
+                Assert.Equal(expected.cells.c[i], mapData.Cells[i].NeighborCells.ToArray());
 
                 // Verify cell vertices (v)
-                Assert.Equal(expected.cells.v[i], mapData.Cells[i].V.ToArray());
+                Assert.Equal(expected.cells.v[i], mapData.Cells[i].Verticies.ToArray());
 
                 // Verify boundary flag (b)
-                Assert.Equal(expected.cells.b[i], (int)mapData.Cells[i].B);
+                Assert.Equal(expected.cells.b[i], (int)mapData.Cells[i].Border);
             }
 
             // 5. Verify Vertex Geometry and Topology

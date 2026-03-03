@@ -48,10 +48,10 @@ namespace MapGen.Core.Helpers
         public static double CalculatePolygonArea(MapCell cell, MapVertex[] vertices)
         {
             double area = 0;
-            for (int i = 0; i < cell.V.Count; i++)
+            for (int i = 0; i < cell.Verticies.Count; i++)
             {
-                var p1 = vertices[cell.V[i]].Point;
-                var p2 = vertices[cell.V[(i + 1) % cell.V.Count]].Point;
+                var p1 = vertices[cell.Verticies[i]].Point;
+                var p2 = vertices[cell.Verticies[(i + 1) % cell.Verticies.Count]].Point;
                 area += (p1.X * p2.Y) - (p2.X * p1.Y);
             }
             return area / 2.0;

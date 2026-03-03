@@ -59,7 +59,7 @@ namespace MapGen.Tests
             {
                 var cell = pack.Cells[i];
                 Assert.Equal(expected.GridMapping[i], cell.GridId);
-                Assert.Equal(expected.Heights[i], cell.H);
+                Assert.Equal(expected.Heights[i], cell.Height);
 
                 // Area can have tiny float jitter, so we check for near-equality
                 Assert.InRange(cell.Area, expected.Areas[i] - 1, expected.Areas[i] + 1);

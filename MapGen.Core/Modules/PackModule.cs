@@ -22,7 +22,7 @@ namespace MapGen.Core.Modules
 
                 // H < 20 check (Deep Ocean)
                 // Distance (t) -1/-2 are water-adjacent/coastal
-                if (cell.H < MapConstants.LAND_THRESHOLD && cell.Distance != -1 && cell.Distance != -2) continue;
+                if (cell.Height < MapConstants.LAND_THRESHOLD && cell.Distance != -1 && cell.Distance != -2) continue;
 
                 // Lake point subsampling
                 if (cell.Distance == -2)
@@ -32,14 +32,14 @@ namespace MapGen.Core.Modules
                 }
 
                 var p = data.Points[i];
-                AddPoint(newP, newG, newH, p.X, p.Y, i, cell.H);
+                AddPoint(newP, newG, newH, p.X, p.Y, i, cell.Height);
 
                 // Add midpoints along coast (Distance 1 or -1)
                 if (cell.Distance == 1 || cell.Distance == -1)
                 {
-                    if (cell.B == 1) continue;
+                    if (cell.Border == 1) continue;
 
-                    foreach (int e in cell.C)
+                    foreach (int e in cell.NeighborCells)
                     {
                         if (i > e) continue;
                         if (data.Cells[e].Distance == cell.Distance)
@@ -51,7 +51,7 @@ namespace MapGen.Core.Modules
                             // Use NumberUtils.Round to match JS: rn((x+x)/2, 1)
                             double x1 = Round((p.X + ep.X) / 2.0, 1);
                             double y1 = Round((p.Y + ep.Y) / 2.0, 1);
-                            AddPoint(newP, newG, newH, x1, y1, i, cell.H);
+                            AddPoint(newP, newG, newH, x1, y1, i, cell.Height);
                         }
                     }
                 }
@@ -80,7 +80,7 @@ namespace MapGen.Core.Modules
             for (int i = 0; i < pack.Cells.Length; i++)
             {
                 var cell = pack.Cells[i];
-                cell.H = newH[i];
+                cell.Height = newH[i];
                 cell.GridId = newG[i];
                 cell.Index = i; // Ensure internal index is set
 

@@ -17,7 +17,7 @@ namespace MapGen.Core.Modules
 
         private static (double size, double lat, double lon) GetSizeAndLatitude(MapData data, IRandom rng)
         {
-            bool touchesBorder = data.Cells.Any(c => c.B == 1 && c.H >= MapConstants.LAND_THRESHOLD);
+            bool touchesBorder = data.Cells.Any(c => c.Border == 1 && c.Height >= MapConstants.LAND_THRESHOLD);
             double max = touchesBorder ? 80 : 100;
 
             // Shared Latitude logic: 40% or 60% base with gaussian shift

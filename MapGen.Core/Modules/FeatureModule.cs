@@ -35,7 +35,7 @@ namespace MapGen.Core.Modules
                 if (data.Cells[startCell].FeatureId != MapConstants.UNMARKED) continue;
 
                 ushort currentFeatureId = nextFeatureId++;
-                bool isLand = data.Cells[startCell].H >= MapConstants.LAND_THRESHOLD;
+                bool isLand = data.Cells[startCell].Height >= MapConstants.LAND_THRESHOLD;
                 bool isBorder = false;
 
                 queue.Enqueue(startCell);
@@ -46,12 +46,12 @@ namespace MapGen.Core.Modules
                     int cellId = queue.Dequeue();
                     var cell = data.Cells[cellId];
 
-                    if (!isBorder && cell.B == 1) isBorder = true;
+                    if (!isBorder && cell.Border == 1) isBorder = true;
 
-                    foreach (int neighborId in cell.C)
+                    foreach (int neighborId in cell.NeighborCells)
                     {
                         var neighbor = data.Cells[neighborId];
-                        bool isNeighborLand = neighbor.H >= MapConstants.LAND_THRESHOLD;
+                        bool isNeighborLand = neighbor.Height >= MapConstants.LAND_THRESHOLD;
 
                         if (isLand == isNeighborLand && neighbor.FeatureId == MapConstants.UNMARKED)
                         {
@@ -91,7 +91,7 @@ namespace MapGen.Core.Modules
             var features = new List<MapFeature>();
 
             // Helper: isLand check matching JS logic
-            bool IsLand(int id) => cells[id].H >= MapConstants.LAND_THRESHOLD;
+            bool IsLand(int id) => cells[id].Height >= MapConstants.LAND_THRESHOLD;
             bool IsWater(int id) => !IsLand(id);
 
             List<int> queue = new List<int> { 0 };
@@ -102,7 +102,7 @@ namespace MapGen.Core.Modules
                 featureIds[firstCell] = featureId;
 
                 bool land = IsLand(firstCell);
-                bool border = cells[firstCell].B == 1;
+                bool border = cells[firstCell].Border == 1;
                 int totalCells = 1;
 
                 // Flood fill queue (JS uses the same array for outer and inner loops)
@@ -112,9 +112,9 @@ namespace MapGen.Core.Modules
                 while (floodQueue.Count > 0)
                 {
                     int cellId = floodQueue.Pop();
-                    if (cells[cellId].B == 1) border = true;
+                    if (cells[cellId].Border == 1) border = true;
 
-                    foreach (int neighborId in cells[cellId].C)
+                    foreach (int neighborId in cells[cellId].NeighborCells)
                     {
                         bool isNeibLand = IsLand(neighborId);
 
@@ -171,7 +171,7 @@ namespace MapGen.Core.Modules
 
             void DefineHaven(int cellId)
             {
-                var waterCells = cells[cellId].C.Where(IsWater).ToList();
+                var waterCells = cells[cellId].NeighborCells.Where(IsWater).ToList();
                 if (waterCells.Count == 0) return;
 
                 var p1 = pack.Points[cellId];
@@ -248,7 +248,7 @@ namespace MapGen.Core.Modules
 
                     int FindOnBorderCell(int currentCell)
                     {
-                        bool IsOnBorder(int cId) => cells[cId].B == 1 || cells[cId].C.Any(OfDifferentType);
+                        bool IsOnBorder(int cId) => cells[cId].Border == 1 || cells[cId].NeighborCells.Any(OfDifferentType);
                         if (IsOnBorder(currentCell)) return currentCell;
 
                         for (int i = 0; i < packCellsNumber; i++)
@@ -260,7 +260,7 @@ namespace MapGen.Core.Modules
                     List<int> GetFeatureVertices(int sCell)
                     {
                         // Fix: Use Where + DefaultIfEmpty to safely handle the -1 default
-                        int startingVertex = cells[sCell].V
+                        int startingVertex = cells[sCell].Verticies
                             .Where(v => vertices[v].AdjacentCells.Any(OfDifferentType))
                             .DefaultIfEmpty(-1)
                             .First();
@@ -288,7 +288,7 @@ namespace MapGen.Core.Modules
                     // Look for cells marked in the previous iteration
                     if (cells[i].Distance != prevDist) continue;
 
-                    foreach (int n in cells[i].C)
+                    foreach (int n in cells[i].NeighborCells)
                     {
                         // If neighbor is unmarked, assign the current distance step
                         if (cells[n].Distance == MapConstants.UNMARKED)

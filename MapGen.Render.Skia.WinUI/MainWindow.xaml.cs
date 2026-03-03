@@ -116,9 +116,9 @@ namespace MapGen.Render.Skia.WinUI
             for (int i = 0; i < _map.Cells.Length; i++)
             {
                 var cell = _map.Cells[i];
-                if (cell.V == null || cell.V.Count < 3) continue;
+                if (cell.Verticies == null || cell.Verticies.Count < 3) continue;
 
-                byte h = cell.H;
+                byte h = cell.Height;
                 if (h < MapConstants.LAND_THRESHOLD)
                 {
                     byte blueDepth = (byte)Math.Clamp(100 + (h * 5), 0, 255);
@@ -150,11 +150,11 @@ namespace MapGen.Render.Skia.WinUI
             // it's much faster to DrawPath once than looping here.
             foreach (var cell in _map.Cells)
             {
-                if (cell.H < 20) continue; // Skip water
+                if (cell.Height < 20) continue; // Skip water
 
                 // Draw the polygon for this cell
                 using var cellPath = new SKPath();
-                var vertices = cell.V; // Using your cell model's Vertex indices
+                var vertices = cell.Verticies; // Using your cell model's Vertex indices
                 if (vertices == null || vertices.Count == 0) continue;
 
                 // Assuming _map.Vertices contains MapPoint coordinates
@@ -183,7 +183,7 @@ namespace MapGen.Render.Skia.WinUI
             foreach (var packCell in _pack.Cells)
             {
                 // 1. Skip Water
-                if (packCell.H < MapConstants.LAND_THRESHOLD) continue;
+                if (packCell.Height < MapConstants.LAND_THRESHOLD) continue;
 
                 // 2. Map back to the GRID cell to get the physical geometry
                 // packCell.GridId is the index of the corresponding cell in _map.Cells
@@ -214,7 +214,7 @@ namespace MapGen.Render.Skia.WinUI
             for (int i = 0; i < _map.Cells.Length; i++)
             {
                 var cell = _map.Cells[i];
-                if (cell.V == null || cell.V.Count < 3) continue;
+                if (cell.Verticies == null || cell.Verticies.Count < 3) continue;
 
                 // Map temperature to a 0-1 range for a gradient. 
                 // We'll assume a range of -20°C (Green/Cool) to 40°C (Red/Hot)
@@ -245,7 +245,7 @@ namespace MapGen.Render.Skia.WinUI
                 var cell = _map.Cells[i];
 
                 // Filter: Only render if it's land and has precipitation
-                if (cell.H < MapConstants.LAND_THRESHOLD || cell.Prec == 0) continue;
+                if (cell.Height < MapConstants.LAND_THRESHOLD || cell.Prec == 0) continue;
 
                 var point = _map.Points[cell.Index];
                 float radius = (float)(Math.Sqrt(cell.Prec) * 0.85);
@@ -330,12 +330,12 @@ namespace MapGen.Render.Skia.WinUI
         private SKPath CreateCellPath(MapCell cell)
         {
             var path = new SKPath();
-            var v0 = _map.Vertices[cell.V[0]].Point;
+            var v0 = _map.Vertices[cell.Verticies[0]].Point;
             path.MoveTo((float)v0.X, (float)v0.Y);
 
-            for (int j = 1; j < cell.V.Count; j++)
+            for (int j = 1; j < cell.Verticies.Count; j++)
             {
-                var v = _map.Vertices[cell.V[j]].Point;
+                var v = _map.Vertices[cell.Verticies[j]].Point;
                 path.LineTo((float)v.X, (float)v.Y);
             }
             path.Close();

@@ -14,13 +14,13 @@ namespace MapGen.Core.Modules
             for (int i = 0; i < data.Cells.Length; i++)
             {
                 var cell = data.Cells[i];
-                if (cell.B == 1 || cell.H < MapConstants.LAND_THRESHOLD) continue;
+                if (cell.Border == 1 || cell.Height < MapConstants.LAND_THRESHOLD) continue;
 
-                double minNeighborH = cell.C.Where(n => n != -1).Min(n => (double)data.Cells[n].H);
-                if (cell.H > minNeighborH) continue;
+                double minNeighborH = cell.NeighborCells.Where(n => n != -1).Min(n => (double)data.Cells[n].Height);
+                if (cell.Height > minNeighborH) continue;
 
                 bool isDeep = true;
-                double threshold = cell.H + elevationLimit;
+                double threshold = cell.Height + elevationLimit;
                 Queue<int> queue = new Queue<int>();
                 HashSet<int> checkedCells = new HashSet<int> { i };
                 queue.Enqueue(i);
@@ -28,12 +28,12 @@ namespace MapGen.Core.Modules
                 while (isDeep && queue.Count > 0)
                 {
                     int q = queue.Dequeue();
-                    foreach (int n in data.Cells[q].C)
+                    foreach (int n in data.Cells[q].NeighborCells)
                     {
                         if (n == -1 || checkedCells.Contains(n)) continue;
-                        if (data.Cells[n].H >= threshold) continue;
+                        if (data.Cells[n].Height >= threshold) continue;
 
-                        if (data.Cells[n].H < MapConstants.LAND_THRESHOLD)
+                        if (data.Cells[n].Height < MapConstants.LAND_THRESHOLD)
                         {
                             isDeep = false;
                             break;
@@ -47,7 +47,7 @@ namespace MapGen.Core.Modules
                 if (isDeep)
                 {
                     var lakeCells = new List<int> { i };
-                    lakeCells.AddRange(cell.C.Where(n => n != -1 && data.Cells[n].H == cell.H));
+                    lakeCells.AddRange(cell.NeighborCells.Where(n => n != -1 && data.Cells[n].Height == cell.Height));
                     AddLake(data, lakeCells);
                 }
             }
@@ -58,11 +58,11 @@ namespace MapGen.Core.Modules
             int newFeatureId = data.Features.Count;
             foreach (int i in lakeCells)
             {
-                data.Cells[i].H = MapConstants.LAKE_HEIGHT;
+                data.Cells[i].Height = MapConstants.LAKE_HEIGHT;
                 data.Cells[i].Distance = MapConstants.WATER_COAST;
                 data.Cells[i].FeatureId = (ushort)newFeatureId;
 
-                foreach (int n in data.Cells[i].C)
+                foreach (int n in data.Cells[i].NeighborCells)
                 {
                     if (n != -1 && !lakeCells.Contains(n))
                         data.Cells[n].Distance = MapConstants.LAND_COAST;
@@ -82,16 +82,16 @@ namespace MapGen.Core.Modules
                 if (data.Features[lakeId].Type != FeatureType.Lake) continue;
 
                 bool isBreached = false;
-                foreach (int c in data.Cells[i].C)
+                foreach (int c in data.Cells[i].NeighborCells)
                 {
                     if (c == -1) continue;
                     var potentialBreach = data.Cells[c];
 
                     // If the neighbor is a low-lying coastline cell
                     if (potentialBreach.Distance == MapConstants.LAND_COAST &&
-                        potentialBreach.H <= MapConstants.LAKE_BREACH_LIMIT)
+                        potentialBreach.Height <= MapConstants.LAKE_BREACH_LIMIT)
                     {
-                        foreach (int n in potentialBreach.C)
+                        foreach (int n in potentialBreach.NeighborCells)
                         {
                             if (n == -1) continue;
                             int neighborFeatureId = data.Cells[n].FeatureId;
@@ -112,13 +112,13 @@ namespace MapGen.Core.Modules
 
         private static void RemoveLake(MapData data, int thresholdId, int lakeId, int oceanId)
         {
-            data.Cells[thresholdId].H = MapConstants.LAKE_HEIGHT;
+            data.Cells[thresholdId].Height = MapConstants.LAKE_HEIGHT;
             data.Cells[thresholdId].Distance = MapConstants.WATER_COAST;
             data.Cells[thresholdId].FeatureId = (ushort)oceanId;
 
-            foreach (int n in data.Cells[thresholdId].C)
+            foreach (int n in data.Cells[thresholdId].NeighborCells)
             {
-                if (n != -1 && data.Cells[n].H >= MapConstants.LAND_THRESHOLD)
+                if (n != -1 && data.Cells[n].Height >= MapConstants.LAND_THRESHOLD)
                     data.Cells[n].Distance = MapConstants.LAND_COAST;
             }
 
@@ -136,7 +136,7 @@ namespace MapGen.Core.Modules
                 return 20.0; // Default matching JS logic
 
             // Get minimum height from shoreline cells
-            double minShoreHeight = feature.Shoreline.Min(cellId => pack.Cells[cellId].H);
+            double minShoreHeight = feature.Shoreline.Min(cellId => pack.Cells[cellId].Height);
 
             // Match JS: rn(minShoreHeight - 0.01, 2)
             return NumberUtils.Round(minShoreHeight - MapConstants.LAKE_ELEVATION_DELTA, 2);
@@ -175,7 +175,7 @@ namespace MapGen.Core.Modules
                 {
                     int cellId = stack.Pop();
 
-                    foreach (int n in cells[cellId].C)
+                    foreach (int n in cells[cellId].NeighborCells)
                     {
                         if (checkedCells.Contains(n) || h[n] >= maxElevation) continue;
 

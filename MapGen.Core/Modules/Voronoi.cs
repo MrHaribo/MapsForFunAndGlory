@@ -36,19 +36,19 @@ namespace MapGen.Core.Modules
                 int p = Delaunay.Triangles[NextHalfedge(e)];
 
                 // Fill Cell Data (Adjacency and Vertices)
-                if (p < PointsN && Cells[p].C.Count == 0)
+                if (p < PointsN && Cells[p].NeighborCells.Count == 0)
                 {
                     var edges = EdgesAroundPoint(e);
 
                     // MapCell.V = Indices of triangles (Voronoi vertices)
-                    Cells[p].V = edges.Select(ex => TriangleOfEdge(ex)).ToList();
+                    Cells[p].Verticies = edges.Select(ex => TriangleOfEdge(ex)).ToList();
 
                     // MapCell.C = Indices of neighbor points (Voronoi neighbors)
-                    Cells[p].C = edges.Select(ex => Delaunay.Triangles[ex])
+                    Cells[p].NeighborCells = edges.Select(ex => Delaunay.Triangles[ex])
                                       .Where(c => c < PointsN).ToList();
 
                     // MapCell.B = Border flag
-                    Cells[p].B = (byte)(edges.Count > Cells[p].C.Count ? 1 : 0);
+                    Cells[p].Border = (byte)(edges.Count > Cells[p].NeighborCells.Count ? 1 : 0);
                 }
 
                 // Fill Vertex Data (Circumcenters and Relationships)
