@@ -108,7 +108,7 @@ namespace MapGen.Core.Modules
             {
                 double x = GetPointInRange(rangeX, data.Width, rng);
                 double y = GetPointInRange(rangeY, data.Height, rng);
-                start = FindGridCell(data, x, y);
+                start = data.FindGridCell(x, y);
                 limit++;
             } while (data.Cells[start].Height + h > 90 && limit < 50);
 
@@ -173,7 +173,7 @@ namespace MapGen.Core.Modules
             {
                 double x = GetPointInRange(rangeX, data.Width, rng);
                 double y = GetPointInRange(rangeY, data.Height, rng);
-                start = FindGridCell(data, x, y);
+                start = data.FindGridCell(x, y);
                 limit++;
             } while (data.Cells[start].Height < 20 && limit < 50);
 
@@ -240,8 +240,8 @@ namespace MapGen.Core.Modules
                     limit++;
                 } while ((dist < data.Width / 8.0 || dist > data.Width / 3.0) && limit < 50);
 
-                int startCell = FindGridCell(data, startX, startY);
-                int endCell = FindGridCell(data, endX, endY);
+                int startCell = data.FindGridCell(startX, startY);
+                int endCell = data.FindGridCell(endX, endY);
                 Trace.WriteLine($"Points: start({startX:F2}, {startY:F2}) end({endX:F2}, {endY:F2}) cells: {startCell}->{endCell}");
 
                 List<int> getRange(int cur, int end)
@@ -341,7 +341,7 @@ namespace MapGen.Core.Modules
                     {
                         startX = GetPointInRange(rX, data.Width, rng);
                         startY = GetPointInRange(rY, data.Height, rng);
-                        startCell = FindGridCell(data, startX, startY);
+                        startCell = data.FindGridCell(startX, startY);
                         limit++;
                     } while (data.Cells[startCell].Height < 20 && limit < 50);
 
@@ -353,7 +353,7 @@ namespace MapGen.Core.Modules
                         double endY = rng.Next() * data.Height * 0.7 + data.Height * 0.15;
                         dist = Math.Abs(endY - startY) + Math.Abs(endX - startX);
 
-                        endCell = FindGridCell(data, endX, endY);
+                        endCell = data.FindGridCell(endX, endY);
                         limit++;
                     } while ((dist < data.Width / 8.0 || dist > data.Width / 2.0) && limit < 50);
                 }
@@ -470,8 +470,8 @@ namespace MapGen.Core.Modules
             double endX = vert ? Math.Floor(data.Width - startX - data.Width * 0.1 + rng.Next() * data.Width * 0.2) : data.Width - 5;
             double endY = vert ? data.Height - 5 : Math.Floor(data.Height - startY - data.Height * 0.1 + rng.Next() * data.Height * 0.2);
 
-            int start = FindGridCell(data, startX, startY);
-            int end = FindGridCell(data, endX, endY);
+            int start = data.FindGridCell(startX, startY);
+            int end = data.FindGridCell(endX, endY);
 
             // Strait path is distinct: No 'used' tracking in path selection to allow straighter lines
             List<int> range = new List<int>();
@@ -691,17 +691,6 @@ namespace MapGen.Core.Modules
             }
 
             return 0;
-        }
-
-
-
-        private static int FindGridCell(MapData data, double x, double y)
-        {
-            // Math.Min ensures we don't go out of bounds on the right/bottom edges
-            int row = (int)Math.Floor(Math.Min(y / data.Spacing, data.CellsCountY - 1));
-            int col = (int)Math.Floor(Math.Min(x / data.Spacing, data.CellsCountX - 1));
-
-            return row * data.CellsCountX + col;
         }
 
         private static int FindNearestCell(MapData data, double x, double y)

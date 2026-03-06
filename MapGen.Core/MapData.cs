@@ -1,5 +1,6 @@
 ﻿using MapGen.Core.Helpers;
 using MapGen.Core.Modules;
+using System;
 using System.Collections.Generic;
 
 namespace MapGen.Core
@@ -46,6 +47,15 @@ namespace MapGen.Core
 
         // Calculated Coordinates (Outputs)
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
+
+        public int FindGridCell(double x, double y)
+        {
+            // Math.Min ensures we don't go out of bounds on the right/bottom edges
+            int row = (int)Math.Floor(Math.Min(y / Spacing, CellsCountY - 1));
+            int col = (int)Math.Floor(Math.Min(x / Spacing, CellsCountX - 1));
+
+            return row * CellsCountX + col;
+        }
     }
 
     public class MapPack
