@@ -6,6 +6,7 @@ using SkiaSharp;
 using SkiaSharp.Views.Windows;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -87,6 +88,7 @@ namespace MapGen.Render.Skia.WinUI
             RenderHeightmap(canvas);
             RenderBiomes(canvas);
             RenderPrecipitation(canvas);
+            RenderShorelines(canvas);
 
             // 2. Start a new layer for the clipped rivers
             // We use a SaveLayer so the blending only affects the rivers and the mask
@@ -324,6 +326,85 @@ namespace MapGen.Render.Skia.WinUI
                     canvas.DrawLine(p1X, p1Y, p2X, p2Y, paint);
                 }
             }
+        }
+
+        private void RenderShorelines(SKCanvas canvas)
+        {
+            if (_pack?.Features == null) return;
+
+            using var islandShorePaint = new SKPaint
+            {
+                Color = SKColors.Red.WithAlpha(180),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+
+            using var lakeShorePaint = new SKPaint
+            {
+                Color = SKColors.Yellow.WithAlpha(180),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+
+            foreach (var feature in _pack.Features)
+            {
+                if (feature.Shoreline == null || feature.Shoreline.Count == 0) continue;
+
+                // Choose color based on feature type
+                var paint = feature.IsLand ? islandShorePaint : lakeShorePaint;
+
+                foreach (int cellIdx in feature.Shoreline)
+                {
+                    var cell = _pack.Cells[cellIdx];
+
+                    // To visualize the shoreline clearly, we draw the Voronoi polygon 
+                    // of the water cell (for islands) or land cell (for lakes).
+                    var cellPoints = cell.Verticies
+                        .Select(vIdx => _pack.Vertices[vIdx].Point)
+                        .Select(p => new SKPoint((float)p.X, (float)p.Y))
+                        .ToArray();
+
+                    if (cellPoints.Length > 0)
+                    {
+                        using var path = new SKPath();
+                        path.MoveTo(cellPoints[0]);
+                        for (int i = 1; i < cellPoints.Length; i++)
+                        {
+                            path.LineTo(cellPoints[i]);
+                        }
+                        path.Close();
+                        canvas.DrawPath(path, paint);
+                    }
+                }
+
+                // Optional: Draw a thin line along the OrderedVertices to verify winding/connection
+                RenderOrderedBoundary(canvas, feature);
+            }
+        }
+
+        private void RenderOrderedBoundary(SKCanvas canvas, MapFeature feature)
+        {
+            using var boundaryPaint = new SKPaint
+            {
+                Color = SKColors.White,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                IsAntialias = true
+            };
+
+            if (feature.OrderedVertices == null || feature.OrderedVertices.Count < 2) return;
+
+            using var path = new SKPath();
+            var firstV = _pack.Vertices[feature.OrderedVertices[0]].Point;
+            path.MoveTo((float)firstV.X, (float)firstV.Y);
+
+            foreach (var vIdx in feature.OrderedVertices.Skip(1))
+            {
+                var v = _pack.Vertices[vIdx].Point;
+                path.LineTo((float)v.X, (float)v.Y);
+            }
+            path.Close();
+            canvas.DrawPath(path, boundaryPaint);
         }
 
         // Helper to keep the rendering loops clean

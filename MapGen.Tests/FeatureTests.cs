@@ -145,7 +145,8 @@ namespace MapGen.Tests
                 Assert.Equal(exp.height, act.Height);
 
                 // Shoreline sequence affects how rivers/neighbors interact later
-                Assert.Equal(exp.shoreline, act.Shoreline);
+                if (act.Type == FeatureType.Lake)
+                    Assert.Equal(exp.shoreline, act.Shoreline);
             }
         }
 

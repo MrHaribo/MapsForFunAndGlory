@@ -220,16 +220,31 @@ namespace MapGen.Core.Modules
                     Area = absArea
                 };
 
-                if (featureType == FeatureType.Lake)
+                if (featureType == FeatureType.Island || featureType == FeatureType.Lake)
                 {
-                    if (area > 0) feature.Vertices.Reverse();
-                    feature.Shoreline = feature.Vertices
+                    bool inverseWindingOrder = area > 0;
+                    if (featureType == FeatureType.Lake && inverseWindingOrder) feature.Vertices.Reverse();
+
+                    feature.OrderedVertices = new List<int>(feature.Vertices);
+
+                    if (featureType == FeatureType.Island && inverseWindingOrder) feature.OrderedVertices.Reverse();
+
+                    bool targetIsLand = (featureType == FeatureType.Lake);
+                    feature.Shoreline = feature.OrderedVertices
                         .SelectMany(v => vertices[v].AdjacentCells)
-                        .Where(IsLand)
+                        .Where(cIdx => cIdx >= 0 && cIdx < pack.Cells.Length)
+                        .Where(cIdx => {
+                            bool isCellLand = cells[cIdx].Height >= MapConstants.LAND_THRESHOLD;
+                            bool isPartOfThisFeature = featureIds[cIdx] == featureId;
+                            return !isPartOfThisFeature && (isCellLand == targetIsLand);
+                        })
                         .Distinct()
                         .ToList();
 
-                    feature.Height = LakeModule.GetHeight(pack, feature);
+                    if (featureType == FeatureType.Lake)
+                    {
+                        feature.Height = LakeModule.GetHeight(pack, feature);
+                    }
                 }
 
                 return feature;
