@@ -32,8 +32,8 @@ namespace MapGen.Render.Skia.WinUI
             var mapOptions = new MapOptions
             {
                 //Seed = "42",
-                Seed = "1114678237",
-                //Seed = new Random().Next().ToString(),
+                //Seed = "1114678237",
+                Seed = new Random().Next().ToString(),
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 2000,
@@ -87,7 +87,7 @@ namespace MapGen.Render.Skia.WinUI
             // 1. Render the base layers (Heightmap, etc.)
             RenderHeightmap(canvas);
             RenderBiomes(canvas);
-            RenderPrecipitation(canvas);
+            //RenderPrecipitation(canvas);
             RenderShoreline(canvas);
 
             // 2. Start a new layer for the clipped rivers
@@ -335,62 +335,55 @@ namespace MapGen.Render.Skia.WinUI
             using var linePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = 2.5f,
-                IsAntialias = true
-            };
-
-            using var rayPaint = new SKPaint
-            {
-                Color = SKColors.White.WithAlpha(200),
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1f,
-                IsAntialias = true
+                StrokeWidth = 3f,
+                IsAntialias = true,
+                StrokeJoin = SKStrokeJoin.Round
             };
 
             foreach (var feature in _pack.Features)
             {
-                var vertices = feature.OrderedVertices;
-                if (vertices == null || vertices.Count < 2) continue;
+                var vertices = feature.ShorelineVertices;
+                if (vertices == null || vertices.Count < 3) continue;
 
-                int count = vertices.Count;
-
-                for (int i = 0; i < count; i++)
+                // Draw the segments with the traffic light gradient
+                for (int i = 0; i < vertices.Count - 1; i++)
                 {
                     var p1 = _pack.Vertices[vertices[i]].Point;
-                    var p2 = _pack.Vertices[vertices[(i + 1) % count]].Point;
+                    var p2 = _pack.Vertices[vertices[i + 1]].Point;
 
-                    float x1 = (float)p1.X; float y1 = (float)p1.Y;
-                    float x2 = (float)p2.X; float y2 = (float)p2.Y;
+                    float progress = (float)i / vertices.Count;
+                    linePaint.Color = GetTrafficLightColor(progress);
 
-                    // 1. Color Gradient based on progress (0.0 to 1.0)
-                    float progress = (float)i / count;
-                    // Transitions from Magenta at start to Cyan at end
-                    linePaint.Color = SKColor.FromHsl(300 - (progress * 120), 100, 50);
-
-                    canvas.DrawLine(x1, y1, x2, y2, linePaint);
-
-                    // 2. Flow Direction Ray
-                    // Draw a small line at the 25% mark of the segment pointing toward p2
-                    float dirX = x2 - x1;
-                    float dirY = y2 - y1;
-                    float len = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
-
-                    if (len > 0.1f)
-                    {
-                        // Normalize and scale for a small arrow/tick
-                        float tickLen = 4f;
-                        float rayEndX = x1 + (dirX / len) * tickLen;
-                        float rayEndY = y1 + (dirY / len) * tickLen;
-
-                        canvas.DrawLine(x1, y1, rayEndX, rayEndY, rayPaint);
-                    }
+                    canvas.DrawLine((float)p1.X, (float)p1.Y, (float)p2.X, (float)p2.Y, linePaint);
                 }
 
-                // Draw the Red Start Dot
-                var start = _pack.Vertices[vertices[0]].Point;
-                using var dotPaint = new SKPaint { Color = SKColors.Red, Style = SKPaintStyle.Fill };
-                canvas.DrawCircle((float)start.X, (float)start.Y, 4f, dotPaint);
+                // --- THE CLOSING SEGMENT ---
+                // Draw the final link from the end of the list back to the start
+                var pStart = _pack.Vertices[vertices[0]].Point;
+                var pEnd = _pack.Vertices[vertices[vertices.Count - 1]].Point;
+
+                // We use a distinct color (White) for the closing link to verify closure
+                linePaint.Color = SKColors.White;
+                linePaint.StrokeWidth = 2f; // Slightly thinner to see the "snap"
+                canvas.DrawLine((float)pEnd.X, (float)pEnd.Y, (float)pStart.X, (float)pStart.Y, linePaint);
+
+                // Draw a Bright White Circle at the start
+                using var startPaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
+                canvas.DrawCircle((float)pStart.X, (float)pStart.Y, 5f, startPaint);
+
+                // Draw a small Red dot at the very end of the list
+                // If the red dot and white circle are in the same place, the data is perfect
+                startPaint.Color = SKColors.Red;
+                canvas.DrawCircle((float)pEnd.X, (float)pEnd.Y, 3f, startPaint);
             }
+        }
+
+        private SKColor GetTrafficLightColor(float progress)
+        {
+            if (progress < 0.5f) // Green to Yellow
+                return new SKColor((byte)(progress * 2 * 255), 255, 0);
+            else // Yellow to Red
+                return new SKColor(255, (byte)((1 - (progress - 0.5f) * 2) * 255), 0);
         }
 
         // Helper to keep the rendering loops clean

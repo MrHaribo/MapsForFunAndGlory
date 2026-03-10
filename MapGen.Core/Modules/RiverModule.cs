@@ -479,13 +479,13 @@ namespace MapGen.Core.Modules
                     foreach (var l in lakes)
                     {
                         if (l.IsClosed) continue;
-                        double minShoreHeight = l.Shoreline.Min(s => h[s]);
+                        double minShoreHeight = l.ShorelineCells.Min(s => h[s]);
                         if (minShoreHeight >= 100 || l.Height > minShoreHeight) continue;
 
                         if (iteration > elevateLakeMaxIteration)
                         {
-                            foreach (int i in l.Shoreline) h[i] = cells[i].Height;
-                            l.Height = l.Shoreline.Min(s => h[s]) - 1;
+                            foreach (int i in l.ShorelineCells) h[i] = cells[i].Height;
+                            l.Height = l.ShorelineCells.Min(s => h[s]) - 1;
                             l.IsClosed = true;
                             continue;
                         }

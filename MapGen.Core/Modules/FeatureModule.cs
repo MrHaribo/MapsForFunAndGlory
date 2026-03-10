@@ -225,12 +225,12 @@ namespace MapGen.Core.Modules
                     bool inverseWindingOrder = area > 0;
                     if (featureType == FeatureType.Lake && inverseWindingOrder) feature.Vertices.Reverse();
 
-                    feature.OrderedVertices = new List<int>(feature.Vertices);
+                    feature.ShorelineVertices = new List<int>(feature.Vertices);
 
-                    if (featureType == FeatureType.Island && inverseWindingOrder) feature.OrderedVertices.Reverse();
+                    if (featureType == FeatureType.Island && inverseWindingOrder) feature.ShorelineVertices.Reverse();
 
                     bool targetIsLand = (featureType == FeatureType.Lake);
-                    feature.Shoreline = feature.OrderedVertices
+                    feature.ShorelineCells = feature.ShorelineVertices
                         .SelectMany(v => vertices[v].AdjacentCells)
                         .Where(cIdx => cIdx >= 0 && cIdx < pack.Cells.Length)
                         .Where(cIdx => {
@@ -250,57 +250,88 @@ namespace MapGen.Core.Modules
                     OrderVertices(feature);
 
                     // Optional: Ensure the final sorted loop matches the intended winding
-                    double sortedArea = PathUtils.CalculatePolygonArea(feature.OrderedVertices.Select(v => vertices[v].Point).ToList());
-                    if (featureType == FeatureType.Island && sortedArea > 0) feature.OrderedVertices.Reverse();
-                    if (featureType == FeatureType.Lake && sortedArea < 0) feature.OrderedVertices.Reverse();
+                    double sortedArea = PathUtils.CalculatePolygonArea(feature.ShorelineVertices.Select(v => vertices[v].Point).ToList());
+                    if (featureType == FeatureType.Island && sortedArea > 0) feature.ShorelineVertices.Reverse();
+                    if (featureType == FeatureType.Lake && sortedArea < 0) feature.ShorelineVertices.Reverse();
                 }
 
                 return feature;
 
                 void OrderVertices(MapFeature feat)
                 {
-                    if (feat.OrderedVertices == null || feat.OrderedVertices.Count < 3) return;
+                    if (feat.ShorelineVertices == null || feat.ShorelineVertices.Count < 3) return;
 
-                    // We use a HashSet for O(1) lookups to see if a candidate vertex is part of the shoreline
-                    var vertexPool = new HashSet<int>(feat.OrderedVertices);
+                    var boundaryGraph = new Dictionary<int, List<int>>();
+                    var vSet = new HashSet<int>(feat.ShorelineVertices);
+
+                    foreach (int vIdx in vSet)
+                    {
+                        foreach (int neighborV in vertices[vIdx].NeighborVertices)
+                        {
+                            if (!vSet.Contains(neighborV)) continue;
+
+                            // FIX: Filter out -1 (map edge) indices to prevent IndexOutOfRange
+                            var sharedCells = vertices[vIdx].AdjacentCells
+                                .Intersect(vertices[neighborV].AdjacentCells)
+                                .Where(c => c >= 0 && c < featureIds.Length)
+                                .ToList();
+
+                            bool isBoundary = sharedCells.Any(c => featureIds[c] == feat.Id) &&
+                                              sharedCells.Any(c => featureIds[c] != feat.Id);
+
+                            if (isBoundary)
+                            {
+                                if (!boundaryGraph.ContainsKey(vIdx)) boundaryGraph[vIdx] = new List<int>();
+                                if (!boundaryGraph[vIdx].Contains(neighborV)) boundaryGraph[vIdx].Add(neighborV);
+                            }
+                        }
+                    }
+
+                    if (boundaryGraph.Count == 0) return;
+
                     var sorted = new List<int>();
+                    var visitedEdges = new HashSet<(int, int)>();
 
-                    // Start with the first vertex in the current list
-                    int currentV = feat.OrderedVertices[0];
-                    int startV = currentV;
+                    // Pick a starting vertex that has exactly 2 boundary edges (ideal) 
+                    // or just the first one if it's a pinch point.
+                    int startV = boundaryGraph.OrderBy(kvp => kvp.Value.Count).First().Key;
+                    int currentV = startV;
 
-                    for (int i = 0; i < feat.OrderedVertices.Count; i++)
+                    // Safety limit: twice the number of vertices to allow for complex shapes
+                    for (int i = 0; i < feat.ShorelineVertices.Count * 2; i++)
                     {
                         sorted.Add(currentV);
-                        vertexPool.Remove(currentV);
 
-                        // Find the next neighbor: 
-                        // Must be in our pool AND must be a 'boundary' vertex
+                        if (!boundaryGraph.TryGetValue(currentV, out var neighbors)) break;
+
                         int nextV = -1;
-                        foreach (int neighborV in vertices[currentV].NeighborVertices)
-                        {
-                            // If we found the start again and we've walked most of the pool, we are done
-                            if (neighborV == startV && sorted.Count > 2 && vertexPool.Count < 2)
-                            {
-                                nextV = -2; // Loop closed signal
-                                break;
-                            }
 
-                            if (vertexPool.Contains(neighborV))
+                        // 1. Can we close the loop? Only if we've actually moved (count > 2)
+                        if (sorted.Count > 2 && neighbors.Contains(startV))
+                        {
+                            nextV = startV;
+                        }
+                        else
+                        {
+                            // 2. Otherwise, find an edge we haven't walked yet
+                            foreach (var n in neighbors)
                             {
-                                nextV = neighborV;
-                                break;
+                                if (!visitedEdges.Contains((currentV, n)))
+                                {
+                                    nextV = n;
+                                    break;
+                                }
                             }
                         }
 
-                        if (nextV == -2) break; // Loop closed successfully
-                        if (nextV == -1) break; // Path ended prematurely (shouldn't happen on closed features)
+                        if (nextV == -1 || nextV == startV) break;
 
+                        visitedEdges.Add((currentV, nextV));
+                        visitedEdges.Add((nextV, currentV));
                         currentV = nextV;
                     }
 
-                    // Replace the jumbled list with our sorted walk
-                    feat.OrderedVertices = sorted;
+                    feat.ShorelineVertices = sorted;
                 }
 
                 (int, List<int>) GetCellsData(FeatureType featureType, int fCell)

@@ -132,11 +132,11 @@ namespace MapGen.Core.Modules
 
         public static double GetHeight(MapPack pack, MapFeature feature)
         {
-            if (feature.Shoreline == null || feature.Shoreline.Count == 0)
+            if (feature.ShorelineCells == null || feature.ShorelineCells.Count == 0)
                 return 20.0; // Default matching JS logic
 
             // Get minimum height from shoreline cells
-            double minShoreHeight = feature.Shoreline.Min(cellId => pack.Cells[cellId].Height);
+            double minShoreHeight = feature.ShorelineCells.Min(cellId => pack.Cells[cellId].Height);
 
             // Match JS: rn(minShoreHeight - 0.01, 2)
             return NumberUtils.Round(minShoreHeight - MapConstants.LAKE_ELEVATION_DELTA, 2);
@@ -159,10 +159,10 @@ namespace MapGen.Core.Modules
                 }
 
                 // 1. MATCH JS SIDE-EFFECT: Sort the shoreline in-place by height
-                feature.Shoreline.Sort((a, b) => h[a].CompareTo(h[b]));
+                feature.ShorelineCells.Sort((a, b) => h[a].CompareTo(h[b]));
 
                 bool isDeep = true;
-                int lowestShoreCell = feature.Shoreline[0];
+                int lowestShoreCell = feature.ShorelineCells[0];
 
                 // 2. MATCH JS STACK BEHAVIOR: Use Stack (LIFO) instead of Queue
                 var stack = new Stack<int>();
@@ -208,7 +208,7 @@ namespace MapGen.Core.Modules
                 if (feature.Type != FeatureType.Lake) continue;
 
                 // 1. Flux (Precipitation on shoreline)
-                feature.Flux = feature.Shoreline.Sum(c => (double)grid.Cells[pack.Cells[c].GridId].Prec);
+                feature.Flux = feature.ShorelineCells.Sum(c => (double)grid.Cells[pack.Cells[c].GridId].Prec);
 
                 // 2. Temperature (Rounded to 1 decimal, threshold based on CellsCount)
                 if (feature.CellsCount < 6)
@@ -217,7 +217,7 @@ namespace MapGen.Core.Modules
                 }
                 else
                 {
-                    double avgTemp = feature.Shoreline.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
+                    double avgTemp = feature.ShorelineCells.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
                     feature.Temp = Math.Round(avgTemp, 1);
                 }
 
@@ -233,10 +233,10 @@ namespace MapGen.Core.Modules
 
                 // CRITICAL: Sort in-place to match JS side-effect
                 // This reorders the actual list on the feature object
-                feature.Shoreline.Sort((a, b) => h[a].CompareTo(h[b]));
+                feature.ShorelineCells.Sort((a, b) => h[a].CompareTo(h[b]));
 
                 // After sorting, the lowest cell is at index 0
-                feature.OutCell = feature.Shoreline[0];
+                feature.OutCell = feature.ShorelineCells[0];
                 lakeOutCells[feature.OutCell] = feature.Id;
             }
 

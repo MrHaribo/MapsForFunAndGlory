@@ -137,8 +137,8 @@ namespace MapGen.Core
         public double Area { get; set; }
         public double Height { get; set; }
         public List<int> Vertices { get; set; }         // Original raw data (Regression-safe)
-        public List<int> OrderedVertices { get; set; }  // Consistent winding (Mesh-safe)
-        public List<int> Shoreline { get; set; }        // Coastal neighbors
+        public List<int> ShorelineVertices { get; set; }  // Consistent winding (Mesh-safe)
+        public List<int> ShorelineCells { get; set; }        // Coastal neighbors
 
         // Added for Lake-River interactions
         public ushort RiverId { get; set; }     // The main river associated with this lake
