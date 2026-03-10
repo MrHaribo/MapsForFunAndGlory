@@ -245,9 +245,63 @@ namespace MapGen.Core.Modules
                     {
                         feature.Height = LakeModule.GetHeight(pack, feature);
                     }
+
+                    // ... after Shoreline calculation ...
+                    OrderVertices(feature);
+
+                    // Optional: Ensure the final sorted loop matches the intended winding
+                    double sortedArea = PathUtils.CalculatePolygonArea(feature.OrderedVertices.Select(v => vertices[v].Point).ToList());
+                    if (featureType == FeatureType.Island && sortedArea > 0) feature.OrderedVertices.Reverse();
+                    if (featureType == FeatureType.Lake && sortedArea < 0) feature.OrderedVertices.Reverse();
                 }
 
                 return feature;
+
+                void OrderVertices(MapFeature feat)
+                {
+                    if (feat.OrderedVertices == null || feat.OrderedVertices.Count < 3) return;
+
+                    // We use a HashSet for O(1) lookups to see if a candidate vertex is part of the shoreline
+                    var vertexPool = new HashSet<int>(feat.OrderedVertices);
+                    var sorted = new List<int>();
+
+                    // Start with the first vertex in the current list
+                    int currentV = feat.OrderedVertices[0];
+                    int startV = currentV;
+
+                    for (int i = 0; i < feat.OrderedVertices.Count; i++)
+                    {
+                        sorted.Add(currentV);
+                        vertexPool.Remove(currentV);
+
+                        // Find the next neighbor: 
+                        // Must be in our pool AND must be a 'boundary' vertex
+                        int nextV = -1;
+                        foreach (int neighborV in vertices[currentV].NeighborVertices)
+                        {
+                            // If we found the start again and we've walked most of the pool, we are done
+                            if (neighborV == startV && sorted.Count > 2 && vertexPool.Count < 2)
+                            {
+                                nextV = -2; // Loop closed signal
+                                break;
+                            }
+
+                            if (vertexPool.Contains(neighborV))
+                            {
+                                nextV = neighborV;
+                                break;
+                            }
+                        }
+
+                        if (nextV == -2) break; // Loop closed successfully
+                        if (nextV == -1) break; // Path ended prematurely (shouldn't happen on closed features)
+
+                        currentV = nextV;
+                    }
+
+                    // Replace the jumbled list with our sorted walk
+                    feat.OrderedVertices = sorted;
+                }
 
                 (int, List<int>) GetCellsData(FeatureType featureType, int fCell)
                 {

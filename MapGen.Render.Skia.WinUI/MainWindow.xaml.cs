@@ -88,7 +88,7 @@ namespace MapGen.Render.Skia.WinUI
             RenderHeightmap(canvas);
             RenderBiomes(canvas);
             RenderPrecipitation(canvas);
-            RenderShorelines(canvas);
+            RenderShoreline(canvas);
 
             // 2. Start a new layer for the clipped rivers
             // We use a SaveLayer so the blending only affects the rivers and the mask
@@ -328,83 +328,69 @@ namespace MapGen.Render.Skia.WinUI
             }
         }
 
-        private void RenderShorelines(SKCanvas canvas)
+        private void RenderShoreline(SKCanvas canvas)
         {
             if (_pack?.Features == null) return;
 
-            using var islandShorePaint = new SKPaint
+            using var linePaint = new SKPaint
             {
-                Color = SKColors.Red.WithAlpha(180),
-                Style = SKPaintStyle.Fill,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 2.5f,
                 IsAntialias = true
             };
 
-            using var lakeShorePaint = new SKPaint
+            using var rayPaint = new SKPaint
             {
-                Color = SKColors.Yellow.WithAlpha(180),
-                Style = SKPaintStyle.Fill,
+                Color = SKColors.White.WithAlpha(200),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
                 IsAntialias = true
             };
 
             foreach (var feature in _pack.Features)
             {
-                if (feature.Shoreline == null || feature.Shoreline.Count == 0) continue;
+                var vertices = feature.OrderedVertices;
+                if (vertices == null || vertices.Count < 2) continue;
 
-                // Choose color based on feature type
-                var paint = feature.IsLand ? islandShorePaint : lakeShorePaint;
+                int count = vertices.Count;
 
-                foreach (int cellIdx in feature.Shoreline)
+                for (int i = 0; i < count; i++)
                 {
-                    var cell = _pack.Cells[cellIdx];
+                    var p1 = _pack.Vertices[vertices[i]].Point;
+                    var p2 = _pack.Vertices[vertices[(i + 1) % count]].Point;
 
-                    // To visualize the shoreline clearly, we draw the Voronoi polygon 
-                    // of the water cell (for islands) or land cell (for lakes).
-                    var cellPoints = cell.Verticies
-                        .Select(vIdx => _pack.Vertices[vIdx].Point)
-                        .Select(p => new SKPoint((float)p.X, (float)p.Y))
-                        .ToArray();
+                    float x1 = (float)p1.X; float y1 = (float)p1.Y;
+                    float x2 = (float)p2.X; float y2 = (float)p2.Y;
 
-                    if (cellPoints.Length > 0)
+                    // 1. Color Gradient based on progress (0.0 to 1.0)
+                    float progress = (float)i / count;
+                    // Transitions from Magenta at start to Cyan at end
+                    linePaint.Color = SKColor.FromHsl(300 - (progress * 120), 100, 50);
+
+                    canvas.DrawLine(x1, y1, x2, y2, linePaint);
+
+                    // 2. Flow Direction Ray
+                    // Draw a small line at the 25% mark of the segment pointing toward p2
+                    float dirX = x2 - x1;
+                    float dirY = y2 - y1;
+                    float len = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
+
+                    if (len > 0.1f)
                     {
-                        using var path = new SKPath();
-                        path.MoveTo(cellPoints[0]);
-                        for (int i = 1; i < cellPoints.Length; i++)
-                        {
-                            path.LineTo(cellPoints[i]);
-                        }
-                        path.Close();
-                        canvas.DrawPath(path, paint);
+                        // Normalize and scale for a small arrow/tick
+                        float tickLen = 4f;
+                        float rayEndX = x1 + (dirX / len) * tickLen;
+                        float rayEndY = y1 + (dirY / len) * tickLen;
+
+                        canvas.DrawLine(x1, y1, rayEndX, rayEndY, rayPaint);
                     }
                 }
 
-                // Optional: Draw a thin line along the OrderedVertices to verify winding/connection
-                RenderOrderedBoundary(canvas, feature);
+                // Draw the Red Start Dot
+                var start = _pack.Vertices[vertices[0]].Point;
+                using var dotPaint = new SKPaint { Color = SKColors.Red, Style = SKPaintStyle.Fill };
+                canvas.DrawCircle((float)start.X, (float)start.Y, 4f, dotPaint);
             }
-        }
-
-        private void RenderOrderedBoundary(SKCanvas canvas, MapFeature feature)
-        {
-            using var boundaryPaint = new SKPaint
-            {
-                Color = SKColors.White,
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1.5f,
-                IsAntialias = true
-            };
-
-            if (feature.OrderedVertices == null || feature.OrderedVertices.Count < 2) return;
-
-            using var path = new SKPath();
-            var firstV = _pack.Vertices[feature.OrderedVertices[0]].Point;
-            path.MoveTo((float)firstV.X, (float)firstV.Y);
-
-            foreach (var vIdx in feature.OrderedVertices.Skip(1))
-            {
-                var v = _pack.Vertices[vIdx].Point;
-                path.LineTo((float)v.X, (float)v.Y);
-            }
-            path.Close();
-            canvas.DrawPath(path, boundaryPaint);
         }
 
         // Helper to keep the rendering loops clean
