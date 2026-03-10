@@ -104,6 +104,7 @@ namespace MapGen.Core.Modules
                 bool land = IsLand(firstCell);
                 bool border = cells[firstCell].Border == 1;
                 int totalCells = 1;
+                ushort detectedParentId = 0;
 
                 // Flood fill queue (JS uses the same array for outer and inner loops)
                 var floodQueue = new Stack<int>();
@@ -117,6 +118,17 @@ namespace MapGen.Core.Modules
                     foreach (int neighborId in cells[cellId].NeighborCells)
                     {
                         bool isNeibLand = IsLand(neighborId);
+                        ushort neibFeatureId = featureIds[neighborId];
+
+                        // Parent Detection Logic
+                        // If the neighbor already has a feature ID and it's different from ours,
+                        // that feature is a candidate for being our "Parent" (the container).
+                        if (neibFeatureId != 0 && neibFeatureId != featureId)
+                        {
+                            // For a Lake, the parent is the first Land feature we touch.
+                            // For an Island, the parent is the first Water feature we touch.
+                            if (detectedParentId == 0) detectedParentId = neibFeatureId;
+                        }
 
                         if (land && !isNeibLand)
                         {
@@ -141,7 +153,8 @@ namespace MapGen.Core.Modules
                     }
                 }
 
-                features.Add(AddFeature(firstCell, land, border, featureId, totalCells));
+                var feature = AddFeature(firstCell, land, border, featureId, totalCells, detectedParentId);
+                features.Add(feature);
 
                 // Find next unmarked cell
                 int nextIndex = -1;
@@ -189,7 +202,7 @@ namespace MapGen.Core.Modules
                 harbor[cellId] = (byte)waterCells.Count;
             }
 
-            MapFeature AddFeature(int firstCell, bool land, bool border, int featureId, int totalCells)
+            MapFeature AddFeature(int firstCell, bool land, bool border, int featureId, int totalCells, int parentId)
             {
                 var featureType = land ? FeatureType.Island : border ? FeatureType.Ocean : FeatureType.Lake;
 
@@ -211,6 +224,7 @@ namespace MapGen.Core.Modules
                 var feature = new MapFeature
                 {
                     Id = featureId,
+                    ParentId = parentId,
                     Type = featureType,
                     IsLand = land,
                     IsBorder = border,

@@ -127,6 +127,7 @@ namespace MapGen.Core
     public class MapFeature
     {
         public int Id { get; set; }
+        public int ParentId { get; set; }
         public bool IsLand { get; set; }
         public bool IsBorder { get; set; }
         public FeatureType Type { get; set; }
