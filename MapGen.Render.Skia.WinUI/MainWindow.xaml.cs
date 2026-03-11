@@ -85,8 +85,9 @@ namespace MapGen.Render.Skia.WinUI
             canvas.Scale(finalScale);
 
             // 1. Render the base layers (Heightmap, etc.)
-            RenderHeightmap(canvas);
-            RenderBiomes(canvas);
+            //RenderHeightmap(canvas);
+            RenderPackHeightmap(canvas);
+            //RenderBiomes(canvas);
             //RenderPrecipitation(canvas);
             RenderShoreline(canvas);
 
@@ -135,6 +136,61 @@ namespace MapGen.Render.Skia.WinUI
 
                 using var path = CreateCellPath(cell);
                 canvas.DrawPath(path, fillPaint);
+            }
+        }
+
+        private void RenderPackHeightmap(SKCanvas canvas)
+        {
+            // 1. Draw a base background for "Deep Ocean" 
+            // Since Pack omits many ocean cells, we fill the canvas with the deepest water color first.
+            canvas.Clear(new SKColor(30, 60, 100));
+
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+            using var strokePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = SKColors.Black.WithAlpha(40),
+                StrokeWidth = 0.5f,
+                IsAntialias = true
+            };
+
+            foreach (var cell in _pack.Cells)
+            {
+                // Safety check for vertices
+                if (cell.Verticies == null || cell.Verticies.Count < 3) continue;
+
+                // 2. Determine Color based on Height
+                byte h = cell.Height;
+                if (h < MapConstants.LAND_THRESHOLD)
+                {
+                    // Shallow water/Coastal
+                    byte blueDepth = (byte)Math.Clamp(100 + (h * 5), 0, 255);
+                    fillPaint.Color = new SKColor(30, 60, blueDepth);
+                }
+                else
+                {
+                    // Land
+                    byte landBrightness = (byte)Math.Clamp((h - 20) * 3 + 50, 0, 255);
+                    fillPaint.Color = new SKColor(landBrightness, landBrightness, landBrightness);
+                }
+
+                // 3. Create the Path using Pack-specific vertex data
+                using var path = new SKPath();
+                var firstV = _pack.Vertices[cell.Verticies[0]];
+                path.MoveTo((float)firstV.Point.X, (float)firstV.Point.Y);
+
+                for (int i = 1; i < cell.Verticies.Count; i++)
+                {
+                    var v = _pack.Vertices[cell.Verticies[i]];
+                    path.LineTo((float)v.Point.X, (float)v.Point.Y);
+                }
+                path.Close();
+
+                // 4. Draw the cell
+                canvas.DrawPath(path, fillPaint);
+
+                // Optional: Draw cell borders to see if they overlap or have gaps
+                canvas.DrawPath(path, strokePaint);
             }
         }
 

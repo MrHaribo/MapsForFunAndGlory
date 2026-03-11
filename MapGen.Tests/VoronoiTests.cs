@@ -90,6 +90,41 @@ namespace MapGen.Tests
             }
         }
 
+        [Fact]
+        public void VoronoiGenerator_CellPoint_IsInsidePolygon()
+        {
+            var mapData = TestMapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+
+            foreach (var cell in mapData.Cells)
+            {
+                if (cell.Verticies.Count < 3) continue;
+
+                // Point-in-polygon check (Ray casting or Winding number)
+                bool isInside = IsPointInPolygon(
+                    cell.Point,
+                    cell.Verticies.Select(vIdx => mapData.Vertices[vIdx].Point).ToList()
+                );
+
+                Assert.True(isInside, $"Cell {cell.Index} center point is outside its own perimeter!");
+            }
+        }
+
+        private bool IsPointInPolygon(MapPoint p, List<MapPoint> poly)
+        {
+            bool inside = false;
+            for (int i = 0, j = poly.Count - 1; i < poly.Count; j = i++)
+            {
+                if (((poly[i].Y > p.Y) != (poly[j].Y > p.Y)) &&
+                    (p.X < (poly[j].X - poly[i].X) * (p.Y - poly[i].Y) / (poly[j].Y - poly[i].Y) + poly[i].X))
+                {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
         //[Fact]
         //public void ExportStrictGrid()
         //{

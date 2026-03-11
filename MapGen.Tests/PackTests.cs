@@ -74,6 +74,17 @@ namespace MapGen.Tests
                 Assert.True(actualIndex != -1, $"Quadtree failed to find a cell for probe at {probe.X},{probe.Y}");
                 Assert.Equal(probe.ExpectedIndex, actualIndex);
             }
+
+            // 7. Assert Vertex-Cell Integrity in Pack
+            for (int i = 0; i < pack.Cells.Length; i++)
+            {
+                var cell = pack.Cells[i];
+                foreach (var vIdx in cell.Verticies)
+                {
+                    // Ensure every vertex of a cell actually lists this cell as an adjacent cell
+                    Assert.Contains(i, pack.Vertices[vIdx].AdjacentCells);
+                }
+            }
         }
     }
 }
