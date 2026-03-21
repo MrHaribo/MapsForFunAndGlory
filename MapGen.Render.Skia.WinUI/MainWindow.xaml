@@ -15,8 +15,30 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <skiasharp:SKXamlCanvas x:Name="SkiaCanvas"
-                        VerticalAlignment="Stretch"
-                        HorizontalAlignment="Stretch"
-                        PaintSurface="OnPaintSurface" />
+
+    <StackPanel>
+
+        <MenuBar Height="44">
+            <MenuBarItem >
+                <MenuFlyoutSubItem Text="New">
+                    <MenuFlyoutItem Text="Plain Text Document"  Click="ChangeColorItem_Click"/>
+                    <MenuFlyoutItem Text="Rich Text Document"/>
+                    <MenuFlyoutItem Text="Other Formats..."/>
+                </MenuFlyoutSubItem>
+                <MenuFlyoutItem Text="Open..."/>
+                <MenuFlyoutItem Text="Save"/>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Exit"/>
+            </MenuBarItem>
+        </MenuBar>
+
+        <skiasharp:SKXamlCanvas x:Name="SkiaCanvas"
+                                Width="1920"
+                                Height="1080"
+                                VerticalAlignment="Stretch"
+                                HorizontalAlignment="Stretch"
+                                PaintSurface="OnPaintSurface" />
+    </StackPanel>
+
+
 </Window>
