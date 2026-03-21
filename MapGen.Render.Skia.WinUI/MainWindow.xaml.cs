@@ -33,11 +33,16 @@ namespace MapGen.Render.Skia.WinUI
 
         private void Window_Activated(object sender, WindowActivatedEventArgs args)
         {
+            GenerateMap();
+        }
+
+        private void GenerateMap()
+        {
+            var seed = string.IsNullOrEmpty(ViewModel.Seed) ? new Random().Next().ToString() : ViewModel.Seed;
+
             var mapOptions = new MapOptions
             {
-                //Seed = "42",
-                //Seed = "1114678237",
-                Seed = new Random().Next().ToString(),
+                Seed = seed,
                 Width = 1920,
                 Height = 1080,
                 PointsCount = 2000,
@@ -92,11 +97,6 @@ namespace MapGen.Render.Skia.WinUI
             sw.Restart();
 
             _pack = pack;
-        }
-
-        private void Show_Click(object sender, RoutedEventArgs e)
-        {
-            SkiaCanvas.Invalidate();
         }
 
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
@@ -162,6 +162,15 @@ namespace MapGen.Render.Skia.WinUI
             //canvas.Restore(); // Restore the scale/transform
         }
 
-        
+        private void Show_Click(object sender, RoutedEventArgs e)
+        {
+            SkiaCanvas.Invalidate();
+        }
+
+        private void Generate_Click(object sender, RoutedEventArgs e)
+        {
+            GenerateMap();
+            SkiaCanvas.Invalidate();
+        }
     }
 }

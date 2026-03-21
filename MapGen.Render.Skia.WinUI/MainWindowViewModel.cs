@@ -9,6 +9,7 @@ namespace MapGen.Render.Skia.WinUI
 {
     public partial class MainWindowViewModel : ObservableObject
     {
+        [ObservableProperty] private string _seed;
 
         [ObservableProperty] private bool _showGridHeightmap;
         [ObservableProperty] private bool _showPackHeightmap = true;
