@@ -21,7 +21,7 @@
         <MenuBar Height="44">
             <MenuBarItem >
                 <MenuFlyoutSubItem Text="New">
-                    <MenuFlyoutItem Text="Plain Text Document"  Click="ChangeColorItem_Click"/>
+                    <MenuFlyoutItem Text="Plain Text Document"  Click="Show_Click"/>
                     <MenuFlyoutItem Text="Rich Text Document"/>
                     <MenuFlyoutItem Text="Other Formats..."/>
                 </MenuFlyoutSubItem>
@@ -29,6 +29,22 @@
                 <MenuFlyoutItem Text="Save"/>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Exit"/>
+            </MenuBarItem>
+
+            <MenuBarItem Title="View">
+                <MenuFlyoutItem Text="Output"/>
+                <MenuFlyoutSeparator/>
+                <ToggleMenuFlyoutItem Text="ShowGridHeightmap" IsChecked="{x:Bind ViewModel.ShowGridHeightmap, Mode=TwoWay}" Click="Show_Click" />
+                <ToggleMenuFlyoutItem Text="ShowPackHeightmap" IsChecked="{x:Bind ViewModel.ShowPackHeightmap, Mode=TwoWay}" Click="Show_Click"/>
+                <ToggleMenuFlyoutItem Text="ShowBiomes" IsChecked="{x:Bind ViewModel.ShowBiomes, Mode=TwoWay}" Click="Show_Click"/>
+                <ToggleMenuFlyoutItem Text="ShowPrecipitation" IsChecked="{x:Bind ViewModel.ShowPrecipitation, Mode=TwoWay}" Click="Show_Click"/>
+                <ToggleMenuFlyoutItem Text="ShowTemperature" IsChecked="{x:Bind ViewModel.ShowTemperature, Mode=TwoWay}" Click="Show_Click"/>
+                <ToggleMenuFlyoutItem Text="ShowShoreline" IsChecked="{x:Bind ViewModel.ShowShoreline, Mode=TwoWay}" Click="Show_Click"/>
+                <ToggleMenuFlyoutItem Text="ShowRivers" IsChecked="{x:Bind ViewModel.ShowRivers, Mode=TwoWay}" Click="Show_Click"/>
+                <MenuFlyoutSeparator/>
+                <RadioMenuFlyoutItem Text="Small icons" GroupName="SizeGroup"/>
+                <RadioMenuFlyoutItem Text="Medium icons" IsChecked="True" GroupName="SizeGroup"/>
+                <RadioMenuFlyoutItem Text="Large icons" GroupName="SizeGroup"/>
             </MenuBarItem>
         </MenuBar>
 

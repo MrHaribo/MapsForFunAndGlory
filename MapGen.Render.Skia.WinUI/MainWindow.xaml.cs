@@ -7,6 +7,7 @@ using SkiaSharp.Views.Windows;
 using System;
 using System.Diagnostics;
 using Windows.Graphics;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -20,6 +21,8 @@ namespace MapGen.Render.Skia.WinUI
     {
         private MapData _map;
         private MapPack _pack;
+
+        public MainWindowViewModel ViewModel { get; } = new();
 
         public MainWindow()
         {
@@ -91,9 +94,9 @@ namespace MapGen.Render.Skia.WinUI
             _pack = pack;
         }
 
-        private void ChangeColorItem_Click(object sender, RoutedEventArgs e)
+        private void Show_Click(object sender, RoutedEventArgs e)
         {
-
+            SkiaCanvas.Invalidate();
         }
 
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
@@ -111,32 +114,52 @@ namespace MapGen.Render.Skia.WinUI
             canvas.Scale(finalScale);
 
             // 1. Render the base layers (Heightmap, etc.)
-            //RenderHeightmap(canvas);
-            MapGenRenderer.RenderPackHeightmap(canvas, _pack);
-            //RenderBiomes(canvas);
-            //RenderPrecipitation(canvas);
-            MapGenRenderer.RenderShoreline(canvas, _pack);
 
-            // 2. Start a new layer for the clipped rivers
-            // We use a SaveLayer so the blending only affects the rivers and the mask
-            canvas.SaveLayer();
+            if (ViewModel.ShowGridHeightmap)
+                MapGenRenderer.RenderGridHeightmap(canvas, _map);
 
-            // 3. Draw the Land Mask (The "Destination" for the blend)
-            MapGenRenderer.RenderLandMask(canvas, _map);
+            if (ViewModel.ShowPackHeightmap)
+                MapGenRenderer.RenderPackHeightmap(canvas, _pack);
 
-            // 4. Draw the Rivers using SrcIn blend mode
-            // This tells Skia: "Only keep the River pixels that overlap with the Land Mask"
-            using (var paint = new SKPaint { BlendMode = SKBlendMode.SrcIn })
-            {
-                canvas.SaveLayer(paint);
+            if (ViewModel.ShowBiomes)
+                MapGenRenderer.RenderBiomes(canvas, _map, _pack);
+
+            if (ViewModel.ShowPrecipitation)
+                MapGenRenderer.RenderPrecipitation(canvas, _map);
+
+            if (ViewModel.ShowTemperature)
+                MapGenRenderer.RenderTemperature(canvas, _map);
+
+            if (ViewModel.ShowShoreline)
+                MapGenRenderer.RenderShoreline(canvas, _pack);
+
+            if (ViewModel.ShowRivers)
                 MapGenRenderer.RenderRivers(canvas, _pack);
-                canvas.Restore();
-            }
 
-            // 5. Cleanup the layers
-            canvas.Restore(); // Restore from the initial SaveLayer
 
-            canvas.Restore(); // Restore the scale/transform
+            //// 2. Start a new layer for the clipped rivers
+            //// We use a SaveLayer so the blending only affects the rivers and the mask
+            //canvas.SaveLayer();
+
+            //// 3. Draw the Land Mask (The "Destination" for the blend)
+            //MapGenRenderer.RenderLandMask(canvas, _map);
+
+            //if (ViewModel.ShowRivers)
+            //{
+            //    // 4. Draw the Rivers using SrcIn blend mode
+            //    // This tells Skia: "Only keep the River pixels that overlap with the Land Mask"
+            //    using (var paint = new SKPaint { BlendMode = SKBlendMode.SrcIn })
+            //    {
+            //        canvas.SaveLayer(paint);
+            //        MapGenRenderer.RenderRivers(canvas, _pack);
+            //        canvas.Restore();
+            //    }
+            //}
+
+            //// 5. Cleanup the layers
+            //canvas.Restore(); // Restore from the initial SaveLayer
+
+            //canvas.Restore(); // Restore the scale/transform
         }
 
         
