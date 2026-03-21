@@ -142,11 +142,11 @@ namespace MapGen.Core.Modules
             return NumberUtils.Round(minShoreHeight - MapConstants.LAKE_ELEVATION_DELTA, 2);
         }
 
-        public static void DetectCloseLakes(MapPack pack, double[] h)
+        public static void DetectCloseLakes(IMapGraph map, double[] h)
         {
-            var cells = pack.Cells;
+            var cells = map.Cells;
 
-            foreach (var feature in pack.Features)
+            foreach (var feature in map.Features)
             {
                 if (feature.Type != FeatureType.Lake) continue;
                 feature.IsClosed = false;
@@ -181,7 +181,7 @@ namespace MapGen.Core.Modules
 
                         if (h[n] < MapConstants.LAND_THRESHOLD) // Water found
                         {
-                            var nFeature = pack.GetFeature(cells[n].FeatureId);
+                            var nFeature = map.GetFeature(cells[n].FeatureId);
                             if (nFeature.Type == FeatureType.Ocean || feature.Height > nFeature.Height)
                             {
                                 isDeep = false;
@@ -199,25 +199,25 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static Dictionary<int, int> DefineClimateData(MapPack pack, MapData grid, double[] h)
+        public static Dictionary<int, int> DefineClimateData(IMapGraph map, MapData grid, double[] h)
         {
             var lakeOutCells = new Dictionary<int, int>();
 
-            foreach (var feature in pack.Features)
+            foreach (var feature in map.Features)
             {
                 if (feature.Type != FeatureType.Lake) continue;
 
                 // 1. Flux (Precipitation on shoreline)
-                feature.Flux = feature.ShorelineCells.Sum(c => (double)grid.Cells[pack.Cells[c].GridId].Prec);
+                feature.Flux = feature.ShorelineCells.Sum(c => (double)grid.Cells[map.Cells[c].GridId].Prec);
 
                 // 2. Temperature (Rounded to 1 decimal, threshold based on CellsCount)
                 if (feature.CellsCount < 6)
                 {
-                    feature.Temp = grid.Cells[pack.Cells[feature.FirstCell].GridId].Temp;
+                    feature.Temp = grid.Cells[map.Cells[feature.FirstCell].GridId].Temp;
                 }
                 else
                 {
-                    double avgTemp = feature.ShorelineCells.Average(c => (double)grid.Cells[pack.Cells[c].GridId].Temp);
+                    double avgTemp = feature.ShorelineCells.Average(c => (double)grid.Cells[map.Cells[c].GridId].Temp);
                     feature.Temp = Math.Round(avgTemp, 1);
                 }
 
@@ -243,9 +243,12 @@ namespace MapGen.Core.Modules
             return lakeOutCells;
         }
 
-        public static void CleanupLakeData(MapPack pack)
+        public static void CleanupLakeData(IMapGraph map)
         {
-            foreach (var feature in pack.Features)
+            if (!(map is MapPack pack))
+                return;
+
+            foreach (var feature in map.Features)
             {
                 if (feature.Type != FeatureType.Lake) continue;
 

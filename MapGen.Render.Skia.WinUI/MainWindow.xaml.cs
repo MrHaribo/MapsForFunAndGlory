@@ -6,6 +6,7 @@ using SkiaSharp;
 using SkiaSharp.Views.Windows;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -49,6 +50,8 @@ namespace MapGen.Render.Skia.WinUI
                 Rng = rng,
             };
 
+            var sw = Stopwatch.StartNew();
+
             GridGenerator.Generate(mapData);
             VoronoiGenerator.CalculateVoronoi(mapData);
             HeightmapGenerator.Generate(mapData);
@@ -60,12 +63,30 @@ namespace MapGen.Render.Skia.WinUI
             ClimateModule.CalculateTemperatures(mapData);
             ClimateModule.GeneratePrecipitation(mapData);
 
+            Trace.WriteLine("Pack generated " + sw.ElapsedMilliseconds);
+            sw.Restart();
+
             _map = mapData;
 
             var pack = PackModule.ReGraph(mapData);
+
+            Trace.WriteLine("ReGraph " + sw.ElapsedMilliseconds);
+            sw.Restart();
+
             FeatureModule.MarkupPack(pack);
+
+            Trace.WriteLine("MarkupPack " + sw.ElapsedMilliseconds);
+            sw.Restart();
+
             RiverModule.Generate(pack, mapData, allowErosion: true);
+
+            Trace.WriteLine("RiverModule " + sw.ElapsedMilliseconds);
+            sw.Restart();
+
             BiomModule.Define(pack, mapData);
+
+            Trace.WriteLine("BiomModule " + sw.ElapsedMilliseconds);
+            sw.Restart();
 
             _pack = pack;
         }

@@ -10,7 +10,22 @@ namespace MapGen.Core
 
     public enum FeatureType { Ocean, Lake, Island }
 
-    public class MapData
+    public interface IMapGraph
+    {
+        int Width { get; }
+        int Height { get; }
+        int PointsCount { get; }
+        string Seed { get; }
+
+        MapCell[] Cells { get; set; }
+        MapVertex[] Vertices { get; set; }
+        MapPoint[] Points { get; set; }
+
+        public List<MapFeature> Features { get; set; }
+        MapFeature GetFeature(int id);
+    }
+
+    public class MapData : IMapGraph
     {
         // Options
         public MapOptions Options { get; set; }
@@ -48,6 +63,7 @@ namespace MapGen.Core
         // Calculated Coordinates (Outputs)
         public MapCoordinates Coords { get; set; } = new MapCoordinates();
 
+        public MapFeature GetFeature(int id) => Features[id];
         public int FindGridCell(double x, double y)
         {
             // Math.Min ensures we don't go out of bounds on the right/bottom edges
@@ -58,7 +74,7 @@ namespace MapGen.Core
         }
     }
 
-    public class MapPack
+    public class MapPack : IMapGraph
     {
         public MapOptions Options { get; set; }
 
@@ -77,13 +93,7 @@ namespace MapGen.Core
 
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
-
-        public MapFeature GetFeature(int id)
-        {
-            // If id is 0, it's 'No Feature'
-            if (id <= 0 || id > Features.Count) return null;
-            return Features[id - 1];
-        }
+        public MapFeature GetFeature(int id) => Features[id - 1];
     }
 
     public class MapCell

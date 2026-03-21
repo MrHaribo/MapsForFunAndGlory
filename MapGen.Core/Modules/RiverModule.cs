@@ -14,8 +14,13 @@ namespace MapGen.Core.Modules
 
         public static void Generate(MapPack pack, MapData grid, bool allowErosion = true)
         {
-            var cells = pack.Cells;
-            var features = pack.Features;
+            pack.Rivers = GenerateRivers(pack, grid, allowErosion);
+        }
+
+        public static List<MapRiver> GenerateRivers(IMapGraph map, MapData grid, bool allowErosion)
+        {
+            var cells = map.Cells;
+            var features = map.Features;
             int cellsCount = cells.Length;
 
             // Scoped tracking objects
@@ -24,29 +29,30 @@ namespace MapGen.Core.Modules
             ushort riverNext = 1;
 
             // 1. Initial Height modification (JS: alterHeights)
-            double[] h = AlterHeights(pack);
+            double[] h = AlterHeights(map);
 
             // 2. Hydrological preprocessing
-            LakeModule.DetectCloseLakes(pack, h);
-            ResolveDepressions(pack, h);
+            LakeModule.DetectCloseLakes(map, h);
+            ResolveDepressions(map, h);
 
             // 3. Core Simulation
             DrainWater();
 
-            DefineRivers(pack, riversData, riverParents);
-            CalculateConfluenceFlux(pack, h);
-            LakeModule.CleanupLakeData(pack);
+            var rivers = DefineRivers(map, riversData, riverParents);
+            CalculateConfluenceFlux(map, h);
+            LakeModule.CleanupLakeData(map);
 
             // 4. Erosion / Finalize
             if (allowErosion)
             {
-                for (int i = 0; i < pack.Cells.Length; i++)
+                for (int i = 0; i < map.Cells.Length; i++)
                 {
-                    pack.Cells[i].Height = (byte)Math.Floor(h[i]);
+                    map.Cells[i].Height = (byte)Math.Floor(h[i]);
                 }
-                DowncutRivers(pack);
+                DowncutRivers(map);
             }
 
+            return rivers;
 
             //if (allowErosion)
             //{
@@ -65,7 +71,7 @@ namespace MapGen.Core.Modules
 
             void DrainWater()
             {
-                double cellsNumberModifier = Math.Pow(pack.PointsCount / 10000.0, 0.25);
+                double cellsNumberModifier = Math.Pow(map.PointsCount / 10000.0, 0.25);
 
                 // Sorting land by height descending (JS: h[b] - h[a])
                 var land = Enumerable.Range(0, cellsCount)
@@ -73,12 +79,12 @@ namespace MapGen.Core.Modules
                     .OrderByDescending(i => h[i])
                     .ToList();
 
-                var lakeOutCells = LakeModule.DefineClimateData(pack, grid, h);
+                var lakeOutCells = LakeModule.DefineClimateData(map, grid, h);
 
                 foreach (int i in land)
                 {
                     // Add precipitation flux
-                    byte prec = grid.Cells[pack.Cells[i].GridId].Prec;
+                    byte prec = grid.Cells[map.Cells[i].GridId].Prec;
                     //tempFlux[i] += prec / cellsNumberModifier;
                     cells[i].Flux += Math.Floor(prec / cellsNumberModifier);
 
@@ -86,7 +92,7 @@ namespace MapGen.Core.Modules
                     // In JS, 'lakes' is a list of features where i is the outCell
                     if (lakeOutCells.TryGetValue(i, out int featureId))
                     {
-                        var lake = pack.GetFeature(featureId);
+                        var lake = map.GetFeature(featureId);
                         if (lake != null && lake.Flux > lake.Evaporation)
                         {
                             // Find the specific water cell belonging to this lake neighbor
@@ -192,7 +198,7 @@ namespace MapGen.Core.Modules
 
                 if (h[toCell] < 20)
                 {
-                    var waterBody = pack.GetFeature(cells[toCell].FeatureId);
+                    var waterBody = map.GetFeature(cells[toCell].FeatureId);
                     if (waterBody != null && waterBody.Type == FeatureType.Lake)
                     {
                         if (waterBody.RiverId == 0 || fromFlux > waterBody.EnteringFlux)
@@ -216,13 +222,13 @@ namespace MapGen.Core.Modules
 
             int GetLowestNeighbor(int i, int? excludeLakeId = null)
             {
-                var neighbors = pack.Cells[i].NeighborCells;
+                var neighbors = map.Cells[i].NeighborCells;
 
                 // 1. Lake Outlet Logic: Filter neighbors first if an exclusion ID is provided.
                 // This prevents rivers from flowing back into the lake they just exited.
                 if (excludeLakeId.HasValue)
                 {
-                    var filtered = neighbors.Where(n => pack.Cells[n].FeatureId != excludeLakeId.Value).ToList();
+                    var filtered = neighbors.Where(n => map.Cells[n].FeatureId != excludeLakeId.Value).ToList();
 
                     if (filtered.Count > 0)
                     {
@@ -239,9 +245,9 @@ namespace MapGen.Core.Modules
 
                 // 2. Haven Logic: If no lake filter, check for forced downhill paths.
                 // Havens are pre-calculated to guide rivers toward the sea in flat areas.
-                if (pack.Cells[i].Haven > 0)
+                if (map.Cells[i].Haven > 0)
                 {
-                    return pack.Cells[i].Haven;
+                    return map.Cells[i].Haven;
                 }
 
                 // 3. Standard Downhill: Find the neighbor with the minimum height.
@@ -259,19 +265,21 @@ namespace MapGen.Core.Modules
         #region DefineRivers
 
         // Logic for defining River objects (Metadata)
-        public static void DefineRivers(MapPack pack, Dictionary<int, List<int>> riversData, Dictionary<int, int> riverParents)
+        public static List<MapRiver> DefineRivers(IMapGraph map, Dictionary<int, List<int>> riversData, Dictionary<int, int> riverParents)
         {
+            var rivers = new List<MapRiver>();
+
             // 1. Reset cell-level river metadata to ensure a clean slate
-            foreach (var cell in pack.Cells)
+            foreach (var cell in map.Cells)
             {
                 cell.RiverId = 0;
                 cell.Confluence = 0;
             }
-            pack.Rivers = new List<MapRiver>();
+
 
             // Constants for width scaling based on map density
             // JS: const cellsFactor = Math.pow(pack.cells.i.length / 10000, 0.25);
-            double cellsFactor = Math.Pow(pack.PointsCount / 10000.0, 0.25);
+            double cellsFactor = Math.Pow(map.PointsCount / 10000.0, 0.25);
             double defaultWidthFactor = Math.Round(1.0 / cellsFactor, 2);
             double mainStemWidthFactor = Math.Round(defaultWidthFactor * 1.2, 2);
 
@@ -287,9 +295,9 @@ namespace MapGen.Core.Modules
                 foreach (int cellIdx in riverCells)
                 {
                     // FIX: Skip invalid indices like -1
-                    if (cellIdx < 0 || cellIdx >= pack.Cells.Length) continue;
+                    if (cellIdx < 0 || cellIdx >= map.Cells.Length) continue;
 
-                    var cell = pack.Cells[cellIdx];
+                    var cell = map.Cells[cellIdx];
                     if (cell.Height < MapConstants.LAND_THRESHOLD) continue;
 
                     // If the cell already has a different RiverId, it's a confluence point
@@ -315,18 +323,18 @@ namespace MapGen.Core.Modules
 
                 // 4. Generate Geometric Path (Add wiggle/meandering based on terrain)
                 // This usually involves looking at the vertices of the Voronoi cells
-                var meanderedPoints = AddMeandering(pack, riverCells);
+                var meanderedPoints = AddMeandering(map, riverCells);
 
                 // 5. Calculate Physical Attributes for Rendering/Simulation
-                double discharge = pack.Cells[mouth].Flux;
+                double discharge = map.Cells[mouth].Flux;
                 double length = GetApproximateLength(meanderedPoints);
-                double sourceWidth = GetSourceWidth(pack.Cells[source].Flux);
+                double sourceWidth = GetSourceWidth(map.Cells[source].Flux);
 
                 // Calculate visual width using the Azgaar power formula
                 double offset = GetOffset(discharge, meanderedPoints.Count, widthFactor, sourceWidth);
                 double width = Math.Round(Math.Pow(offset / 1.5, 1.8), 2);
 
-                pack.Rivers.Add(new MapRiver
+                rivers.Add(new MapRiver
                 {
                     Id = riverId,
                     Source = source,
@@ -340,17 +348,19 @@ namespace MapGen.Core.Modules
                     Cells = riverCells
                 });
             }
+
+            return rivers;
         }
 
-        public static void CalculateConfluenceFlux(MapPack pack, double[] h)
+        public static void CalculateConfluenceFlux(IMapGraph map, double[] h)
         {
-            foreach (var cell in pack.Cells)
+            foreach (var cell in map.Cells)
             {
                 // Check if there is any confluence marked (JS: if (!cells.conf[i]) continue)
                 if (cell.Confluence == 0) continue;
 
                 var sortedInflux = cell.NeighborCells
-                    .Select(neighborIdx => pack.Cells[neighborIdx])
+                    .Select(neighborIdx => map.Cells[neighborIdx])
                     // JS: cells.r[c] && h[c] > h[i]
                     .Where(n => n.RiverId > 0 && h[n.Index] > h[cell.Index])
                     // JS: .map(c => cells.fl[c])
@@ -373,9 +383,9 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static void DowncutRivers(MapPack pack)
+        public static void DowncutRivers(IMapGraph map)
         {
-            var cells = pack.Cells;
+            var cells = map.Cells;
 
             // JS: for (const i of pack.cells.i)
             for (int i = 0; i < cells.Length; i++)
@@ -426,20 +436,20 @@ namespace MapGen.Core.Modules
 
         #region Resolve Depressions
 
-        private static double[] AlterHeights(MapPack pack)
+        private static double[] AlterHeights(IMapGraph map)
         {
-            return pack.Cells.Select((c, i) =>
+            return map.Cells.Select((c, i) =>
             {
                 if (c.Height < MapConstants.LAND_THRESHOLD || c.Distance < 1) return (double)c.Height;
-                double meanDist = c.NeighborCells.Average(n => (double)pack.Cells[n].Distance);
+                double meanDist = c.NeighborCells.Average(n => (double)map.Cells[n].Distance);
                 return c.Height + (c.Distance / 100.0) + (meanDist / 10000.0);
             }).ToArray();
         }
 
-        public static void ResolveDepressions(MapPack pack, double[] h)
+        public static void ResolveDepressions(IMapGraph map, double[] h)
         {
-            var cells = pack.Cells;
-            var features = pack.Features;
+            var cells = map.Cells;
+            var features = map.Features;
 
             int maxIterations = 250;
             int checkLakeMaxIteration = (int)(maxIterations * 0.85);
@@ -447,7 +457,7 @@ namespace MapGen.Core.Modules
 
             double GetHeight(int i)
             {
-                var f = pack.GetFeature(pack.Cells[i].FeatureId);
+                var f = map.GetFeature(map.Cells[i].FeatureId);
                 return (f != null && f.Type == FeatureType.Lake) ? f.Height : h[i];
             }
 
@@ -467,7 +477,7 @@ namespace MapGen.Core.Modules
             {
                 if (progress.Count > 5 && progress.Sum() > 0)
                 {
-                    double[] original = RiverModule.AlterHeights(pack);
+                    double[] original = RiverModule.AlterHeights(map);
                     Array.Copy(original, h, h.Length);
                     break;
                 }
@@ -518,22 +528,22 @@ namespace MapGen.Core.Modules
 
         #region Meandering
 
-        public static List<PointFlux> AddMeandering(MapPack pack, List<int> riverCells, double meandering = 0.5)
+        public static List<PointFlux> AddMeandering(IMapGraph map, List<int> riverCells, double meandering = 0.5)
         {
             // FIX: Clean the input list immediately so all subsequent logic (and indices) are safe
-            riverCells = riverCells.Where(idx => idx >= 0 && idx < pack.Cells.Length).ToList();
+            riverCells = riverCells.Where(idx => idx >= 0 && idx < map.Cells.Length).ToList();
 
             if (riverCells.Count < 2) return new List<PointFlux>();
 
-            var cells = pack.Cells;
+            var cells = map.Cells;
             var meandered = new List<PointFlux>();
             int lastStep = riverCells.Count - 1;
 
             // Convert cell IDs to Coordinates (MapPoint list)
-            var points = GetRiverPoints(pack, riverCells);
+            var points = GetRiverPoints(map, riverCells);
 
             // Initial step logic based on height (Lowland vs Highland)
-            int step = pack.Cells[riverCells[0]].Height < 20 ? 1 : 10;
+            int step = map.Cells[riverCells[0]].Height < 20 ? 1 : 10;
 
             for (int i = 0; i <= lastStep; i++, step++)
             {
@@ -601,27 +611,27 @@ namespace MapGen.Core.Modules
             return Math.Round(Math.Min(Math.Pow(flux, 0.9) / MapConstants.RIVER_FLUX_FACTOR, 1.0), 2);
         }
 
-        private static List<MapPoint> GetRiverPoints(MapPack pack, List<int> riverCells)
+        private static List<MapPoint> GetRiverPoints(IMapGraph map, List<int> riverCells)
         {
             return riverCells.Select((cell, i) =>
             {
-                if (cell == -1) return GetBorderPoint(pack, riverCells[i - 1]);
+                if (cell == -1) return GetBorderPoint(map, riverCells[i - 1]);
 
                 // Use the pack-level coordinate array
-                return pack.Points[cell];
+                return map.Points[cell];
             }).ToList();
         }
 
-        private static MapPoint GetBorderPoint(MapPack pack, int cellIndex)
+        private static MapPoint GetBorderPoint(IMapGraph map, int cellIndex)
         {
-            var p = pack.Points[cellIndex];
-            double[] dists = { p.Y, pack.Height - p.Y, p.X, pack.Width - p.X };
+            var p = map.Points[cellIndex];
+            double[] dists = { p.Y, map.Height - p.Y, p.X, map.Width - p.X };
             double min = dists.Min();
 
             if (min == p.Y) return new MapPoint(p.X, 0);
-            if (min == pack.Height - p.Y) return new MapPoint(p.X, pack.Height);
+            if (min == map.Height - p.Y) return new MapPoint(p.X, map.Height);
             if (min == p.X) return new MapPoint(0, p.Y);
-            return new MapPoint(pack.Width, p.Y);
+            return new MapPoint(map.Width, p.Y);
         }
 
         private static double GetApproximateLength(List<PointFlux> points)
