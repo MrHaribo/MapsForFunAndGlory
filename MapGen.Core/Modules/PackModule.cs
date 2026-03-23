@@ -61,34 +61,28 @@ namespace MapGen.Core.Modules
             return CreatePack(mapData, newP, newG, newH);
         }
 
-
-
         public static MapPack RefineRivers(MapPack pack, MapData mapData)
         {
             var newP = new List<MapPoint>();
-            var newG = new List<int>(); // Grid indices
-            var newH = new List<byte>(); // Heights
+            var newG = new List<int>();
+            var newH = new List<byte>();
 
-            // 1. Gather River Spine Points (Attractors)
-            // We use the meander paths to create a detailed 'skeleton' to pull points toward
-            var riverSpine = new List<MapPoint>();
+            // 1. Pre-calculate paths once (O(Rivers))
+            var riverPaths = new Dictionary<int, List<MapPoint>>();
             foreach (var river in pack.Rivers)
             {
-                // 1.5 is the meander factor; matches your current river generation
-                var path = RiverModule.AddMeandering(pack, river.Cells, 1.5).Select(p => new MapPoint(p.X, p.Y));
-                riverSpine.AddRange(path);
+                riverPaths[river.Id] = RiverModule.AddMeandering(pack, river.Cells, 1.5).Select(p => new MapPoint(p.X, p.Y)).ToList();
             }
 
-            // 2. Point Collection & River Densification
+            // 2. Collection Loop
             for (int i = 0; i < pack.Cells.Length; i++)
             {
                 var cell = pack.Cells[i];
                 var p = pack.Points[i];
 
-                // Always add the base cell point
-                AddPoint(newP, newG, newH, p.X, p.Y, cell.GridId, cell.Height);
+                // Base Point: Link to current index 'i'
+                AddPoint(newP, newG, newH, p.X, p.Y, i, cell.Height);
 
-                // If this is a river cell, densify its boundaries with land neighbors
                 if (cell.RiverId != 0)
                 {
                     foreach (int nIdx in cell.NeighborCells)
@@ -97,33 +91,21 @@ namespace MapGen.Core.Modules
                         if (neighbor.RiverId == 0)
                         {
                             var np = pack.Points[nIdx];
-
-                            double x1 = Round(p.X + (np.X - p.X) * 0.33, 1);
-                            double y1 = Round(p.Y + (np.Y - p.Y) * 0.33, 1);
-
-                            double x2 = Round(p.X + (np.X - p.X) * 0.66, 1);
-                            double y2 = Round(p.Y + (np.Y - p.Y) * 0.66, 1);
-
-                            AddPoint(newP, newG, newH, x1, y1, cell.GridId, cell.Height);
-                            AddPoint(newP, newG, newH, x2, y2, neighbor.GridId, neighbor.Height);
+                            // Midpoints: Link to 'i' if it's the river side, 
+                            // or 'nIdx' if it's the land side.
+                            AddPoint(newP, newG, newH, p.X + (np.X - p.X) * 0.33, p.Y + (np.Y - p.Y) * 0.33, i, cell.Height);
+                            AddPoint(newP, newG, newH, p.X + (np.X - p.X) * 0.66, p.Y + (np.Y - p.Y) * 0.66, nIdx, neighbor.Height);
                         }
                     }
                 }
             }
 
-            // 3. Warp the points toward the river spine
-            // Radius: How far from the river the 'pull' is felt (1.5x spacing is a good start)
-            // You can adjust 'radius' to make the river valley wider or narrower
+            // 3. Execute Warp (Now much faster)
             double warpRadius = mapData.Spacing * 1.5;
-            if (riverSpine.Count > 0)
-            {
-                WarpPointsToRivers(newP, riverSpine, warpRadius);
-            }
+            WarpPointsToRivers(newP, newG, pack, riverPaths, warpRadius);
 
-            // 4. Create the high-res mesh based on the warped points
+            // 4. Finalize
             var newPack = CreatePack(mapData, newP, newG, newH);
-
-            // 5. Apply the selective smoothing to the final heights
             SelectiveRiverSmooth(newPack, mapData);
 
             return newPack;
@@ -166,60 +148,58 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static void WarpPointsToRivers(List<MapPoint> points, List<MapPoint> riverSpine, double radius)
+        public static void WarpPointsToRivers(
+            List<MapPoint> points,
+            List<int> originCellIndices,
+            MapPack originalPack,
+            Dictionary<int, List<MapPoint>> riverPaths,
+            double radius)
         {
             double radiusSq = radius * radius;
 
             for (int i = 0; i < points.Count; i++)
             {
-                var p = points[i];
+                // Safety: Ensure the index exists in the origin list and the original pack
+                int cellIdx = originCellIndices[i];
+                if (cellIdx < 0 || cellIdx >= originalPack.Cells.Length) continue;
 
-                // 1. Find closest point on the river spine
-                MapPoint closest = FindClosestSpinePoint(p, riverSpine);
-                double distSq = DistSq(p, closest);
+                var cell = originalPack.Cells[cellIdx];
 
-                if (distSq < radiusSq)
+                // Only warp points that belong to a river or are immediately adjacent
+                if (cell.RiverId != 0 && riverPaths.ContainsKey(cell.RiverId))
                 {
-                    double dist = Math.Sqrt(distSq);
-                    // 2. Calculate Falloff (0 at edge of radius, 1 at the spine)
-                    double force = Math.Pow(1.0 - (dist / radius), 2);
+                    var p = points[i];
+                    var spine = riverPaths[cell.RiverId];
 
-                    // 3. Interpolate position (Move 50% of the way max to avoid overlapping)
-                    double strength = 0.5 * force;
-                    points[i] = new MapPoint(
-                        p.X + (closest.X - p.X) * strength,
-                        p.Y + (closest.Y - p.Y) * strength
-                    );
+                    // Find closest point on this specific river's spine
+                    MapPoint closest = spine[0];
+                    double minD2 = double.MaxValue;
+                    for (int j = 0; j < spine.Count; j++)
+                    {
+                        double d2 = DistSq(p.X, p.Y, spine[j].X, spine[j].Y);
+                        if (d2 < minD2) { minD2 = d2; closest = spine[j]; }
+                    }
+
+                    if (minD2 < radiusSq)
+                    {
+                        double dist = Math.Sqrt(minD2);
+                        // Quadratic falloff: stronger pull closer to the center
+                        double force = Math.Pow(1.0 - (dist / radius), 2);
+                        double strength = 0.45 * force;
+
+                        points[i] = new MapPoint(
+                            p.X + (closest.X - p.X) * strength,
+                            p.Y + (closest.Y - p.Y) * strength
+                        );
+                    }
                 }
             }
         }
+
 
         private static double DistSq(double x1, double y1, double x2, double y2)
         {
             return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-        }
-
-        // Overload for MapPoint convenience
-        private static double DistSq(MapPoint a, MapPoint b) => DistSq(a.X, a.Y, b.X, b.Y);
-
-        private static MapPoint FindClosestSpinePoint(MapPoint p, List<MapPoint> riverSpine)
-        {
-            MapPoint bestPoint = riverSpine[0];
-            double minDataSq = double.MaxValue;
-
-            // Linear search is fine for a single river path, 
-            // but if you have thousands of spine points, 
-            // consider a Quadtree or checking only points from the relevant river.
-            for (int i = 0; i < riverSpine.Count; i++)
-            {
-                double d2 = DistSq(p, riverSpine[i]);
-                if (d2 < minDataSq)
-                {
-                    minDataSq = d2;
-                    bestPoint = riverSpine[i];
-                }
-            }
-            return bestPoint;
         }
 
         private static MapPack CreatePack(MapData data, List<MapPoint> newP, List<int> newG, List<byte> newH)
