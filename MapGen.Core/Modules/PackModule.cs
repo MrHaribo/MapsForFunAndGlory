@@ -7,18 +7,18 @@ namespace MapGen.Core.Modules
 {
     public static class PackModule
     {
-        public static MapPack ReGraph(MapData data)
+        public static MapPack ReGraph(MapData mapData)
         {
             var newP = new List<MapPoint>();
             var newG = new List<int>();
             var newH = new List<byte>();
 
-            double spacing2 = Math.Pow(data.Spacing, 2);
+            double spacing2 = Math.Pow(mapData.Spacing, 2);
 
             // 1. Point Filtering & Coastal Densification
-            for (int i = 0; i < data.Cells.Length; i++)
+            for (int i = 0; i < mapData.Cells.Length; i++)
             {
-                var cell = data.Cells[i];
+                var cell = mapData.Cells[i];
 
                 // H < 20 check (Deep Ocean)
                 // Distance (t) -1/-2 are water-adjacent/coastal
@@ -27,11 +27,11 @@ namespace MapGen.Core.Modules
                 // Lake point subsampling
                 if (cell.Distance == -2)
                 {
-                    var feature = data.Features[cell.FeatureId];
+                    var feature = mapData.Features[cell.FeatureId];
                     if (i % 4 == 0 || feature.Type == FeatureType.Lake) continue;
                 }
 
-                var p = data.Points[i];
+                var p = mapData.Points[i];
                 AddPoint(newP, newG, newH, p.X, p.Y, i, cell.Height);
 
                 // Add midpoints along coast (Distance 1 or -1)
@@ -42,9 +42,9 @@ namespace MapGen.Core.Modules
                     foreach (int e in cell.NeighborCells)
                     {
                         if (i > e) continue;
-                        if (data.Cells[e].Distance == cell.Distance)
+                        if (mapData.Cells[e].Distance == cell.Distance)
                         {
-                            var ep = data.Points[e];
+                            var ep = mapData.Points[e];
                             double dist2 = Math.Pow(p.Y - ep.Y, 2) + Math.Pow(p.X - ep.X, 2);
                             if (dist2 < spacing2) continue;
 
@@ -57,42 +57,12 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            // 2. Voronoi Generation for the filtered Pack points
-            var (packCells, packVertices) = VoronoiGenerator.CalculateVoronoi(newP.ToArray(), data.BoundaryPoints);
-
-            // 3. Setup Spatial Lookup
-            var lookups = QuadtreeHelper.CreateLookupDelegates(newP);
-
-            // 4. MapPack Assembly
-            var pack = new MapPack
-            {
-                Cells = packCells,
-                Vertices = packVertices,
-                Points = newP.ToArray(),
-                Options = data.Options,
-
-                // JS: pack.cells.q.find(x, y)
-                FindCell = lookups.Find,
-                FindCellInRange = lookups.FindInRange
-            };
-
-            // 5. Populate Pack-specific Cell Data & Calculate Area
-            for (int i = 0; i < pack.Cells.Length; i++)
-            {
-                var cell = pack.Cells[i];
-                cell.Height = newH[i];
-                cell.GridId = newG[i];
-                cell.Index = i; // Ensure internal index is set
-
-                double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);
-                // Area is clamped to ushort.MaxValue (65535)
-                cell.Area = (ushort)MinMax(Math.Abs(rawArea), 0, ushort.MaxValue);
-            }
-
-            return pack;
+            return CreatePack(mapData, newP, newG, newH);
         }
 
-        public static MapPack RefineRivers(MapPack pack, MapData originalData)
+
+
+        public static MapPack RefineRivers(MapPack pack, MapData mapData)
         {
             var newP = new List<MapPoint>();
             var newG = new List<int>(); // Grid indices
@@ -135,36 +105,44 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            // 2. Voronoi Generation (Standard logic)
-            var (packCells, packVertices) = VoronoiGenerator.CalculateVoronoi(newP.ToArray(), originalData.BoundaryPoints);
+            return CreatePack(mapData, newP, newG, newH);
+        }
+
+        private static MapPack CreatePack(MapData data, List<MapPoint> newP, List<int> newG, List<byte> newH)
+        {
+            // 2. Voronoi Generation for the filtered Pack points
+            var (packCells, packVertices) = VoronoiGenerator.CalculateVoronoi(newP.ToArray(), data.BoundaryPoints);
 
             // 3. Setup Spatial Lookup
             var lookups = QuadtreeHelper.CreateLookupDelegates(newP);
 
             // 4. MapPack Assembly
-            var newPack = new MapPack
+            var pack = new MapPack
             {
                 Cells = packCells,
                 Vertices = packVertices,
                 Points = newP.ToArray(),
-                Options = originalData.Options,
+                Options = data.Options,
+
+                // JS: pack.cells.q.find(x, y)
                 FindCell = lookups.Find,
                 FindCellInRange = lookups.FindInRange
             };
 
-            // 5. Transfer Data & Calculate Areas
-            for (int i = 0; i < newPack.Cells.Length; i++)
+            // 5. Populate Pack-specific Cell Data & Calculate Area
+            for (int i = 0; i < pack.Cells.Length; i++)
             {
-                var cell = newPack.Cells[i];
+                var cell = pack.Cells[i];
                 cell.Height = newH[i];
                 cell.GridId = newG[i];
-                cell.Index = i;
+                cell.Index = i; // Ensure internal index is set
 
-                double rawArea = PathUtils.CalculatePolygonArea(cell, newPack.Vertices);
-                cell.Area = (ushort)Math.Clamp(Math.Abs(rawArea), 0, ushort.MaxValue);
+                double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);
+                // Area is clamped to ushort.MaxValue (65535)
+                cell.Area = (ushort)MinMax(Math.Abs(rawArea), 0, ushort.MaxValue);
             }
 
-            return newPack;
+            return pack;
         }
 
         private static void AddPoint(List<MapPoint> p, List<int> g, List<byte> h, double x, double y, int gridIdx, byte height)
