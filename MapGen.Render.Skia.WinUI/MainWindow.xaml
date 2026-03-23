@@ -27,6 +27,7 @@
 
             <CheckBox Content="ShowGridHeightmap" IsChecked="{x:Bind ViewModel.ShowGridHeightmap, Mode=TwoWay}" Click="Show_Click" Margin="5" />
             <CheckBox Content="ShowPackHeightmap" IsChecked="{x:Bind ViewModel.ShowPackHeightmap, Mode=TwoWay}" Click="Show_Click" Margin="5" />
+            <CheckBox Content="ShowDetailPackHeightmap" IsChecked="{x:Bind ViewModel.ShowDetailPackHeightmap, Mode=TwoWay}" Click="Show_Click" Margin="5" />
             <CheckBox Content="ShowBiomes" IsChecked="{x:Bind ViewModel.ShowBiomes, Mode=TwoWay}" Click="Show_Click" Margin="5"/>
             <CheckBox Content="ShowPrecipitation" IsChecked="{x:Bind ViewModel.ShowPrecipitation, Mode=TwoWay}" Click="Show_Click" Margin="5" />
             <CheckBox Content="ShowTemperature" IsChecked="{x:Bind ViewModel.ShowTemperature, Mode=TwoWay}" Click="Show_Click" Margin="5" />

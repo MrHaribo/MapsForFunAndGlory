@@ -13,6 +13,7 @@ namespace MapGen.Render.Skia.WinUI
 
         [ObservableProperty] private bool _showGridHeightmap;
         [ObservableProperty] private bool _showPackHeightmap = true;
+        [ObservableProperty] private bool _showDetailPackHeightmap;
         [ObservableProperty] private bool _showBiomes;
         [ObservableProperty] private bool _showPrecipitation;
         [ObservableProperty] private bool _showTemperature;

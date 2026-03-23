@@ -21,6 +21,7 @@ namespace MapGen.Render.Skia.WinUI
     {
         private MapData _map;
         private MapPack _pack;
+        private MapPack _detailPack;
 
         public MainWindowViewModel ViewModel { get; } = new();
 
@@ -71,6 +72,13 @@ namespace MapGen.Render.Skia.WinUI
             ClimateModule.CalculateTemperatures(mapData);
             ClimateModule.GeneratePrecipitation(mapData);
 
+
+            //var pack = PackModule.ReGraph(mapData);
+            //FeatureModule.MarkupPack(pack);
+            //RiverModule.Generate(pack, mapData, allowErosion: true);
+            //BiomModule.Define(pack, mapData);
+
+
             Trace.WriteLine("Pack generated " + sw.ElapsedMilliseconds);
             sw.Restart();
 
@@ -97,6 +105,16 @@ namespace MapGen.Render.Skia.WinUI
             sw.Restart();
 
             _pack = pack;
+
+            pack = PackModule.RefineRivers(pack, mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack, mapData, allowErosion: true);
+            BiomModule.Define(pack, mapData);
+
+            Trace.WriteLine("Pack Detail " + sw.ElapsedMilliseconds);
+            sw.Restart();
+
+            _detailPack = pack;
         }
 
         private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
@@ -120,6 +138,9 @@ namespace MapGen.Render.Skia.WinUI
 
             if (ViewModel.ShowPackHeightmap)
                 MapGenRenderer.RenderPackHeightmap(canvas, _pack);
+
+            if (ViewModel.ShowDetailPackHeightmap)
+                MapGenRenderer.RenderPackHeightmap(canvas, _detailPack);
 
             if (ViewModel.ShowBiomes)
                 MapGenRenderer.RenderBiomes(canvas, _map, _pack);
