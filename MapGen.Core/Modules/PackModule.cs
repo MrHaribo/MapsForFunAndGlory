@@ -1,6 +1,7 @@
 ﻿using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static MapGen.Core.Helpers.NumberUtils;
 
 namespace MapGen.Core.Modules
@@ -68,7 +69,17 @@ namespace MapGen.Core.Modules
             var newG = new List<int>(); // Grid indices
             var newH = new List<byte>(); // Heights
 
-            // 1. Point Collection & River Densification
+            // 1. Gather River Spine Points (Attractors)
+            // We use the meander paths to create a detailed 'skeleton' to pull points toward
+            var riverSpine = new List<MapPoint>();
+            foreach (var river in pack.Rivers)
+            {
+                // 1.5 is the meander factor; matches your current river generation
+                var path = RiverModule.AddMeandering(pack, river.Cells, 1.5).Select(p => new MapPoint(p.X, p.Y));
+                riverSpine.AddRange(path);
+            }
+
+            // 2. Point Collection & River Densification
             for (int i = 0; i < pack.Cells.Length; i++)
             {
                 var cell = pack.Cells[i];
@@ -83,15 +94,10 @@ namespace MapGen.Core.Modules
                     foreach (int nIdx in cell.NeighborCells)
                     {
                         var neighbor = pack.Cells[nIdx];
-
-                        // We only add extra points between River -> Land 
-                        // (Adding between River -> River is usually unnecessary and adds too many points)
                         if (neighbor.RiverId == 0)
                         {
                             var np = pack.Points[nIdx];
 
-                            // Calculate two points along the line between cell centers
-                            // This "constricts" the Voronoi cell shape to follow the river path
                             double x1 = Round(p.X + (np.X - p.X) * 0.33, 1);
                             double y1 = Round(p.Y + (np.Y - p.Y) * 0.33, 1);
 
@@ -105,7 +111,115 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            return CreatePack(mapData, newP, newG, newH);
+            // 3. Warp the points toward the river spine
+            // Radius: How far from the river the 'pull' is felt (1.5x spacing is a good start)
+            // You can adjust 'radius' to make the river valley wider or narrower
+            double warpRadius = mapData.Spacing * 1.5;
+            if (riverSpine.Count > 0)
+            {
+                WarpPointsToRivers(newP, riverSpine, warpRadius);
+            }
+
+            // 4. Create the high-res mesh based on the warped points
+            var newPack = CreatePack(mapData, newP, newG, newH);
+
+            // 5. Apply the selective smoothing to the final heights
+            SelectiveRiverSmooth(newPack, mapData);
+
+            return newPack;
+        }
+
+        public static void SelectiveRiverSmooth(MapPack newPack, MapData originalData)
+        {
+            foreach (var cell in newPack.Cells)
+            {
+                int centerIdx = originalData.FindGridCell(cell.Point.X, cell.Point.Y);
+                var sourceCell = originalData.Cells[centerIdx];
+
+                // Only smooth if this cell (or its source) is a river
+                // You can also check sourceCell.NeighborCells to see if a river is nearby
+                bool isRiverArea = sourceCell.RiverId != 0 ||
+                                   sourceCell.NeighborCells.Any(n => originalData.Cells[n].RiverId != 0);
+
+                if (!isRiverArea)
+                {
+                    // Keep original sharp detail
+                    cell.Height = sourceCell.Height;
+                    continue;
+                }
+
+                // Apply IDW Smoothing only to the river corridor
+                double totalWeight = 0;
+                double weightedHeight = 0;
+                var sampleIndices = new List<int>(sourceCell.NeighborCells) { centerIdx };
+
+                foreach (int idx in sampleIndices)
+                {
+                    var sampleCell = originalData.Cells[idx];
+                    double dist = Math.Sqrt(Math.Pow(cell.Point.X - originalData.Points[idx].X, 2) +
+                                            Math.Pow(cell.Point.Y - originalData.Points[idx].Y, 2));
+                    double weight = 1.0 / (dist + 0.001);
+                    weightedHeight += sampleCell.Height * weight;
+                    totalWeight += weight;
+                }
+                cell.Height = (byte)(weightedHeight / totalWeight);
+            }
+        }
+
+        public static void WarpPointsToRivers(List<MapPoint> points, List<MapPoint> riverSpine, double radius)
+        {
+            double radiusSq = radius * radius;
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                var p = points[i];
+
+                // 1. Find closest point on the river spine
+                MapPoint closest = FindClosestSpinePoint(p, riverSpine);
+                double distSq = DistSq(p, closest);
+
+                if (distSq < radiusSq)
+                {
+                    double dist = Math.Sqrt(distSq);
+                    // 2. Calculate Falloff (0 at edge of radius, 1 at the spine)
+                    double force = Math.Pow(1.0 - (dist / radius), 2);
+
+                    // 3. Interpolate position (Move 50% of the way max to avoid overlapping)
+                    double strength = 0.5 * force;
+                    points[i] = new MapPoint(
+                        p.X + (closest.X - p.X) * strength,
+                        p.Y + (closest.Y - p.Y) * strength
+                    );
+                }
+            }
+        }
+
+        private static double DistSq(double x1, double y1, double x2, double y2)
+        {
+            return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+        }
+
+        // Overload for MapPoint convenience
+        private static double DistSq(MapPoint a, MapPoint b) => DistSq(a.X, a.Y, b.X, b.Y);
+
+        private static MapPoint FindClosestSpinePoint(MapPoint p, List<MapPoint> riverSpine)
+        {
+            MapPoint bestPoint = riverSpine[0];
+            double minDataSq = double.MaxValue;
+
+            // Linear search is fine for a single river path, 
+            // but if you have thousands of spine points, 
+            // consider a Quadtree or checking only points from the relevant river.
+            for (int i = 0; i < riverSpine.Count; i++)
+            {
+                double d2 = DistSq(p, riverSpine[i]);
+                if (d2 < minDataSq)
+                {
+                    minDataSq = d2;
+                    bestPoint = riverSpine[i];
+                }
+            }
+            return bestPoint;
         }
 
         private static MapPack CreatePack(MapData data, List<MapPoint> newP, List<int> newG, List<byte> newH)
