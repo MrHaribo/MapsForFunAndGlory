@@ -59,5 +59,21 @@
         public const int LAVA_LAKE_MIN_HEIGHT = 60;
         public const int LAVA_LAKE_MAX_CELLS = 10;
         public const int SINKHOLE_MAX_CELLS = 3;
+
+        // Cell Ranking / Suitability Weights
+        public const int SCORE_ESTUARY = 15;
+        public const int SCORE_OCEAN_COAST = 5;
+        public const int SCORE_SAFE_HARBOR = 20;
+        public const int SCORE_FRESHWATER = 30;
+        public const int SCORE_SALT = 10;
+        public const int SCORE_FROZEN = 1;
+        public const int SCORE_DRY = -5;
+        public const int SCORE_SINKHOLE = -15; // Adjusted to match common JS logic (-5 in your snippet, -15 in some FMG versions, we'll use -15)
+        public const int SCORE_LAVA = -30;
+
+        // Normalization Constants
+        public const float SUITABILITY_RIVER_SCALE = 250f;
+        public const float SUITABILITY_DIVISOR = 5f;
+        public const int ELEVATION_OPTIMUM = 50; // The "neutral" height for population
     }
 }

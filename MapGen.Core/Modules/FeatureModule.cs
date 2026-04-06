@@ -503,5 +503,91 @@ namespace MapGen.Core.Modules
 
             return FeatureGroup.Freshwater;
         }
+
+        public static void RankCells(MapPack pack)
+        {
+            var cells = pack.Cells;
+
+            // 1. Get Biome Data for lookup
+            var biomes = BiomModule.GetDefaultBiomes();
+
+            // 2. Calculate Global Statistics
+            // FMG median excludes 0s: cells.fl.filter(f => f)
+            var fluxValues = cells.Where(c => c.Flux > 0).Select(c => c.Flux).ToList();
+            double meanFlux = fluxValues.Count > 0 ? NumberUtils.Median(fluxValues) : 0.0;
+
+            // FMG Parity: maxFlux = d3.max(cells.fl) + d3.max(cells.conf)
+            // We take the max of each array and sum them.
+            double maxFlux = cells.Max(c => c.Flux) + cells.Max(c => c.Confluence);
+
+            // Mean area for population scaling
+            double meanArea = cells.Average(c => (double)c.Area);
+
+            foreach (var cell in cells)
+            {
+                // No population in water (Height < 20)
+                if (cell.Height < MapConstants.LAND_THRESHOLD) continue;
+
+                // 3. Base Suitability from Biome Habitability
+                // We use the ID to index directly into our fetched biome list
+                double score = biomes[cell.BiomeId].Habitability;
+                if (score <= 0) continue;
+
+                // 4. River & Confluence value
+                if (meanFlux > 0)
+                {
+                    double currentFlux = cell.Flux + cell.Confluence;
+                    // Normalize clamps the value between 0 and 1 based on (val - mean) / (max - mean)
+                    score += NumberUtils.Normalize(currentFlux, meanFlux, maxFlux) * MapConstants.SUITABILITY_RIVER_SCALE;
+                }
+
+                // 5. Elevation penalty
+                // Standard FMG logic: score -= (height - 50) / 5
+                score -= (cell.Height - MapConstants.ELEVATION_OPTIMUM) / MapConstants.SUITABILITY_DIVISOR;
+
+                // 6. Coastal and Waterfront value
+                if (cell.Distance == MapConstants.LAND_COAST)
+                {
+                    // Estuary bonus if a river segment exists in this coastal cell
+                    if (cell.RiverId > 0) score += MapConstants.SCORE_ESTUARY;
+
+                    // Check Haven (the water cell this land cell 'leans' toward)
+                    var havenCell = pack.Cells[cell.Haven];
+                    var feature = pack.GetFeature(havenCell.FeatureId);
+
+                    if (feature.Type == FeatureType.Lake)
+                    {
+                        score += GetLakeScore(feature.Group);
+                    }
+                    else
+                    {
+                        score += MapConstants.SCORE_OCEAN_COAST;
+
+                        // Harbor: 1 water neighbor indicates a deep bay/protected cove
+                        if (cell.Harbor == 1) score += MapConstants.SCORE_SAFE_HARBOR;
+                    }
+                }
+
+                // 7. Finalize Suitability and Population
+                // FMG: cells.s[i] = score / 5
+                cell.Suitability = (short)(score / MapConstants.SUITABILITY_DIVISOR);
+
+                // FMG: cells.pop[i] = score > 0 ? (score * area) / meanArea : 0
+                cell.Population = cell.Suitability > 0
+                    ? (float)((cell.Suitability * (double)cell.Area) / meanArea)
+                    : 0.0f;
+            }
+        }
+
+        private static double GetLakeScore(FeatureGroup group) => group switch
+        {
+            FeatureGroup.Freshwater => MapConstants.SCORE_FRESHWATER,
+            FeatureGroup.Salt => MapConstants.SCORE_SALT,
+            FeatureGroup.Frozen => MapConstants.SCORE_FROZEN,
+            FeatureGroup.Dry => MapConstants.SCORE_DRY,
+            FeatureGroup.Sinkhole => MapConstants.SCORE_SINKHOLE,
+            FeatureGroup.Lava => MapConstants.SCORE_LAVA,
+            _ => 0.0
+        };
     }
 }

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MapGen.Core.Helpers
 {
@@ -40,5 +42,14 @@ namespace MapGen.Core.Helpers
         /// <summary>Equivalent to JS: lerp(a, b, t)</summary>
         public static double Lerp(double a, double b, double t) =>
             a + (b - a) * t;
+
+        public static double Median(List<double> source)
+        {
+            var sorted = source.OrderBy(n => n).ToList();
+            int mid = sorted.Count / 2;
+            return (sorted.Count % 2 != 0)
+                ? sorted[mid]
+                : (sorted[mid] + sorted[mid - 1]) / 2f;
+        }
     }
 }

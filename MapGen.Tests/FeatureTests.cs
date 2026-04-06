@@ -65,6 +65,16 @@ namespace MapGen.Tests
             public double Temp { get; set; }
         }
 
+        public class CellRankRegressionData
+        {
+            public string Seed { get; set; }
+            public double MeanFlux { get; set; }
+            public double MaxFlux { get; set; }
+            public double MeanArea { get; set; }
+            public short[] Suitability { get; set; }
+            public float[] Population { get; set; }
+        }
+
         [Fact]
         public void TestGridFeatureDetection()
         {
@@ -229,6 +239,49 @@ namespace MapGen.Tests
                 "lava" => FeatureGroup.Lava,
                 _ => throw new ArgumentException($"Unknown JS feature group: {jsGroup}")
             };
+        }
+
+        [Fact]
+        public void TestPackCellRanks()
+        {
+            // 1. Load Expected Data
+            var json = File.ReadAllText("data/regression_cell_ranks.json");
+            var expected = JsonConvert.DeserializeObject<CellRankRegressionData>(json);
+
+            // 2. Setup (Full Pipeline)
+            var mapData = TestMapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
+
+            var pack = PackModule.ReGraph(mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack, mapData, allowErosion: true);
+            BiomModule.Define(pack, mapData);
+            FeatureModule.DefineGroups(pack);
+
+            // 3. Run Logic
+            FeatureModule.RankCells(pack);
+
+            // 4. Verification
+            Assert.Equal(expected.Suitability.Length, pack.Cells.Length);
+
+            for (int i = 0; i < pack.Cells.Length; i++)
+            {
+                var cell = pack.Cells[i];
+
+                // Verify Suitability(Int16) -Should be bit-perfect
+                Assert.Equal(expected.Suitability[i], cell.Suitability);
+
+                //Verify Population(Float) -Using precision tolerance
+                // FMG population can be 0 or a positive float.
+                Assert.Equal(expected.Population[i], cell.Population);
+            }
         }
     }
 }

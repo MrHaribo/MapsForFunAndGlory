@@ -122,6 +122,10 @@ namespace MapGen.Core
 
         // Bioms
         public byte BiomeId { get; set; }
+
+        // Population
+        public short Suitability { get; set; } // cells.s
+        public float Population { get; set; }   // cells.pop
     }
 
     public class MapVertex
