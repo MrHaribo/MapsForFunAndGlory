@@ -1,6 +1,7 @@
 ﻿using MapGen.Core;
 using MapGen.Core.Modules;
 using Newtonsoft.Json;
+using static MapGen.Tests.BiomeTests;
 
 namespace MapGen.Tests
 {
@@ -46,6 +47,22 @@ namespace MapGen.Tests
             public double area { get; set; }
             public double height { get; set; }
             public List<int> shoreline { get; set; } // Sequence matters!
+        }
+
+        public class FeatureGroupRegressionData
+        {
+            public string Seed { get; set; }
+            public List<FeatureGroupEntry> Features { get; set; }
+        }
+
+        public class FeatureGroupEntry
+        {
+            public int Id { get; set; }
+            public string Type { get; set; }
+            public string Group { get; set; } // The JS string value
+            public int Cells { get; set; }
+            public double Height { get; set; }
+            public double Temp { get; set; }
         }
 
         [Fact]
@@ -150,6 +167,68 @@ namespace MapGen.Tests
             }
         }
 
+        [Fact]
+        public void TestPackFeatureGroups()
+        {
+            // 1. Load Expected Data
+            var json = File.ReadAllText("data/regression_feature_groups.json");
+            var expected = JsonConvert.DeserializeObject<FeatureGroupRegressionData>(json);
 
+            // 2. Setup (Full Pipeline)
+            var mapData = TestMapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
+
+            var pack = PackModule.ReGraph(mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack, mapData, allowErosion: true);
+            BiomModule.Define(pack, mapData);
+
+            // 3. Run the Logic under test
+            FeatureModule.DefineGroups(pack);
+
+            // 4. Verification
+            foreach (var expectedFeature in expected.Features)
+            {
+                // JS skips to group oceans, we do it here, but have to skip it in the test to keep parity
+                if (expectedFeature.Type == "ocean") continue;
+
+                // Get our feature (id - 1 because Pack.Features is 0-indexed while FMG IDs are 1-based)
+                var actualFeature = pack.GetFeature(expectedFeature.Id);
+
+                // Map JS string to our Enum
+                FeatureGroup expectedEnum = MapJsGroupToEnum(expectedFeature.Group);
+
+                Assert.True(actualFeature != null, $"Feature {expectedFeature.Id} missing in Pack");
+                Assert.Equal(expectedEnum, actualFeature.Group);
+            }
+        }
+
+        private FeatureGroup MapJsGroupToEnum(string jsGroup)
+        {
+            return jsGroup switch
+            {
+                "ocean" => FeatureGroup.Ocean,
+                "sea" => FeatureGroup.Sea,
+                "gulf" => FeatureGroup.Gulf,
+                "continent" => FeatureGroup.Continent,
+                "island" => FeatureGroup.Island,
+                "isle" => FeatureGroup.Isle,
+                "lake_island" => FeatureGroup.LakeIsland,
+                "freshwater" => FeatureGroup.Freshwater,
+                "salt" => FeatureGroup.Salt,
+                "frozen" => FeatureGroup.Frozen,
+                "dry" => FeatureGroup.Dry,
+                "sinkhole" => FeatureGroup.Sinkhole,
+                "lava" => FeatureGroup.Lava,
+                _ => throw new ArgumentException($"Unknown JS feature group: {jsGroup}")
+            };
+        }
     }
 }

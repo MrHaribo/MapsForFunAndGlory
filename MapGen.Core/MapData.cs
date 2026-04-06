@@ -8,8 +8,6 @@ namespace MapGen.Core
     public delegate int ClosestCell(double x, double y);
     public delegate int ClosestCellInRange(double x, double y, double radius);
 
-    public enum FeatureType { Ocean, Lake, Island }
-
     public interface IMapGraph
     {
         int Width { get; }
@@ -160,6 +158,7 @@ namespace MapGen.Core
         public double Evaporation { get; set; } // Calculated based on area/climate
         public bool IsClosed { get; set; }
         public double Temp { get; set; }
+        public FeatureGroup Group { get; set; }
     }
 
     public class MapCoordinates

@@ -415,5 +415,93 @@ namespace MapGen.Core.Modules
                 if (marked == 0) break;
             }
         }
+
+        public static void DefineGroups(MapPack pack)
+        {
+            int gridCellsNumber = pack.Cells.Length;
+
+            // Thresholds based on Total Cells and Divisor constants
+            int oceanMin = gridCellsNumber / MapConstants.OCEAN_MIN_SIZE_DIVISOR;
+            int seaMin = gridCellsNumber / MapConstants.SEA_MIN_SIZE_DIVISOR;
+            int continentMin = gridCellsNumber / MapConstants.CONTINENT_MIN_SIZE_DIVISOR;
+            int islandMin = gridCellsNumber / MapConstants.ISLAND_MIN_SIZE_DIVISOR;
+
+            foreach (var feature in pack.Features)
+            {
+                // Skip nulls. FMG logic specifically skips "ocean" type for the main loop 
+                // but defines it via a sub-call. To maintain parity, we classify everything.
+                if (feature == null) continue;
+
+                if (feature.Type == FeatureType.Ocean)
+                {
+                    feature.Group = DefineOceanGroup(feature, oceanMin, seaMin);
+                }
+                else if (feature.Type == FeatureType.Lake)
+                {
+                    // Note: FMG sets feature.height here via Lakes.getHeight. 
+                    // We assume feature.Height is already populated.
+                    feature.Group = DefineLakeGroup(feature);
+                }
+                else if (feature.IsLand) // This handles "island" type in JS
+                {
+                    feature.Group = DefineIslandGroup(feature, pack, continentMin, islandMin);
+                }
+            }
+        }
+
+        private static FeatureGroup DefineOceanGroup(MapFeature feature, int oceanMin, int seaMin)
+        {
+            if (feature.CellsCount > oceanMin) return FeatureGroup.Ocean;
+            if (feature.CellsCount > seaMin) return FeatureGroup.Sea;
+            return FeatureGroup.Gulf;
+        }
+
+        private static FeatureGroup DefineIslandGroup(MapFeature feature, MapPack pack, int continentMin, int islandMin)
+        {
+            // Parity: pack.features[pack.cells.f[feature.firstCell - 1]]
+            // We check the feature ID of the cell index exactly 1 before the first cell of this feature.
+            int prevCellIdx = feature.FirstCell - 1;
+            if (prevCellIdx >= 0)
+            {
+                ushort prevFeatureId = pack.Cells[prevCellIdx].FeatureId;
+                // MapPack.GetFeature(id) uses id - 1 internally
+                var prevFeature = pack.GetFeature(prevFeatureId);
+
+                if (prevFeature != null && prevFeature.Type == FeatureType.Lake)
+                    return FeatureGroup.LakeIsland;
+            }
+
+            if (feature.CellsCount > continentMin) return FeatureGroup.Continent;
+            if (feature.CellsCount > islandMin) return FeatureGroup.Island;
+            return FeatureGroup.Isle;
+        }
+
+        private static FeatureGroup DefineLakeGroup(MapFeature feature)
+        {
+            // Temperature check
+            if (feature.Temp < MapConstants.LAKE_FROZEN_TEMP) return FeatureGroup.Frozen;
+
+            // Lava check: height > 60, small, and index-based randomness
+            if (feature.Height > MapConstants.LAVA_LAKE_MIN_HEIGHT &&
+                feature.CellsCount < MapConstants.LAVA_LAKE_MAX_CELLS &&
+                feature.FirstCell % 10 == 0) return FeatureGroup.Lava;
+
+            // Logic for lakes without Inlets and Outlets (Endorheic/Sinks)
+            bool hasInlets = feature.Inlets != null && feature.Inlets.Count > 0;
+            bool hasOutlet = feature.OutCell > 0; // Assuming OutCell 0 or -1 means no outlet
+
+            if (!hasInlets && !hasOutlet)
+            {
+                if (feature.Evaporation > feature.Flux * 4) return FeatureGroup.Dry;
+
+                if (feature.CellsCount < MapConstants.SINKHOLE_MAX_CELLS &&
+                    feature.FirstCell % 10 == 0) return FeatureGroup.Sinkhole;
+            }
+
+            // Salt lake check
+            if (!hasOutlet && feature.Evaporation > feature.Flux) return FeatureGroup.Salt;
+
+            return FeatureGroup.Freshwater;
+        }
     }
 }

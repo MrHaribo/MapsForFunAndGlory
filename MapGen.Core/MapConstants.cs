@@ -47,5 +47,17 @@
         public const int DEPRESSION_MAX_ITERATIONS = 500;
         public const double DEPRESSION_LAKE_ITER_RATIO = 0.85;
         public const double DEPRESSION_ELEVATE_ITER_RATIO = 0.75;
+
+        // Feature Size Threshold Divisors (TotalCells / Divisor)
+        public const int OCEAN_MIN_SIZE_DIVISOR = 25;
+        public const int SEA_MIN_SIZE_DIVISOR = 1000;
+        public const int CONTINENT_MIN_SIZE_DIVISOR = 10;
+        public const int ISLAND_MIN_SIZE_DIVISOR = 1000;
+
+        // Lake Specific Logic Constants
+        public const int LAKE_FROZEN_TEMP = -3;
+        public const int LAVA_LAKE_MIN_HEIGHT = 60;
+        public const int LAVA_LAKE_MAX_CELLS = 10;
+        public const int SINKHOLE_MAX_CELLS = 3;
     }
 }
