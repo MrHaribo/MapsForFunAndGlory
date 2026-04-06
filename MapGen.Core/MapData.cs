@@ -189,6 +189,25 @@ namespace MapGen.Core
         public List<int> Cells { get; set; } = new List<int>();
     }
 
+    public class MapCulture
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+        public string Color { get; set; } = string.Empty;
+        public int CenterCell { get; set; }
+        public int BaseNameId { get; set; }
+        public CultureType Type { get; set; }
+        public double Expansionism { get; set; }
+        public string Shield { get; set; } = "round";
+
+        // Growth/Stats tracking
+        public int CellCount { get; set; }
+        public double TotalArea { get; set; }
+        public double RuralPopulation { get; set; }
+        public double UrbanPopulation { get; set; }
+    }
+
     public readonly struct PointFlux
     {
         public readonly double X, Y, Flux;

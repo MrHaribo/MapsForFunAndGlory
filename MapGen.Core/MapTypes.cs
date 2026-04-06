@@ -19,4 +19,15 @@ namespace MapGen.Core
         World, European, Oriental, English, Antique,
         HighFantasy, DarkFantasy, Random
     }
+
+    public enum CultureType
+    {
+        Generic,
+        Nomadic,
+        Highland,
+        Lake,
+        Naval,
+        River,
+        Hunting
+    }
 }
