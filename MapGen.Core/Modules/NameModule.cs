@@ -1,6 +1,8 @@
-﻿using System;
-using System.Buffers.Text;
+﻿using MapGen.Core.Helpers;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace MapGen.Core.Modules
@@ -16,11 +18,411 @@ namespace MapGen.Core.Modules
         public string BaseContent { get; set; } // The raw comma-separated string of names used to build the chain
     }
 
+    public class NameChain : Dictionary<string, List<string>>
+    {
+        // Key: The 'prev' character (e.g., 'a' or "" for start of word)
+        // Value: List of syllables that follow that character
+    }
+
     public static class NameModule
     {
+        public static string GetBase(IRandom rng, int baseId, int minLength, int maxLength, string prefix, string suffix) => null;
         public static string GetBase(int baseId, int minLength, int maxLength, string prefix, string suffix) => null;
-
         public static string GetBaseShort(int baseId) => null;
+
+        #region Base Name
+
+        public static string GetBase(IRandom rng, NameChain chain, int min, int max, string dupl)
+        {
+            // JS: if (!data || data[""] === undefined) throw Error
+            if (chain == null || !chain.ContainsKey(""))
+            {
+                throw new InvalidOperationException("NameChain is null or missing the starting ('') syllable set.");
+            }
+
+            string word = "";
+            // JS: let v = data[""], cur = ra(v)
+            string currentSyllable = rng.Ra(chain[""].ToArray());
+
+            for (int i = 0; i < 20; i++)
+            {
+                if (string.IsNullOrEmpty(currentSyllable))
+                {
+                    if (word.Length < min)
+                    {
+                        word = "";
+                        currentSyllable = rng.Ra(chain[""].ToArray());
+                        continue;
+                    }
+                    else break;
+                }
+                else
+                {
+                    if (word.Length + currentSyllable.Length > max)
+                    {
+                        if (word.Length < min) word += currentSyllable;
+                        break;
+                    }
+
+                    word += currentSyllable;
+
+                    // JS: v = data[last(cur)] || data[""];
+                    string lastChar = word.Substring(word.Length - 1);
+                    var nextOptions = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
+                    currentSyllable = rng.Ra(nextOptions.ToArray());
+                }
+            }
+
+            if (word.Length > 0)
+            {
+                char last = word[word.Length - 1];
+                if (last == '\'' || last == ' ' || last == '-') word = word.Substring(0, word.Length - 1);
+            }
+
+            // --- Post-Processing (The JS 'Reduce' Logic) ---
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < word.Length; i++)
+            {
+                char c = word[i];
+                char? next = (i + 1 < word.Length) ? word[i + 1] : (char?)null;
+                char? nextNext = (i + 2 < word.Length) ? word[i + 2] : (char?)null;
+
+                // Duplication check (if not in allowed list 'dupl')
+                if (next != null && c == next.Value && !dupl.Contains(c)) continue;
+
+                if (sb.Length == 0)
+                {
+                    sb.Append(char.ToUpperInvariant(c));
+                    continue;
+                }
+
+                char lastProcessed = sb[sb.Length - 1];
+                if (lastProcessed == '-' && c == ' ') continue;
+                if (lastProcessed == ' ' || lastProcessed == '-')
+                {
+                    sb.Append(char.ToUpperInvariant(c));
+                    continue;
+                }
+
+                if (c == 'a' && next == 'e') continue;
+                if (next != null && nextNext != null && c == next.Value && c == nextNext.Value) continue;
+
+                sb.Append(c);
+            }
+
+            string name = sb.ToString();
+
+            // Multi-word part joining (ensure parts are at least 2 chars)
+            var parts = name.Split(' ');
+            if (parts.Any(p => p.Length < 2))
+            {
+                name = parts[0] + string.Join("", parts.Skip(1).Select(p => p.ToLowerInvariant()));
+            }
+
+            if (name.Length < 2)
+            {
+                throw new Exception($"Generated name '{name}' is too short (min length 2). Check NameBase settings.");
+            }
+
+            return name;
+        }
+        
+        public static string GetBaseShort(IRandom rng, NameChain chain, NameBase nameBase)
+        {
+            // JS: const min = nameBases[base].min - 1;
+            // JS: const max = Math.max(nameBases[base].max - 2, min);
+            int min = nameBase.Min - 1;
+            int max = Math.Max(nameBase.Max - 2, min);
+
+            return GetBase(rng, chain, min, max, "");
+        }
+
+        #endregion
+
+        #region Markov Chain
+
+        public static NameChain CalculateChain(string baseContent)
+        {
+            var chain = new NameChain();
+            if (string.IsNullOrWhiteSpace(baseContent)) return chain;
+
+            string[] names = baseContent.Split(',');
+
+            foreach (string n in names)
+            {
+                string name = n.Trim().ToLowerInvariant();
+                if (string.IsNullOrEmpty(name)) continue;
+
+                // JS: !/[^\u0000-\u007f]/.test(name) -> checks if all chars are basic ASCII
+                bool isBasic = name.All(c => c <= 127);
+
+                // Start loop at i = -1 to capture the beginning of the word (prev = "")
+                for (int i = -1; i < name.Length;)
+                {
+                    string prev = (i == -1) ? "" : name[i].ToString();
+                    string syllable = "";
+                    bool hasVowel = false;
+
+                    // Build the syllable (max 5 chars)
+                    int c = i + 1;
+                    while (c < name.Length && syllable.Length < 5)
+                    {
+                        char that = name[c];
+                        char? next = (c + 1 < name.Length) ? name[c + 1] : (char?)null;
+
+                        syllable += that;
+
+                        // Break if syllable starts with special separator
+                        if (syllable == " " || syllable == "-") break;
+                        // Break if next char is a separator or end of word
+                        if (next == null || next == ' ' || next == '-') break;
+
+                        if (IsVowel(that)) hasVowel = true;
+
+                        // Diphthong/Consonant cluster logic (continue means "don't split yet")
+                        if (that == 'y' && next == 'e') { c++; continue; }
+
+                        if (isBasic)
+                        {
+                            if (that == 'o' && next == 'o') { c++; continue; }
+                            if (that == 'e' && next == 'e') { c++; continue; }
+                            if (that == 'a' && next == 'e') { c++; continue; }
+                            if (that == 'c' && next == 'h') { c++; continue; }
+                        }
+
+                        // Break if two same vowels in a row (using IsVowel helper)
+                        if (IsVowel(that) && next != null && that == next.Value) break;
+
+                        // Break if syllable already has a vowel and another is coming soon (lookahead +2)
+                        if (hasVowel)
+                        {
+                            char? nextNext = (c + 2 < name.Length) ? name[c + 2] : (char?)null;
+                            if (nextNext != null && IsVowel(nextNext.Value)) break;
+                        }
+
+                        c++;
+                    }
+
+                    // Store in dictionary
+                    if (!chain.ContainsKey(prev))
+                        chain[prev] = new List<string>();
+
+                    chain[prev].Add(syllable);
+
+                    // Increment i by the length of the syllable processed
+                    i += (syllable.Length > 0) ? syllable.Length : 1;
+                }
+            }
+
+            return chain;
+        }
+
+        #endregion
+
+        #region Culture Name
+
+        public static string GetCulture(IRandom rng, NameChain chain, int min, int max, string dupl)
+        {
+            // Note: In the final integration, 'chain' and 'dupl' come from the culture's baseIndex
+            return GetBase(rng, chain, min, max, dupl);
+        }
+
+        public static string GetCultureShort(IRandom rng, NameChain chain, NameBase nameBase)
+        {
+            return GetBaseShort(rng, chain, nameBase);
+        }
+
+        #endregion
+
+        #region State Name
+
+        public static string GetStateName(IRandom rng, string name, int? culture = null, int? baseIndex = null)
+        {
+            if (string.IsNullOrEmpty(name)) return "Unknown";
+
+            // If base is not provided, we'd normally look it up in pack.cultures[culture].base
+            // For now, we assume baseIndex is passed in from the calling generate loop
+            int b = baseIndex ?? 0;
+
+            // 1. Clean up multi-word names for states
+            if (name.Contains(" "))
+            {
+                string cleaned = name.Replace(" ", "").ToLowerInvariant();
+                name = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned);
+            }
+
+            // 2. Remove common settlement endings inappropriate for states
+            if (name.Length > 6 && name.EndsWith("berg")) name = name.Substring(0, name.Length - 4);
+            if (name.Length > 5 && name.EndsWith("ton")) name = name.Substring(0, name.Length - 3);
+
+            // 3. Culture-specific root adjustments
+            if (b == 5 && (name.EndsWith("sk") || name.EndsWith("ev") || name.EndsWith("ov")))
+            {
+                name = name.Substring(0, name.Length - 2); // Ruthenian
+            }
+            else if (b == 12)
+            {
+                // Japanese: ends in vowel or add 'u'
+                return IsVowel(name[name.Length - 1]) ? name : name + "u";
+            }
+            else if (b == 18 && rng.P(0.4))
+            {
+                // Arabic prefix "Al"
+                bool startsWithVowel = IsVowel(name[0]);
+                return startsWithVowel ? "Al" + name.ToLowerInvariant() : "Al " + name;
+            }
+
+            // 4. Fantasy bases (33-41) usually don't get suffixes
+            if (b > 32 && b < 42) return name;
+
+            // 5. Determine if we should trim the root before adding a suffix
+            bool useSuffix = true;
+            if (name.Length > 3 && IsVowel(name[name.Length - 1]))
+            {
+                if (IsVowel(name[name.Length - 2]) && rng.P(0.85))
+                {
+                    name = name.Substring(0, name.Length - 2); // trim double vowel
+                }
+                else if (rng.P(0.7))
+                {
+                    name = name.Substring(0, name.Length - 1); // trim single vowel
+                }
+                else
+                {
+                    useSuffix = false; // keep as is
+                }
+            }
+            else if (rng.P(0.4))
+            {
+                useSuffix = false; // 40% chance to skip suffix for consonant endings
+            }
+
+            if (!useSuffix) return name;
+
+            // 6. Define the suffix based on Culture Base
+            string suffix = "ia"; // standard
+            double rnd = rng.Next(); // 0.0 to 1.0
+            int l = name.Length;
+
+            if ((b == 3 || b == 4 || b == 13) && rnd < 0.03 && l < 7) suffix = "terra"; // Latins
+            else if (b == 2 && rnd < 0.03 && l < 7) suffix = "terre"; // French
+            else if (b == 0 && rnd < 0.5 && l < 7) suffix = "land"; // German
+            else if (b == 1 && rnd < 0.4 && l < 7) suffix = "land"; // English
+            else if (b == 6 && rnd < 0.3 && l < 7) suffix = "land"; // Norse
+            else if (b == 32 && rnd < 0.1 && l < 7) suffix = "land"; // Fantasy Human
+            else if (b == 7 && rnd < 0.1) suffix = "eia"; // Greek
+            else if (b == 9 && rnd < 0.35) suffix = "maa"; // Finnish
+            else if (b == 15 && rnd < 0.4 && l < 6) suffix = "orszag"; // Hungarian
+            else if (b == 16) suffix = rnd < 0.6 ? "yurt" : "eli"; // Turkish
+            else if (b == 10) suffix = "guk"; // Korean
+            else if (b == 11) suffix = " Guo"; // Chinese
+            else if (b == 14) suffix = (rnd < 0.5 && l < 6) ? "tlan" : "co"; // Nahuatl
+            else if (b == 17 && rnd < 0.8) suffix = "a"; // Berber
+            else if (b == 18 && rnd < 0.8) suffix = "a"; // Arabic
+
+            return ValidateSuffix(name, suffix);
+        }
+
+        #endregion
+
+        #region Map Name
+
+        public static string GetMapName(IRandom rng)
+        {
+            // JS: const base = P(0.7) ? 2 : P(0.5) ? rand(0, 6) : rand(0, 31);
+            int baseIndex;
+            if (rng.P(0.7))
+            {
+                baseIndex = 2; // Default to French
+            }
+            else if (rng.P(0.5))
+            {
+                baseIndex = rng.Next(0, 6); // Pick from first 7 (Western)
+            }
+            else
+            {
+                baseIndex = rng.Next(0, 31); // Pick from first 32
+            }
+
+            var nameBases = GetNameBases();
+
+            // Safety check
+            if (baseIndex >= nameBases.Count) return "Unknown";
+
+            var selectedBase = nameBases[baseIndex];
+
+            // JS: const min = nameBases[base].min - 1;
+            // JS: const max = Math.max(nameBases[base].max - 3, min);
+            int min = selectedBase.Min - 1;
+            int max = Math.Max(selectedBase.Max - 3, min);
+
+            // Generate the root name
+            // Note: GetBase is the Markov generator we will implement next
+            string baseName = GetBase(rng, baseIndex, min, max, "", "");
+
+            // JS: const name = P(0.7) ? addSuffix(baseName) : baseName;
+            return rng.P(0.7) ? AddSuffix(rng, baseName) : baseName;
+        }
+
+        #endregion
+
+        #region Suffix
+
+        public static string AddSuffix(IRandom rng, string name)
+        {
+            // JS: const suffix = P(0.8) ? "ia" : "land";
+            string suffix = rng.P(0.8) ? "ia" : "land";
+
+            if (suffix == "ia" && name.Length > 6)
+            {
+                // JS: name.slice(0, -(name.length - 3))
+                name = name.Substring(0, 3);
+            }
+            else if (suffix == "land" && name.Length > 6)
+            {
+                // JS: name.slice(0, -(name.length - 5))
+                name = name.Substring(0, 5);
+            }
+
+            return ValidateSuffix(name, suffix);
+        }
+
+        public static string ValidateSuffix(string name, string suffix)
+        {
+            if (string.IsNullOrEmpty(name)) return suffix;
+
+            // 1. No suffix if name already ends with it
+            if (name.EndsWith(suffix)) return name;
+
+            char s1 = suffix[0];
+
+            // 2. Remove name last letter if it's the same as suffix first letter
+            if (name[name.Length - 1] == s1)
+                name = name.Substring(0, name.Length - 1);
+
+            // 3. Prevent triple-vowels or triple-consonants at the junction
+            // JS: if (vowel(s1) === vowel(name.slice(-1)) && vowel(s1) === vowel(name.slice(-2, -1)))
+            if (name.Length >= 2)
+            {
+                bool s1IsVowel = IsVowel(s1);
+                if (s1IsVowel == IsVowel(name[name.Length - 1]) &&
+                    s1IsVowel == IsVowel(name[name.Length - 2]))
+                {
+                    name = name.Substring(0, name.Length - 1);
+                }
+            }
+
+            // 4. Repeat check: remove name last letter if it's a suffix first letter
+            // (Standard JS logic repeats this check after the triple-type check)
+            if (name.Length > 0 && name[name.Length - 1] == s1)
+                name = name.Substring(0, name.Length - 1);
+
+            return name + suffix;
+        }
+
+        #endregion
+
+        #region Base Names
 
         public static int NameBasesCount => GetNameBases().Count;
         public static List<NameBase> GetNameBases() => new List<NameBase>
@@ -72,5 +474,13 @@ namespace MapGen.Core.Modules
             // additional by Avengium:
             new NameBase { Name = "Levantine", Index = 42, Min = 4, Max = 12, Duplication = "ankprs", Morbidity = 0, BaseContent =      "Adme,Adramet,Agadir,Akko,Akzib,Alimas,Alis-Ubbo,Alqosh,Amid,Ammon,Ampi,Amurru,Andarig,Anpa,Araden,Aram,Arwad,Ashkelon,Athar,Atiq,Aza,Azeka,Baalbek,Babel,Batrun,Beerot,Beersheba,Beit Shemesh,Berytus,Bet Agus,Bet Anya,Beth-Horon,Bethel,Bethlehem,Bethuel,Bet Nahrin,Bet Nohadra,Bet Zalin,Birmula,Biruta,Bit Agushi,Bitan,Bit Zamani,Cerne,Dammeseq,Darmsuq,Dor,Eddial,Eden Ekron,Elah,Emek,Emun,Ephratah,Eyn Ganim,Finike,Gades,Galatia,Gaza,Gebal,Gedera,Gerizzim,Gethsemane,Gibeon,Gilead,Gilgal,Golgotha,Goshen,Gytte,Hagalil,Haifa,Halab,Haqel Dma,Har Habayit,Har Nevo,Har Pisga,Havilah,Hazor,Hebron,Hormah,Iboshim,Iriho,Irinem,Irridu,Israel,Kadesh,Kanaan,Kapara,Karaly,Kart-Hadasht,Keret Chadeshet,Kernah,Kesed,Keysariya,Kfar,Kfar Nahum,Khalibon,Khalpe,Khamat,Kiryat,Kittim,Kurda,Lapethos,Larna,Lepqis,Lepriptza,Liksos,Lod,Luv,Malaka,Malet,Marat,Megido,Melitta,Merdin,Metsada,Mishmarot,Mitzrayim,Moab,Mopsos,Motye,Mukish,Nampigi,Nampigu,Natzrat,Nimrud,Nineveh,Nob,Nuhadra,Oea,Ofir,Oyat,Phineka,Phoenicus,Pleshet,Qart-Tubah Sarepta,Qatna,Rabat Amon,Rakkath,Ramat Aviv,Ramitha,Ramta,Rehovot,Reshef,Rushadir,Rushakad,Samrin,Sefarad,Sehyon,Sepat,Sexi,Sharon,Shechem,Shefelat,Shfanim,Shiloh,Shmaya,Shomron,Sidon,Sinay,Sis,Solki,Sur,Suria,Tabetu,Tadmur,Tarshish,Tartus,Teberya,Tefessedt,Tekoa,Teyman,Tinga,Tipasa,Tsabratan,Tur Abdin,Tzarfat,Tziyon,Tzor,Ugarit,Unubaal,Ureshlem,Urhay,Urushalim,Vaga,Yaffa,Yamhad,Yam hamelach,Yam Kineret,Yamutbal,Yathrib,Yaudi,Yavne,Yehuda,Yerushalayim,Yev,Yevus,Yizreel,Yurdnan,Zarefat,Zeboim,Zeurta,Zeytim,Zikhron,Zmurna"}
         };
+
+        #endregion
+
+        public static bool IsVowel(char c)
+        {
+            const string vowels = "aeiouyɑ'əøɛœæɶɒɨɪɔɐʊɤɯаоиеёэыуюяàèìòùỳẁȁȅȉȍȕáéíóúýẃőűâêîôûŷŵäëïöüÿẅãẽĩõũỹąęįǫųāēīōūȳăĕĭŏŭǎěǐǒǔȧėȯẏẇạẹịọụỵẉḛḭṵṳ";
+            return vowels.Contains(char.ToLowerInvariant(c));
+        }
     }
 }
