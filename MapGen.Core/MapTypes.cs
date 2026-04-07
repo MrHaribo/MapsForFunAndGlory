@@ -22,6 +22,7 @@ namespace MapGen.Core
 
     public enum CultureType
     {
+        Undefined,
         Generic,
         Nomadic,
         Highland,

@@ -1,4 +1,5 @@
-﻿using MapGen.Core.Helpers;
+﻿using D3Sharp.QuadTree;
+using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,40 +19,283 @@ namespace MapGen.Core.Modules
 
     public static class CultureModule
     {
+
+        #region Generate
+
+        public static void Generate(MapPack pack, MapData grid, int count)
+        {
+            // 1. Initial Setup
+            var cells = pack.Cells;
+            ushort[] cultureIds = new ushort[cells.Length]; // Equivalent to Uint16Array
+
+            // In JS: const populated = cells.i.filter(i => cells.s[i]);
+            var populated = cells.Where(c => c.Suitability > 0).Select(c => c.Index).ToList();
+
+            // 2. Population Safety Check
+            if (populated.Count < count * 25)
+            {
+                count = Math.Max(1, populated.Count / 50);
+                if (populated.Count < 25) // Extreme climate case
+                {
+                    pack.Cultures = new List<MapCulture> 
+                    {
+                        new MapCulture { Name = "Wildlands", Id = 0, BaseNameId = 1, Shield = "round" }
+                    };
+                    // In a real app, you'd trigger a Warning/Exception here instead of an Alert Dialog
+                    return;
+                }
+            }
+            var x = grid.Rng.Next();
+
+            // 3. Selection & Preparation
+            var selectedTemplates = selectCultures(count);
+
+
+            var finalCultures = new List<MapCulture>();
+            var codes = new List<string>();
+
+            // JS: const centers = d3.quadtree();
+            // Create an empty quadtree to track centers as we place them
+            var quadDatas = new List<QuadPoint>();
+            var tree = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
+            var colors = ColorUtil.GetColors(count, grid.Rng);
+
+            // 4. Main Generation Loop
+            for (int i = 0; i < selectedTemplates.Count; i++)
+            {
+                var template = selectedTemplates[i];
+                int newId = i + 1;
+
+                // JS: const sortingFn = c.sort ? c.sort : i => cells.s[i];
+                var sortingFn = template.SortingFn ?? ((int idx) => (double)cells[idx].Suitability);
+
+                // Pass the actual tree reference so it can be searched
+                int center = placeCenter(sortingFn, tree);
+
+                var type = defineCultureType(center);
+                var expansionism = defineCultureExpansionism(type);
+
+                var code = LanguageUtils.Abbreviate(template.Name, codes);
+                codes.Add(code);
+
+                var mc = new MapCulture
+                {
+                    Id = newId,
+                    Code = code,
+                    Name = template.Name,
+                    BaseNameId = template.BaseNameId,
+                    CenterCell = center,
+                    Shield = template.Shield,
+                    Color = "getColors(i)", // Placeholder
+                    Type = type,
+                    Expansionism = expansionism,
+                    // Expansionism, Code, etc will be added in the next step
+                };
+                
+                finalCultures.Add(mc);
+                cultureIds[center] = (ushort)newId;
+            }
+
+            // 5. Finalize Wildlands (JS: cultures.unshift)
+            finalCultures.Insert(0, new MapCulture
+            {
+                Name = "Wildlands",
+                Id = 0,
+                BaseNameId = 1,
+                Shield = "round"
+            });
+
+            pack.Cultures = finalCultures;
+            // pack.Cells.Culture = cultureIds; (Update the cell-to-culture map)
+
+            // --- LOCAL FUNCTIONS (Placeholders) ---
+
+            List<CultureTemplate> selectCultures(int culturesNumber)
+            {
+                // Get the full list of available templates for this culture set
+                List<CultureTemplate> defaultCultures = GetDefault(pack, grid, culturesNumber);
+                List<CultureTemplate> selected = new List<CultureTemplate>();
+
+                // 1. Logic for locked/pre-existing cultures (Skipped for fresh generate)
+
+                // 2. If we need exactly as many as are in the default set, just return them
+                if (culturesNumber == defaultCultures.Count) return defaultCultures;
+
+                // 3. Selection Loop
+                while (selected.Count < culturesNumber && defaultCultures.Count > 0)
+                {
+                    int attempt = 0;
+                    CultureTemplate? picked = null;
+                    int rndIdx = 0;
+
+                    do
+                    {
+                        rndIdx = grid.Rng.Next(0, defaultCultures.Count - 1);
+                        picked = defaultCultures[rndIdx];
+                        attempt++;
+
+                        // JS: while (i < 200 && !P(culture.odd));
+                    } while (attempt < MapConstants.CULTURE_SELECT_MAX_ATTEMPTS && !grid.Rng.P(picked.Odd));
+
+                    selected.Add(picked);
+                    defaultCultures.RemoveAt(rndIdx);
+                }
+
+                return selected;
+            }
+
+            int placeCenter(Func<int, double> sortingFn, QuadTree<QuadPoint, QuadPointNode> tree)
+            {
+
+                double spacing = (pack.Width + pack.Height) / 2.0 / count;
+                const int MAX_ATTEMPTS = 100;
+
+                // Use a stable sort to match JS
+                var sorted = populated
+                    .OrderByDescending(id => sortingFn(id))
+                    .ThenBy(id => id) // This is the crucial tie-breaker for 100% parity
+                    .ToList();
+
+                int max = (int)Math.Floor(sorted.Count / 2.0);
+
+                int cellId = 0;
+                for (int i = 0; i < MAX_ATTEMPTS; i++)
+                {
+
+                    int biasedIndex = grid.Rng.Biased(0, max, 5);
+                    cellId = sorted[Math.Clamp(biasedIndex, 0, sorted.Count - 1)];
+
+                    spacing *= 0.9;
+
+                    var pos = cells[cellId].Point;
+
+                    // JS: !centers.find(x, y, spacing)
+                    // Find if ANY point exists within 'spacing'
+                    var existingCenterInRange = tree.Find(pos.X, pos.Y, spacing);
+
+                    // If no center is found within radius, and cell isn't already a culture center
+                    if (existingCenterInRange == null && cultureIds[cellId] == 0)
+                    {
+                        break;
+                    }
+                }
+
+                return cellId;
+            }
+
+            CultureType defineCultureType(int i)
+            {
+                var cell = pack.Cells[i];
+
+                // 1. Nomadic: low height (<70) and specific biomes (1, 2, 4)
+                int[] nomadicBiomes = { 1, 2, 4 };
+                if (cell.Height < 70 && nomadicBiomes.Contains(cell.BiomeId))
+                    return CultureType.Nomadic;
+
+                // 2. Highland: high elevation (>50)
+                if (cell.Height > 50)
+                    return CultureType.Highland;
+
+                // 3. Lake: Check the feature at the cell's 'haven' (nearest water)
+                var havenCell = pack.Cells[cell.Haven];
+                var havenFeature = pack.GetFeature(havenCell.FeatureId);
+
+                if (havenFeature.Type == FeatureType.Lake && havenFeature.CellsCount > 5)
+                    return CultureType.Lake;
+
+                // 4. Naval: Coastal logic with probability checks
+                // JS: pack.features[cells.f[i]] is the feature the cell itself belongs to
+                var cellFeature = pack.GetFeature(cell.FeatureId);
+
+                bool isNaval = (cell.Harbor > 0 && havenFeature.Type != FeatureType.Lake && grid.Rng.P(0.1)) ||
+                               (cell.Harbor > 0 && grid.Rng.P(0.6)) ||
+                               (cellFeature.Group == FeatureGroup.Island && grid.Rng.P(0.4));
+
+                if (isNaval) return CultureType.Naval;
+
+                // 5. River: Has a river ID and flux > 100
+                if (cell.RiverId != 0 && cell.Flux > 100)
+                    return CultureType.River;
+
+                // 6. Hunting: Temperature > 2 and specific biomes
+                int[] huntingBiomes = { 3, 7, 8, 9, 10, 12 };
+                // Assuming temperature comes from the grid cell associated with the pack cell
+                double temp = grid.Cells[cell.GridId].Temp;
+
+                if (temp > 2 && huntingBiomes.Contains(cell.BiomeId))
+                    return CultureType.Hunting;
+
+                // 7. Default
+                return CultureType.Generic;
+            }
+
+            double defineCultureExpansionism(CultureType type)
+            {
+                double baseExpansion = type switch
+                {
+                    CultureType.Lake => 0.8,
+                    CultureType.Naval => 1.5,
+                    CultureType.River => 0.9,
+                    CultureType.Nomadic => 1.5,
+                    CultureType.Hunting => 0.7,
+                    CultureType.Highland => 1.2,
+                    _ => 1.0 // Generic
+                };
+
+                // JS: rn(((Math.random() * sizeVariety) / 2 + 1) * base, 1)
+                // rng.NextDouble() provides the Math.random() parity
+                double randomFactor = (grid.Rng.Next() * MapConstants.CULTUE_EXPANSIONISM_SIZE_VARIETY / 2) + 1;
+                double result = randomFactor * baseExpansion;
+
+                // Rounding to 1 decimal place to match the JS 'rn(val, 1)'
+                return NumberUtils.Round(result, 1);
+            }
+
+            
+        }
+
+        #endregion
+
         #region Default Cultures
 
-        public static List<CultureTemplate> GetDefault(Culture set, MapPack pack, MapData grid, int count)
+        public static List<CultureTemplate> GetDefault(MapPack pack, MapData grid, int count)
         {
+            var cultureSet = pack.Options.CultureSet;
+
             var cells = pack.Cells;
             double sMax = cells.Max(c => (double)c.Suitability);
             if (sMax <= 0) sMax = 1; // Prevent division by zero
-
-            // --- JS Helper Parity Methods ---
-            // n: normalized cell score
+                                     // 1. Force (double) cast to prevent integer division truncating to 0
             double N(int i) => Math.Ceiling((pack.Cells[i].Suitability / sMax) * 3);
 
-            // td: temperature difference fee
+            // 2. Exact truthy check parity
             double TD(int i, double goal)
             {
-                // Using grid.Cells to get the temperature from the underlying grid
-                double d = Math.Abs(grid.Cells[pack.Cells[i].GridId].Temp - goal);
-                return d > 0 ? d + 1 : 1;
+                double tempValue = grid.Cells[pack.Cells[i].GridId].Temp;
+                double d = Math.Abs(tempValue - goal);
+
+                // JS 'd ? d + 1 : 1' means if d is exactly 0.0, return 1, else d + 1
+                // We use a small epsilon for safety with floating point 0
+                return (d != 0) ? d + 1 : 1;
             }
 
-            // bd: biome difference fee
+            // 3. Biome logic is fine, but ensure types match
             double BD(int i, int[] biomes, double fee = 4)
-                => biomes.Contains(pack.Cells[i].BiomeId) ? 1 : fee;
+                => biomes.Contains(pack.Cells[i].BiomeId) ? 1.0 : fee;
 
-            // sf: sea/coast fee (not on sea coast fee)
+            // 4. Haven check - Note the Grid Index lookup
             double SF(int i, double fee = 4)
             {
                 int havenIdx = pack.Cells[i].Haven;
                 if (havenIdx == 0) return fee;
+
+                // JS: pack.features[cells.f[cells.haven[cell]]]
+                // Make sure we are looking up the feature of the HAVEN cell
                 var feature = pack.GetFeature(pack.Cells[havenIdx].FeatureId);
-                return feature.Type != FeatureType.Lake ? 1 : fee;
+                return feature.Type != FeatureType.Lake ? 1.0 : fee;
             }
 
-            return set switch
+            return cultureSet switch
             {
                 Culture.European => new List<CultureTemplate>
                 {

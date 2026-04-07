@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using static MapGen.Core.Helpers.LanguageUtils;
 
 namespace MapGen.Core.Modules
 {
@@ -520,14 +521,5 @@ namespace MapGen.Core.Modules
 
         #endregion
 
-        #region Language Utils
-
-        public static bool IsVowel(char c)
-        {
-            const string vowels = "aeiouyɑ'əøɛœæɶɒɨɪɔɐʊɤɯаоиеёэыуюяàèìòùỳẁȁȅȉȍȕáéíóúýẃőűâêîôûŷŵäëïöüÿẅãẽĩõũỹąęįǫųāēīōūȳăĕĭŏŭǎěǐǒǔȧėȯẏẇạẹịọụỵẉḛḭṵṳ";
-            return vowels.Contains(char.ToLowerInvariant(c));
-        }
-
-        #endregion
     }
 }

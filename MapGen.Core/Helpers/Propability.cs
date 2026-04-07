@@ -94,6 +94,25 @@ namespace MapGen.Core.Helpers
             return Math.Clamp(rounded, min, max);
         }
 
+        public static List<T> Shuffle<T>(this IRandom rng, List<T> list)
+        {
+            int m = list.Count;
+            while (m > 0)
+            {
+                // 1. Get the random index using the same precision/order as JS
+                // d3.shuffle uses: i = Math.random() * m-- | 0;
+                double r = rng.Next(); // The raw 0.0 - 1.0 value
+                int i = (int)Math.Floor(r * m);
+                m--;
+
+                // 2. Swap elements
+                T temp = list[m];
+                list[m] = list[i];
+                list[i] = temp;
+            }
+            return list;
+        }
+
         public static int GetNumberInRange(this IRandom rng, string r)
         {
             if (string.IsNullOrEmpty(r)) return 0;

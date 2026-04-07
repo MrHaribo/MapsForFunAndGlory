@@ -92,6 +92,8 @@ namespace MapGen.Core
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
         public MapFeature GetFeature(int id) => Features[id - 1];
+
+        public List<MapCulture> Cultures { get; set; } = new List<MapCulture>();
     }
 
     public class MapCell
@@ -126,6 +128,9 @@ namespace MapGen.Core
         // Population
         public short Suitability { get; set; } // cells.s
         public float Population { get; set; }   // cells.pop
+
+        // Culture
+        public int CultureId { get; set; }
     }
 
     public class MapVertex
@@ -192,14 +197,14 @@ namespace MapGen.Core
     public class MapCulture
     {
         public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Code { get; set; } = string.Empty;
-        public string Color { get; set; } = string.Empty;
+        public string Name { get; set; }
+        public string Code { get; set; }
+        public string Color { get; set; }
         public int CenterCell { get; set; }
         public int BaseNameId { get; set; }
         public CultureType Type { get; set; }
         public double Expansionism { get; set; }
-        public string Shield { get; set; } = "round";
+        public string Shield { get; set; }
 
         // Growth/Stats tracking
         public int CellCount { get; set; }

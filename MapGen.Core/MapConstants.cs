@@ -75,5 +75,10 @@
         public const float SUITABILITY_RIVER_SCALE = 250f;
         public const float SUITABILITY_DIVISOR = 5f;
         public const int ELEVATION_OPTIMUM = 50; // The "neutral" height for population
+
+        // Culture Constants
+        public const float CULTUE_EXPANSIONISM_SIZE_VARIETY = 4.3f;
+        public const int CULTURE_PLACE_CENTER_MAX_ATTEMPTS = 100;
+        public const int CULTURE_SELECT_MAX_ATTEMPTS = 200;
     }
 }
