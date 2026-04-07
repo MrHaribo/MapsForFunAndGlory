@@ -1,5 +1,6 @@
 ﻿using MapGen.Core.Helpers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -20,7 +21,7 @@ namespace MapGen.Core.Modules
         }
         private class NameChain : Dictionary<string, List<string>> { }
 
-        private readonly static Dictionary<int, NameChain> _chains = new Dictionary<int, NameChain>();
+        private readonly static ConcurrentDictionary<int, NameChain> _chains = new ConcurrentDictionary<int, NameChain>();
         private readonly static List<NameBase> _nameBases = GetNameBases();
         private readonly static object _chainLock = new object();
 
@@ -29,21 +30,11 @@ namespace MapGen.Core.Modules
 
         #region Markov Chain
 
-        private static NameChain GetChain(int baseId)
+        private static NameChain GetChain(int baseId) => _chains.GetOrAdd(baseId, id =>
         {
-            if (!_chains.TryGetValue(baseId, out var chain))
-            {
-                lock (_chainLock)
-                {
-                    if (!_chains.TryGetValue(baseId, out chain))
-                    {
-                        var nb = GetNameBase(baseId);
-                        chain = CalculateChain(nb.BaseContent, nb.Index);
-                    }
-                }
-            }
-            return chain;
-        }
+            var nb = GetNameBase(id);
+            return CalculateChain(nb.BaseContent, nb.Index);
+        });
 
         private static NameChain CalculateChain(string content, int index)
         {
@@ -120,7 +111,6 @@ namespace MapGen.Core.Modules
 
         #region Base Names
 
-        // Mimic: const getBase = function (base, min, max, dupl) { ... }
         public static string GetBase(IRandom rng, int baseId, int min = 0, int max = 0, string dupl = null)
         {
             var chain = GetChain(baseId);
