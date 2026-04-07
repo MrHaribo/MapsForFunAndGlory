@@ -47,7 +47,6 @@ namespace D3Sharp.QuadTree
                     return this;
                 }
             }
-            Console.WriteLine(data);
             xp = getX(node.Data); yp = getY(node.Data);
             if (x == xp && y == yp)
             {
