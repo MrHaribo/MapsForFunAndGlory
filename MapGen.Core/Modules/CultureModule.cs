@@ -91,16 +91,16 @@ namespace MapGen.Core.Modules
 
                 Culture.English => new List<CultureTemplate>
                 {
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "heater" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "wedged" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "oldFrench" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "spanish" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "hessen" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy5" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy4" },
-                    new CultureTemplate { Name = NameModule.GetBase(1, 5, 9, "", ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy1" }
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "heater" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "wedged" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "oldFrench" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "spanish" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "hessen" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy5" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy4" },
+                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy1" }
                 },
 
                 Culture.Antique => new List<CultureTemplate>
@@ -192,12 +192,12 @@ namespace MapGen.Core.Modules
                 {
                     // JS: rand(nameBases.length - 1)
                     // Using your extension: rng.Next(max) is inclusive 0 to max
-                    int rnd = grid.Rng.Next(NameModule.NameBasesCount - 1);
+                    int rndId = NameModule.GetRandomBaseId(grid.Rng);
 
                     return new CultureTemplate
                     {
-                        Name = NameModule.GetBaseShort(rnd),
-                        BaseNameId = rnd,
+                        BaseNameId = rndId,
+                        Name = NameModule.GetBaseShort(grid.Rng, rndId),
                         Odd = 1.0,
                         SortingFn = null, // Random cultures use default suitability sorting
                         Shield = GetRandomShield(grid.Rng)

@@ -1,47 +1,57 @@
 ﻿using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 
 namespace MapGen.Core.Modules
 {
-    public class NameBase
-    {
-        public string Name { get; set; }
-        public int Index { get; set; }
-        public int Min { get; set; }
-        public int Max { get; set; }
-        public string Duplication { get; set; }// Letters allowed to be duplicated (e.g., "lt" in German)
-        public double Morbidity { get; set; } // Morbidity (or occasionally referred to as the Mutation rate)
-        public string BaseContent { get; set; } // The raw comma-separated string of names used to build the chain
-    }
-
-    public class NameChain : Dictionary<string, List<string>>
-    {
-        // Key: The 'prev' character (e.g., 'a' or "" for start of word)
-        // Value: List of syllables that follow that character
-    }
-
     public static class NameModule
     {
-        public static string GetBase(IRandom rng, int baseId, int minLength, int maxLength, string prefix, string suffix) => null;
-        public static string GetBase(int baseId, int minLength, int maxLength, string prefix, string suffix) => null;
-        public static string GetBaseShort(int baseId) => null;
-
-        #region Base Name
-
-        public static string GetBase(IRandom rng, NameChain chain, int min, int max, string dupl)
+        private class NameBase
         {
-            // JS: if (!data || data[""] === undefined) throw Error
-            if (chain == null || !chain.ContainsKey(""))
-            {
-                throw new InvalidOperationException("NameChain is null or missing the starting ('') syllable set.");
-            }
+            public string Name { get; set; }
+            public int Index { get; set; }
+            public int Min { get; set; }
+            public int Max { get; set; }
+            public string Duplication { get; set; }// Letters allowed to be duplicated (e.g., "lt" in German)
+            public double Morbidity { get; set; } // Morbidity (or occasionally referred to as the Mutation rate)
+            public string BaseContent { get; set; } // The raw comma-separated string of names used to build the chain
+        }
+
+        private class NameChain : Dictionary<string, List<string>> { }
+
+
+        // A registry of chains, indexed by BaseId
+        private static readonly Dictionary<int, NameChain> _chains = new Dictionary<int, NameChain>();
+        private static readonly object _lock = new object();
+
+        // Ensure we have a list of metadata bases to reference
+        private static readonly Lazy<List<NameBase>> _nameBases = new Lazy<List<NameBase>>(GetNameBases);
+
+        #region Public Interface
+
+        /// <summary>
+        /// Returns a random valid BaseId. Replaces the need to expose NameBasesCount.
+        /// </summary>
+        public static int GetRandomBaseId(IRandom rng)
+        {
+            return rng.Next(_nameBases.Value.Count - 1);
+        }
+
+        /// <summary>
+        /// Generates a name using the full parameter set.
+        /// </summary>
+        public static string GetBase(IRandom rng, int baseId, int min, int max, string dupl)
+        {
+            NameChain chain = GetChain(baseId);
+
+            if (!chain.ContainsKey(""))
+                throw new InvalidOperationException($"Chain for base {baseId} is invalid.");
 
             string word = "";
-            // JS: let v = data[""], cur = ra(v)
             string currentSyllable = rng.Ra(chain[""].ToArray());
 
             for (int i = 0; i < 20; i++)
@@ -56,30 +66,69 @@ namespace MapGen.Core.Modules
                     }
                     else break;
                 }
-                else
+
+                if (word.Length + currentSyllable.Length > max)
                 {
-                    if (word.Length + currentSyllable.Length > max)
-                    {
-                        if (word.Length < min) word += currentSyllable;
-                        break;
-                    }
-
-                    word += currentSyllable;
-
-                    // JS: v = data[last(cur)] || data[""];
-                    string lastChar = word.Substring(word.Length - 1);
-                    var nextOptions = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
-                    currentSyllable = rng.Ra(nextOptions.ToArray());
+                    if (word.Length < min) word += currentSyllable;
+                    break;
                 }
+
+                word += currentSyllable;
+                string lastChar = word.Substring(word.Length - 1);
+
+                var nextOptions = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
+                currentSyllable = rng.Ra(nextOptions.ToArray());
             }
 
-            if (word.Length > 0)
-            {
-                char last = word[word.Length - 1];
-                if (last == '\'' || last == ' ' || last == '-') word = word.Substring(0, word.Length - 1);
-            }
+            return PostProcess(word, dupl);
+        }
 
-            // --- Post-Processing (The JS 'Reduce' Logic) ---
+        /// <summary>
+        /// Generates a short name for a specific base ID using its metadata rules.
+        /// </summary>
+        public static string GetBaseShort(IRandom rng, int baseId)
+        {
+            var nameBase = GetInternalBase(baseId);
+            int min = nameBase.Min - 1;
+            int max = Math.Max(nameBase.Max - 2, min);
+
+            return GetBase(rng, baseId, min, max, nameBase.Duplication);
+        }
+
+        /// <summary>
+        /// High-level wrapper for culture generation.
+        /// </summary>
+        public static string GetCulture(IRandom rng, int baseId, int min, int max, string dupl)
+        {
+            return GetBase(rng, baseId, min, max, dupl);
+        }
+
+        /// <summary>
+        /// Generates a short name for a culture.
+        /// </summary>
+        public static string GetCultureShort(IRandom rng, int baseId)
+        {
+            return GetBaseShort(rng, baseId);
+        }
+
+        #endregion
+
+        #region Internal Logic
+
+        private static NameBase GetInternalBase(int baseId)
+        {
+            var nb = _nameBases.Value.FirstOrDefault(b => b.Index == baseId);
+            if (nb == null) throw new Exception($"NameBase {baseId} not found.");
+            return nb;
+        }
+
+        private static string PostProcess(string word, string dupl)
+        {
+            if (string.IsNullOrEmpty(word)) return "";
+
+            char last = word[word.Length - 1];
+            if (last == '\'' || last == ' ' || last == '-') word = word.Substring(0, word.Length - 1);
+
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < word.Length; i++)
             {
@@ -87,7 +136,6 @@ namespace MapGen.Core.Modules
                 char? next = (i + 1 < word.Length) ? word[i + 1] : (char?)null;
                 char? nextNext = (i + 2 < word.Length) ? word[i + 2] : (char?)null;
 
-                // Duplication check (if not in allowed list 'dupl')
                 if (next != null && c == next.Value && !dupl.Contains(c)) continue;
 
                 if (sb.Length == 0)
@@ -111,77 +159,64 @@ namespace MapGen.Core.Modules
             }
 
             string name = sb.ToString();
-
-            // Multi-word part joining (ensure parts are at least 2 chars)
             var parts = name.Split(' ');
             if (parts.Any(p => p.Length < 2))
             {
                 name = parts[0] + string.Join("", parts.Skip(1).Select(p => p.ToLowerInvariant()));
             }
 
-            if (name.Length < 2)
-            {
-                throw new Exception($"Generated name '{name}' is too short (min length 2). Check NameBase settings.");
-            }
-
             return name;
         }
-        
-        public static string GetBaseShort(IRandom rng, NameChain chain, NameBase nameBase)
-        {
-            // JS: const min = nameBases[base].min - 1;
-            // JS: const max = Math.max(nameBases[base].max - 2, min);
-            int min = nameBase.Min - 1;
-            int max = Math.Max(nameBase.Max - 2, min);
 
-            return GetBase(rng, chain, min, max, "");
+        private static NameChain GetChain(int baseId)
+        {
+            if (!_chains.TryGetValue(baseId, out var chain))
+            {
+                lock (_lock)
+                {
+                    if (!_chains.TryGetValue(baseId, out chain))
+                    {
+                        var nameBase = GetInternalBase(baseId);
+                        chain = CalculateChain(nameBase);
+                        _chains[baseId] = chain;
+                    }
+                }
+            }
+            return chain;
         }
 
-        #endregion
-
-        #region Markov Chain
-
-        public static NameChain CalculateChain(string baseContent)
+        private static NameChain CalculateChain(NameBase nameBase)
         {
             var chain = new NameChain();
-            if (string.IsNullOrWhiteSpace(baseContent)) return chain;
+            if (string.IsNullOrWhiteSpace(nameBase.BaseContent)) return chain;
 
-            string[] names = baseContent.Split(',');
-
+            string[] names = nameBase.BaseContent.Split(',');
             foreach (string n in names)
             {
                 string name = n.Trim().ToLowerInvariant();
                 if (string.IsNullOrEmpty(name)) continue;
 
-                // JS: !/[^\u0000-\u007f]/.test(name) -> checks if all chars are basic ASCII
                 bool isBasic = name.All(c => c <= 127);
 
-                // Start loop at i = -1 to capture the beginning of the word (prev = "")
                 for (int i = -1; i < name.Length;)
                 {
                     string prev = (i == -1) ? "" : name[i].ToString();
                     string syllable = "";
                     bool hasVowel = false;
 
-                    // Build the syllable (max 5 chars)
                     int c = i + 1;
                     while (c < name.Length && syllable.Length < 5)
                     {
                         char that = name[c];
                         char? next = (c + 1 < name.Length) ? name[c + 1] : (char?)null;
-
                         syllable += that;
 
-                        // Break if syllable starts with special separator
                         if (syllable == " " || syllable == "-") break;
-                        // Break if next char is a separator or end of word
                         if (next == null || next == ' ' || next == '-') break;
 
                         if (IsVowel(that)) hasVowel = true;
 
-                        // Diphthong/Consonant cluster logic (continue means "don't split yet")
                         if (that == 'y' && next == 'e') { c++; continue; }
-
                         if (isBasic)
                         {
                             if (that == 'o' && next == 'o') { c++; continue; }
@@ -190,46 +225,21 @@ namespace MapGen.Core.Modules
                             if (that == 'c' && next == 'h') { c++; continue; }
                         }
 
-                        // Break if two same vowels in a row (using IsVowel helper)
                         if (IsVowel(that) && next != null && that == next.Value) break;
-
-                        // Break if syllable already has a vowel and another is coming soon (lookahead +2)
                         if (hasVowel)
                         {
                             char? nextNext = (c + 2 < name.Length) ? name[c + 2] : (char?)null;
                             if (nextNext != null && IsVowel(nextNext.Value)) break;
                         }
-
                         c++;
                     }
 
-                    // Store in dictionary
-                    if (!chain.ContainsKey(prev))
-                        chain[prev] = new List<string>();
-
+                    if (!chain.ContainsKey(prev)) chain[prev] = new List<string>();
                     chain[prev].Add(syllable);
-
-                    // Increment i by the length of the syllable processed
                     i += (syllable.Length > 0) ? syllable.Length : 1;
                 }
             }
-
             return chain;
-        }
-
-        #endregion
-
-        #region Culture Name
-
-        public static string GetCulture(IRandom rng, NameChain chain, int min, int max, string dupl)
-        {
-            // Note: In the final integration, 'chain' and 'dupl' come from the culture's baseIndex
-            return GetBase(rng, chain, min, max, dupl);
-        }
-
-        public static string GetCultureShort(IRandom rng, NameChain chain, NameBase nameBase)
-        {
-            return GetBaseShort(rng, chain, nameBase);
         }
 
         #endregion
@@ -358,7 +368,7 @@ namespace MapGen.Core.Modules
 
             // Generate the root name
             // Note: GetBase is the Markov generator we will implement next
-            string baseName = GetBase(rng, baseIndex, min, max, "", "");
+            string baseName = GetBase(rng, baseIndex, min, max, "");
 
             // JS: const name = P(0.7) ? addSuffix(baseName) : baseName;
             return rng.P(0.7) ? AddSuffix(rng, baseName) : baseName;
@@ -424,8 +434,7 @@ namespace MapGen.Core.Modules
 
         #region Base Names
 
-        public static int NameBasesCount => GetNameBases().Count;
-        public static List<NameBase> GetNameBases() => new List<NameBase>
+        private static List<NameBase> GetNameBases() => new List<NameBase>
         {
             // real-world bases by Azgaar:
             new NameBase { Name = "German", Index = 0, Min = 5, Max = 12, Duplication = "lt", Morbidity = 0, BaseContent =              "Achern,Aichhalden,Aitern,Albbruck,Alpirsbach,Altensteig,Althengstett,Appenweier,Auggen,Badenen,Badenweiler,Baiersbronn,Ballrechten,Bellingen,Berghaupten,Bernau,Biberach,Biederbach,Binzen,Birkendorf,Birkenfeld,Bischweier,Blumberg,Bollen,Bollschweil,Bonndorf,Bosingen,Braunlingen,Breisach,Breisgau,Breitnau,Brigachtal,Buchenbach,Buggingen,Buhl,Buhlertal,Calw,Dachsberg,Dobel,Donaueschingen,Dornhan,Dornstetten,Dottingen,Dunningen,Durbach,Durrheim,Ebhausen,Ebringen,Efringen,Egenhausen,Ehrenkirchen,Ehrsberg,Eimeldingen,Eisenbach,Elzach,Elztal,Emmendingen,Endingen,Engelsbrand,Enz,Enzklosterle,Eschbronn,Ettenheim,Ettlingen,Feldberg,Fischerbach,Fischingen,Fluorn,Forbach,Freiamt,Freiburg,Freudenstadt,Friedenweiler,Friesenheim,Frohnd,Furtwangen,Gaggenau,Geisingen,Gengenbach,Gernsbach,Glatt,Glatten,Glottertal,Gorwihl,Gottenheim,Grafenhausen,Grenzach,Griesbach,Gutach,Gutenbach,Hag,Haiterbach,Hardt,Harmersbach,Hasel,Haslach,Hausach,Hausen,Hausern,Heitersheim,Herbolzheim,Herrenalb,Herrischried,Hinterzarten,Hochenschwand,Hofen,Hofstetten,Hohberg,Horb,Horben,Hornberg,Hufingen,Ibach,Ihringen,Inzlingen,Kandern,Kappel,Kappelrodeck,Karlsbad,Karlsruhe,Kehl,Keltern,Kippenheim,Kirchzarten,Konigsfeld,Krozingen,Kuppenheim,Kussaberg,Lahr,Lauchringen,Lauf,Laufenburg,Lautenbach,Lauterbach,Lenzkirch,Liebenzell,Loffenau,Loffingen,Lorrach,Lossburg,Mahlberg,Malsburg,Malsch,March,Marxzell,Marzell,Maulburg,Monchweiler,Muhlenbach,Mullheim,Munstertal,Murg,Nagold,Neubulach,Neuenburg,Neuhausen,Neuried,Neuweiler,Niedereschach,Nordrach,Oberharmersbach,Oberkirch,Oberndorf,Oberbach,Oberried,Oberwolfach,Offenburg,Ohlsbach,Oppenau,Ortenberg,otigheim,Ottenhofen,Ottersweier,Peterstal,Pfaffenweiler,Pfalzgrafenweiler,Pforzheim,Rastatt,Renchen,Rheinau,Rheinfelden,Rheinmunster,Rickenbach,Rippoldsau,Rohrdorf,Rottweil,Rummingen,Rust,Sackingen,Sasbach,Sasbachwalden,Schallbach,Schallstadt,Schapbach,Schenkenzell,Schiltach,Schliengen,Schluchsee,Schomberg,Schonach,Schonau,Schonenberg,Schonwald,Schopfheim,Schopfloch,Schramberg,Schuttertal,Schwenningen,Schworstadt,Seebach,Seelbach,Seewald,Sexau,Simmersfeld,Simonswald,Sinzheim,Solden,Staufen,Stegen,Steinach,Steinen,Steinmauern,Straubenhardt,Stuhlingen,Sulz,Sulzburg,Teinach,Tiefenbronn,Tiengen,Titisee,Todtmoos,Todtnau,Todtnauberg,Triberg,Tunau,Tuningen,uhlingen,Unterkirnach,Reichenbach,Utzenfeld,Villingen,Villingendorf,Vogtsburg,Vohrenbach,Waldachtal,Waldbronn,Waldkirch,Waldshut,Wehr,Weil,Weilheim,Weisenbach,Wembach,Wieden,Wiesental,Wildbad,Wildberg,Winzeln,Wittlingen,Wittnau,Wolfach,Wutach,Wutoschingen,Wyhlen,Zavelstein"},
