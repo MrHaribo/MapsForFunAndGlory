@@ -18,45 +18,115 @@ namespace MapGen.Core.Modules
             public double Morbidity { get; set; }
             public string BaseContent { get; set; }
         }
-
-        // Mimic: let chains = [];
-        private static NameChain[] _chains;
-        private static List<NameBase> _nameBases;
-
         private class NameChain : Dictionary<string, List<string>> { }
 
-        static NameModule()
+        private readonly static Dictionary<int, NameChain> _chains = new Dictionary<int, NameChain>();
+        private readonly static List<NameBase> _nameBases = GetNameBases();
+        private readonly static object _chainLock = new object();
+
+        private static NameBase GetNameBase(int baseId) => _nameBases.First(b => b.Index == baseId);
+        private static int NameBaseCount => _nameBases.Count;
+
+        #region Markov Chain
+
+        private static NameChain GetChain(int baseId)
         {
-            _nameBases = GetNameBases();
-            // Initialize the array to the correct size, but leave elements null
-            // until updateChain is called, just like JS.
-            int maxIndex = _nameBases.Max(b => b.Index);
-            _chains = new NameChain[maxIndex + 1];
+            if (!_chains.TryGetValue(baseId, out var chain))
+            {
+                lock (_chainLock)
+                {
+                    if (!_chains.TryGetValue(baseId, out chain))
+                    {
+                        var nb = GetNameBase(baseId);
+                        chain = CalculateChain(nb.BaseContent, nb.Index);
+                    }
+                }
+            }
+            return chain;
         }
 
-        // Mimic: const updateChain = i => { ... }
-        private static void UpdateChain(int i)
+        private static NameChain CalculateChain(string content, int index)
         {
-            var nb = _nameBases.FirstOrDefault(b => b.Index == i);
-            if (nb != null && !string.IsNullOrEmpty(nb.BaseContent))
+            var chain = new NameChain();
+            string[] array = content.Split(',');
+
+            bool isArabic = content.Contains("Abha,Ajman,Alabar");
+            if (isArabic) Console.WriteLine("Chain Start");
+
+            foreach (string n in array)
             {
-                _chains[i] = CalculateChain(nb.BaseContent, nb.Index);
+                string name = n.Trim().ToLowerInvariant();
+                bool basic = name.All(c => c <= 127);
+
+                // Mimic: for (let i = -1, syllable = ""; i < name.length; i += syllable.length || 1, syllable = "")
+                for (int i = -1; i < name.Length;)
+                {
+                    string syllable = "";
+                    string prev = (i >= 0 && i < name.Length) ? name[i].ToString() : "";
+                    int v = 0;
+
+                    for (int c = i + 1; c < name.Length && syllable.Length < 5; c++)
+                    {
+                        char that = name[c];
+                        char? next = (c + 1 < name.Length) ? name[c + 1] : (char?)null;
+
+                        syllable += that;
+
+                        if (syllable == " " || syllable == "-") break;
+                        if (!next.HasValue || next == ' ' || next == '-') break;
+
+                        if (IsVowel(that)) v = 1;
+
+                        bool isException = false;
+                        if (that == 'y' && next == 'e') isException = true;
+                        if (basic)
+                        {
+                            if (that == 'o' && next == 'e' || (that == 'o' && next == 'o')) isException = true; // Added oo/ee logic
+                            if (that == 'e' && next == 'e') isException = true;
+                            if (that == 'a' && next == 'e') isException = true;
+                            if (that == 'c' && next == 'h') isException = true;
+                        }
+
+                        if (isException) continue;
+
+                        // JS: if (vowel(that) === next) break;
+                        // Note: vowel() in JS returns the character if it's a vowel, else undefined.
+                        // So vowel('a') === 'a' is true. 
+                        //if (IsVowel(that) && that == next.Value) break;
+
+                        // To match the JS exactly, we must NOT break on double vowels 
+                        // because the JS strict equality (boolean === string) always fails.
+                        // if (IsVowel(that) && that == next.Value) break;
+
+                        // JS: if (v && vowel(name[c + 2])) break;
+                        if (v == 1 && (c + 2 < name.Length) && IsVowel(name[c + 2])) break;
+                    }
+
+                    if (!chain.ContainsKey(prev)) chain[prev] = new List<string>();
+                    chain[prev].Add(syllable);
+
+                    if (isArabic)
+                    {
+                        Console.WriteLine($"CS > Word: \"{name}\" | Prev: \"{prev}\" | Syllable: \"{syllable}\"");
+                    }
+
+                    i += (syllable.Length > 0) ? syllable.Length : 1;
+                }
             }
-            else
-            {
-                _chains[i] = null;
-            }
+            return chain;
         }
+
+        #endregion
+
+        #region Base Names
 
         // Mimic: const getBase = function (base, min, max, dupl) { ... }
         public static string GetBase(IRandom rng, int baseId, int min = 0, int max = 0, string dupl = null)
         {
-            if (_chains[baseId] == null) UpdateChain(baseId);
+            var chain = GetChain(baseId);
+            if (chain == null || !chain.ContainsKey("")) return "ERROR";
 
-            var data = _chains[baseId];
-            if (data == null || !data.ContainsKey("")) return "ERROR";
-
-            var nb = _nameBases.First(b => b.Index == baseId);
+            var nb = GetNameBase(baseId);
 
             // JS Logic: if (!min) min = nameBases[base].min;
             if (min <= 0) min = nb.Min;
@@ -67,7 +137,7 @@ namespace MapGen.Core.Modules
             // To match this, we use null as the "not passed" state.
             if (dupl != "") dupl = nb.Duplication ?? "";
 
-            List<string> v = data[""];
+            List<string> v = chain[""];
             string cur = rng.Ra(v.ToArray());
             string w = "";
 
@@ -80,7 +150,7 @@ namespace MapGen.Core.Modules
                     {
                         cur = "";
                         w = "";
-                        v = data[""];
+                        v = chain[""];
                     }
                     else break;
                 }
@@ -94,7 +164,7 @@ namespace MapGen.Core.Modules
                     else
                     {
                         string lastChar = cur.Substring(cur.Length - 1);
-                        v = data.ContainsKey(lastChar) ? data[lastChar] : data[""];
+                        v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
                     }
                 }
 
@@ -176,83 +246,10 @@ namespace MapGen.Core.Modules
             return name;
         }
 
-        // Mimic: const calculateChain = function (string) { ... }
-        private static NameChain CalculateChain(string content, int index)
+
+        public static int GetRandomBaseId(IRandom rng)
         {
-            var chain = new NameChain();
-            string[] array = content.Split(',');
-
-            bool isArabic = content.Contains("Abha,Ajman,Alabar");
-            if (isArabic) Console.WriteLine("Chain Start");
-
-            foreach (string n in array)
-            {
-                string name = n.Trim().ToLowerInvariant();
-                bool basic = name.All(c => c <= 127);
-
-                // Mimic: for (let i = -1, syllable = ""; i < name.length; i += syllable.length || 1, syllable = "")
-                for (int i = -1; i < name.Length;)
-                {
-                    string syllable = "";
-                    string prev = (i >= 0 && i < name.Length) ? name[i].ToString() : "";
-                    int v = 0;
-
-                    for (int c = i + 1; c < name.Length && syllable.Length < 5; c++)
-                    {
-                        char that = name[c];
-                        char? next = (c + 1 < name.Length) ? name[c + 1] : (char?)null;
-
-                        syllable += that;
-
-                        if (syllable == " " || syllable == "-") break;
-                        if (!next.HasValue || next == ' ' || next == '-') break;
-
-                        if (IsVowel(that)) v = 1;
-
-                        bool isException = false;
-                        if (that == 'y' && next == 'e') isException = true;
-                        if (basic)
-                        {
-                            if (that == 'o' && next == 'e' || (that == 'o' && next == 'o')) isException = true; // Added oo/ee logic
-                            if (that == 'e' && next == 'e') isException = true;
-                            if (that == 'a' && next == 'e') isException = true;
-                            if (that == 'c' && next == 'h') isException = true;
-                        }
-
-                        if (isException) continue;
-
-                        // JS: if (vowel(that) === next) break;
-                        // Note: vowel() in JS returns the character if it's a vowel, else undefined.
-                        // So vowel('a') === 'a' is true. 
-                        //if (IsVowel(that) && that == next.Value) break;
-
-                        // To match the JS exactly, we must NOT break on double vowels 
-                        // because the JS strict equality (boolean === string) always fails.
-                        // if (IsVowel(that) && that == next.Value) break;
-
-                        // JS: if (v && vowel(name[c + 2])) break;
-                        if (v == 1 && (c + 2 < name.Length) && IsVowel(name[c + 2])) break;
-                    }
-
-                    if (!chain.ContainsKey(prev)) chain[prev] = new List<string>();
-                    chain[prev].Add(syllable);
-
-                    if (isArabic)
-                    {
-                        Console.WriteLine($"CS > Word: \"{name}\" | Prev: \"{prev}\" | Syllable: \"{syllable}\"");
-                    }
-
-                    i += (syllable.Length > 0) ? syllable.Length : 1;
-                }
-            }
-            return chain;
-        }
-
-        #region Specific Names
-
-        internal static int GetRandomBaseId(IRandom rng)
-        {
-            return rng.Next(_nameBases.Count);
+            return rng.Next(NameBaseCount);
         }
 
         /// <summary>
@@ -260,12 +257,16 @@ namespace MapGen.Core.Modules
         /// </summary>
         public static string GetBaseShort(IRandom rng, int baseId)
         {
-            var nameBase = _nameBases.First(b => b.Index == baseId);
+            var nameBase = GetNameBase(baseId);
             int min = nameBase.Min - 1;
             int max = Math.Max(nameBase.Max - 2, min);
 
             return GetBase(rng, baseId, min, max, nameBase.Duplication);
         }
+
+        #endregion
+
+        #region Culture Name
 
         /// <summary>
         /// High-level wrapper for culture generation.
