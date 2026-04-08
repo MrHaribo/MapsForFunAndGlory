@@ -12,6 +12,8 @@ namespace MapGen.Render.Skia.WinUI
 {
     internal class MapGenRenderer
     {
+        #region Heightmap
+
         public static void RenderGridHeightmap(SKCanvas canvas, MapData map)
         {
             using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
@@ -130,6 +132,10 @@ namespace MapGen.Render.Skia.WinUI
             }
         }
 
+        #endregion
+
+        #region Climate
+
         public static void RenderBiomes(SKCanvas canvas, MapData map, MapPack pack)
         {
             if (pack?.Cells == null || map?.Cells == null) return;
@@ -211,6 +217,10 @@ namespace MapGen.Render.Skia.WinUI
             }
         }
 
+        #endregion
+
+        #region Cultures
+
         public static void RenderCultures(SKCanvas canvas, MapPack pack)
         {
             // We'll reuse the paint object for performance, just changing the color
@@ -243,6 +253,77 @@ namespace MapGen.Render.Skia.WinUI
                 canvas.DrawPath(path, culturePaint);
             }
         }
+
+        public static void RenderCultureLabels(SKCanvas canvas, MapPack pack)
+        {
+            // 1. Setup Fonts
+            using var tfName = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold);
+            using var fontName = new SKFont(tfName, 14);
+
+            // Try to get a system emoji font (Windows: Segoe UI Emoji, Mac: Apple Color Emoji, Linux: Noto Color Emoji)
+            using var tfEmoji = SKTypeface.FromFamilyName("Segoe UI Emoji")
+                             ?? SKTypeface.FromFamilyName("Apple Color Emoji")
+                             ?? SKTypeface.FromFamilyName("Noto Color Emoji")
+                             ?? tfName; // Fallback to name font if no emoji font found
+
+            using var fontEmoji = new SKFont(tfEmoji, 14);
+
+            using var textPaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+            using var haloPaint = new SKPaint { Color = SKColors.Black, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3 };
+            using var markPaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+
+            foreach (var culture in pack.Cultures)
+            {
+                if (culture.Id == 0) continue;
+
+                var centerCell = pack.Cells[culture.CenterCell];
+                float x = (float)centerCell.Point.X;
+                float y = (float)centerCell.Point.Y;
+
+                canvas.DrawCircle(x, y, 3, markPaint);
+
+                string symbol = GetCultureSymbol(culture.Type);
+                string name = culture.Name;
+                string spacer = " ";
+
+                // 3. Measure parts to center the whole block
+                float symbolWidth = fontEmoji.MeasureText(symbol, textPaint);
+                float spacerWidth = fontName.MeasureText(spacer, textPaint);
+                float nameWidth = fontName.MeasureText(name, textPaint);
+                float totalWidth = symbolWidth + spacerWidth + nameWidth;
+
+                float startX = x - (totalWidth / 2);
+                float posY = y + 20;
+
+                // 4. Draw Symbol (Emoji Font)
+                canvas.DrawText(symbol, startX, posY, fontEmoji, haloPaint);
+                canvas.DrawText(symbol, startX, posY, fontEmoji, textPaint);
+
+                // 5. Draw Name (Standard Font)
+                float nameX = startX + symbolWidth + spacerWidth;
+                canvas.DrawText(name, nameX, posY, fontName, haloPaint);
+                canvas.DrawText(name, nameX, posY, fontName, textPaint);
+            }
+        }
+
+        private static string GetCultureSymbol(CultureType type)
+        {
+            return type switch
+            {
+                CultureType.Nomadic => "⛺", // Tent
+                CultureType.Highland => "🏔️", // Mountain
+                CultureType.Lake => "💧", // Droplet
+                CultureType.Naval => "⚓", // Anchor
+                CultureType.River => "🛶", // Canoe
+                CultureType.Hunting => "🏹", // Bow and Arrow
+                CultureType.Generic => "📜", // Scroll
+                _ => "🚩"  // Default flag
+            };
+        }
+
+        #endregion
+
+        #region Rivers
 
         public static void RenderRivers(SKCanvas canvas, MapPack pack)
         {
@@ -316,6 +397,37 @@ namespace MapGen.Render.Skia.WinUI
             }
         }
 
+        public static SKPath CreateRiverPath(List<MapPoint> polygonPoints)
+        {
+            var path = new SKPath();
+            if (polygonPoints.Count > 0)
+            {
+                path.MoveTo((float)polygonPoints[0].X, (float)polygonPoints[0].Y);
+
+                for (int i = 1; i < polygonPoints.Count - 1; i++)
+                {
+                    var current = polygonPoints[i];
+                    var next = polygonPoints[i + 1];
+
+                    // Calculate midpoint between current and next
+                    float midX = (float)(current.X + next.X) / 2;
+                    float midY = (float)(current.Y + next.Y) / 2;
+
+                    // Use current point as control point, and midpoint as the end
+                    path.QuadTo((float)current.X, (float)current.Y, midX, midY);
+                }
+
+                path.LineTo((float)polygonPoints[^1].X, (float)polygonPoints[^1].Y);
+                path.Close();
+            }
+
+            return path;
+        }
+
+        #endregion
+
+        #region Shoreline
+
         public static void RenderShoreline(SKCanvas canvas, MapPack pack)
         {
             if (pack?.Features == null) return;
@@ -366,6 +478,10 @@ namespace MapGen.Render.Skia.WinUI
             }
         }
 
+        #endregion
+
+        #region Helpers
+
         public static SKColor GetTrafficLightColor(float progress)
         {
             if (progress < 0.5f) // Green to Yellow
@@ -390,31 +506,6 @@ namespace MapGen.Render.Skia.WinUI
             return path;
         }
 
-        public static SKPath CreateRiverPath(List<MapPoint> polygonPoints)
-        {
-            var path = new SKPath();
-            if (polygonPoints.Count > 0)
-            {
-                path.MoveTo((float)polygonPoints[0].X, (float)polygonPoints[0].Y);
-
-                for (int i = 1; i < polygonPoints.Count - 1; i++)
-                {
-                    var current = polygonPoints[i];
-                    var next = polygonPoints[i + 1];
-
-                    // Calculate midpoint between current and next
-                    float midX = (float)(current.X + next.X) / 2;
-                    float midY = (float)(current.Y + next.Y) / 2;
-
-                    // Use current point as control point, and midpoint as the end
-                    path.QuadTo((float)current.X, (float)current.Y, midX, midY);
-                }
-
-                path.LineTo((float)polygonPoints[^1].X, (float)polygonPoints[^1].Y);
-                path.Close();
-            }
-
-            return path;
-        }
+        #endregion
     }
 }

@@ -168,7 +168,10 @@ namespace MapGen.Render.Skia.WinUI
                 MapGenRenderer.RenderRivers(canvas, _pack);
 
             if (ViewModel.ShowCultures)
+            {
                 MapGenRenderer.RenderCultures(canvas, _pack);
+                MapGenRenderer.RenderCultureLabels(canvas, _pack);
+            }
 
 
             //// 2. Start a new layer for the clipped rivers
