@@ -38,7 +38,7 @@ namespace MapGen.Core.Modules
                 count = Math.Max(1, populated.Count / 50);
                 if (populated.Count < 25) // Extreme climate case
                 {
-                    pack.Cultures = new List<MapCulture> 
+                    pack.Cultures = new List<MapCulture>
                     {
                         new MapCulture { Name = "Wildlands", Id = 0, BaseNameId = 1, Shield = "round" }
                     };
@@ -46,7 +46,7 @@ namespace MapGen.Core.Modules
                     return;
                 }
             }
-            
+
             // 3. Selection & Preparation
             var selectedTemplates = selectCultures(count);
             var finalCultures = new List<MapCulture>();
@@ -78,7 +78,7 @@ namespace MapGen.Core.Modules
 
                 var code = LanguageUtils.Abbreviate(template.Name, codes);
                 codes.Add(code);
-                
+
                 // TODO: Random shield
 
                 var mc = new MapCulture
@@ -96,7 +96,7 @@ namespace MapGen.Core.Modules
                 };
 
 
-                
+
                 finalCultures.Add(mc);
                 cultureIds[centerId] = (ushort)newId;
             }
@@ -267,14 +267,14 @@ namespace MapGen.Core.Modules
 
                 // JS: rn(((Math.random() * sizeVariety) / 2 + 1) * base, 1)
                 // rng.NextDouble() provides the Math.random() parity
-                double randomFactor = (grid.Rng.Next() * MapConstants.CULTUE_EXPANSIONISM_SIZE_VARIETY / 2) + 1;
+                double randomFactor = (grid.Rng.Next() * MapConstants.CULTURE_EXPANSIONISM_SIZE_VARIETY / 2) + 1;
                 double result = randomFactor * baseExpansion;
 
                 // Rounding to 1 decimal place to match the JS 'rn(val, 1)'
                 return NumberUtils.Round(result, 1);
             }
 
-            
+
         }
 
         #endregion
@@ -522,6 +522,190 @@ namespace MapGen.Core.Modules
                 "moriaOrc", "easterling", "militia", "viking"
             };
             return rng.Ra(shields);
+        }
+
+        #endregion
+
+        #region Expand Cultures
+
+        public static void ExpandCultures(MapPack pack)
+        {
+            var cells = pack.Cells;
+            var cultures = pack.Cultures;
+            var biomesData = BiomModule.GetDefaultBiomes();
+
+            // neutralRate is typically 1 unless modified in the UI
+            double neutralRate = MapConstants.CULTURE_NATURAL_EXPAND_RATE;
+            double maxExpansionCost = cells.Length * 0.6 * neutralRate;
+
+            var queue = new MinHeap();
+            // In JS, the 'cost' array is sparse. We use 0.0 to represent 'undefined' 
+            // because path costs in this algorithm are always > 0.
+            double[] costs = new double[cells.Length];
+
+            // 1. Reset culture assignments (Uint16Array in JS initializes to 0)
+            for (int i = 0; i < cells.Length; i++)
+            {
+                cells[i].CultureId = 0;
+            }
+
+            // 2. Seed the Queue
+            foreach (var culture in cultures)
+            {
+                // JS: if (!culture.i || culture.removed || culture.lock) continue;
+                if (culture.Id == 0) continue;
+
+                // JS: queue.push({cellId: culture.center, cultureId: culture.i, priority: 0}, 0);
+                // Note: We DO NOT set costs[center] or cells[center].CultureId here 
+                // to stay bitwise-identical to the provided JS snippet.
+                queue.Enqueue(culture.CenterCell, culture.Id, 0.0);
+            }
+
+            // 3. Local Function Closures
+            double GetBiomeCost(int c, int biome, CultureType type)
+            {
+                int centerCell = cultures[c].CenterCell;
+                int centerBiome = cells[centerCell].BiomeId;
+                double baseCost = biomesData[biome].MovementCost;
+
+                if (centerBiome == biome) return 10;
+                if (type == CultureType.Hunting) return baseCost * 5;
+                if (type == CultureType.Nomadic && biome > 4 && biome < 10) return baseCost * 10;
+                return baseCost * 2;
+            }
+
+            double GetHeightCost(int i, int h, CultureType type)
+            {
+                var f = pack.GetFeature(cells[i].FeatureId);
+                double a = cells[i].Area;
+
+                if (type == CultureType.Lake && f.Type == FeatureType.Lake) return 10;
+                if (type == CultureType.Naval && h < 20) return a * 2;
+                if (type == CultureType.Nomadic && h < 20) return a * 50;
+                if (h < 20) return a * 6;
+                if (type == CultureType.Highland && h < 44) return 3000;
+                if (type == CultureType.Highland && h < 62) return 200;
+                if (type == CultureType.Highland) return 0;
+                if (h >= 67) return 200;
+                if (h >= 44) return 30;
+                return 0;
+            }
+
+            double GetRiverCost(int riverId, int cellId, CultureType type)
+            {
+                if (type == CultureType.River) return riverId != 0 ? 0 : 100;
+                if (riverId == 0) return 0;
+                // minmax parity
+                return Math.Clamp(cells[cellId].Flux / 10.0, 20.0, 100.0);
+            }
+
+            double GetTypeCost(int t, CultureType type)
+            {
+                if (t == 1) return (type == CultureType.Naval || type == CultureType.Lake) ? 0 : (type == CultureType.Nomadic ? 60 : 20);
+                if (t == 2) return (type == CultureType.Naval || type == CultureType.Nomadic) ? 30 : 0;
+                if (t != -1) return (type == CultureType.Naval || type == CultureType.Lake) ? 100 : 0;
+                return 0;
+            }
+
+            // 4. Main Expansion Loop
+            while (queue.Count > 0)
+            {
+                var (cellId, cultureId, priority) = queue.Dequeue();
+
+                // Parity: JS processes every pop. No "priority > costs[cellId]" check here.
+
+                var culture = cultures[cultureId];
+                var type = culture.Type;
+                double expansionism = culture.Expansionism;
+
+                foreach (int neibCellId in cells[cellId].NeighborCells)
+                {
+                    // Calculate Costs
+                    int neibBiome = cells[neibCellId].BiomeId;
+                    double biomeCost = GetBiomeCost(cultureId, neibBiome, type);
+
+                    // JS Tautology: biome === cells.biome[neibCellId] is always true here.
+                    double biomeChangeCost = 0;
+
+                    double heightCost = GetHeightCost(neibCellId, cells[neibCellId].Height, type);
+                    double riverCost = GetRiverCost(cells[neibCellId].RiverId, neibCellId, type);
+                    double typeCost = GetTypeCost(cells[neibCellId].Distance, type);
+
+                    double cellCost = (biomeCost + biomeChangeCost + heightCost + riverCost + typeCost) / expansionism;
+                    double totalCost = priority + cellCost;
+
+                    if (totalCost > maxExpansionCost) continue;
+
+                    // JS: if (!cost[neibCellId] || totalCost < cost[neibCellId])
+                    if (costs[neibCellId] == 0 || totalCost < costs[neibCellId])
+                    {
+                        // JS: if (cells.pop[neibCellId] > 0) cells.culture[neibCellId] = cultureId;
+                        if (cells[neibCellId].Population > 0)
+                        {
+                            cells[neibCellId].CultureId = cultureId;
+                        }
+
+                        costs[neibCellId] = totalCost;
+                        queue.Enqueue(neibCellId, cultureId, totalCost);
+                    }
+                }
+            }
+        }
+
+
+
+        #endregion
+
+        #region MinHeap
+
+        private class MinHeap
+        {
+            private readonly List<(int cellId, int cultureId, double priority)> _nodes = new List<(int, int, double)>();
+
+            public int Count => _nodes.Count;
+
+            public void Enqueue(int cellId, int cultureId, double priority)
+            {
+                _nodes.Add((cellId, cultureId, priority));
+                int i = _nodes.Count - 1;
+                while (i > 0)
+                {
+                    int parent = (i - 1) / 2;
+                    if (_nodes[i].priority >= _nodes[parent].priority) break;
+                    Swap(i, parent);
+                    i = parent;
+                }
+            }
+
+            public (int cellId, int cultureId, double priority) Dequeue()
+            {
+                var root = _nodes[0];
+                _nodes[0] = _nodes[_nodes.Count - 1];
+                _nodes.RemoveAt(_nodes.Count - 1);
+
+                int i = 0;
+                while (true)
+                {
+                    int left = 2 * i + 1;
+                    int right = 2 * i + 2;
+                    int smallest = i;
+
+                    if (left < _nodes.Count && _nodes[left].priority < _nodes[smallest].priority) smallest = left;
+                    if (right < _nodes.Count && _nodes[right].priority < _nodes[smallest].priority) smallest = right;
+
+                    if (smallest == i) break;
+                    Swap(i, smallest);
+                    i = smallest;
+                }
+                return root;
+            }
+
+            private void Swap(int a, int b)
+            {
+                var temp = _nodes[a];
+                _nodes[a] = _nodes[b];
+                _nodes[b] = temp;
+            }
         }
 
         #endregion

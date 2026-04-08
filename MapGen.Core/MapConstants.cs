@@ -77,8 +77,9 @@
         public const int ELEVATION_OPTIMUM = 50; // The "neutral" height for population
 
         // Culture Constants
-        public const float CULTUE_EXPANSIONISM_SIZE_VARIETY = 4.3f;
+        public const float CULTURE_EXPANSIONISM_SIZE_VARIETY = 4.3f;
         public const int CULTURE_PLACE_CENTER_MAX_ATTEMPTS = 100;
         public const int CULTURE_SELECT_MAX_ATTEMPTS = 200;
+        public const double CULTURE_NATURAL_EXPAND_RATE = 1.0;
     }
 }

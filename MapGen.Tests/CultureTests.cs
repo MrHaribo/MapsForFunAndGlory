@@ -30,6 +30,39 @@ namespace MapGen.Tests
         public string Shield { get; set; }
     }
 
+    public class RegressionExpansionData
+    {
+        [JsonProperty("seed")]
+        public string Seed { get; set; }
+
+        [JsonProperty("cellsCount")]
+        public int CellsCount { get; set; }
+
+        [JsonProperty("cultureMap")]
+        public int[] CultureMap { get; set; }
+
+        [JsonProperty("cultures")]
+        public List<CultureMetadata> Cultures { get; set; }
+    }
+
+    public class CultureMetadata
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("center")]
+        public int Center { get; set; }
+
+        [JsonProperty("expansionism")]
+        public double Expansionism { get; set; }
+    }
+
     public class CultureTests
     {
         [Theory]
@@ -108,6 +141,53 @@ namespace MapGen.Tests
                 {
                     Assert.Equal(expected.Cells_Culture[i], pack.Cells[i].CultureId);
                 }
+            }
+        }
+
+        [Fact]
+        public void TestCultureExpansion()
+        {
+            // 1. Load Expected Data
+            var json = File.ReadAllText($"data/regression_cultures_expansion.json");
+            var expected = JsonConvert.DeserializeObject<RegressionExpansionData>(json);
+
+            // 2. Setup (Full Pipeline)
+            var mapData = TestMapData.TestData;
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
+
+            var pack = PackModule.ReGraph(mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack, mapData, allowErosion: true);
+            BiomModule.Define(pack, mapData);
+            FeatureModule.DefineGroups(pack);
+            FeatureModule.RankCells(pack);
+
+            // Reset RNG to the exact state expected before Culture Generation
+            mapData.Rng.Init(mapData.Options.Seed);
+
+            // 3. Execution
+            // Note: Use the exact count from your JS dump (e.g., 9)
+            CultureModule.Generate(pack, mapData, 9);
+            CultureModule.ExpandCultures(pack);
+
+            // 4. Assertions
+            Assert.Equal(expected.Cultures.Count, pack.Cultures.Count);
+
+            Assert.Equal(expected.CellsCount, pack.Cells.Length);
+
+            for (int i = 0; i < pack.Cells.Length; i++)
+            {
+                int expectedCulture = expected.CultureMap[i];
+                int actualCulture = pack.Cells[i].CultureId;
+
+                Assert.Equal(expectedCulture, actualCulture);
             }
         }
     }
