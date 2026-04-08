@@ -32,11 +32,14 @@ namespace MapGen.Tests
 
     public class CultureTests
     {
-        [Fact]
-        public void TestCultureGeneration()
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        public void TestCultureGeneration(int rngOffset)
         {
             // 1. Load Expected Data
-            var json = File.ReadAllText("data/regression_cultures.json");
+            var json = File.ReadAllText($"data/regression_cultures_{rngOffset}.json");
             var expected = JsonConvert.DeserializeObject<RegressionCulturesData>(json);
 
             // 2. Setup (Full Pipeline)
@@ -58,6 +61,9 @@ namespace MapGen.Tests
             FeatureModule.RankCells(pack);
 
             mapData.Rng.Init(mapData.Options.Seed);
+
+            for (int i = 0; i < rngOffset; i++)
+                mapData.Rng.Next();
 
             // 3. Execution
             // Note: Use a fixed seed in your IRandom to match the JS dump!
