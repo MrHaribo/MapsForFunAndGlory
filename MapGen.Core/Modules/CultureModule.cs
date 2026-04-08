@@ -68,34 +68,19 @@ namespace MapGen.Core.Modules
                 // JS: const sortingFn = c.sort ? c.sort : i => cells.s[i];
                 var sortingFn = template.SortingFn ?? ((int idx) => (double)cells[idx].Suitability);
 
-                if (i == 4)
-                {
-                    System.Diagnostics.Debugger.Break();
-                }
-
-                //var beginRnd = grid.Rng.Next();
-
-
                 // Pass the actual tree reference so it can be searched
                 int centerId = placeCenter(sortingFn, centers, template.Name);
-                //var centerRnd = grid.Rng.Next();
-
                 var centerPoint = pack.Cells[centerId].Point;
                 centers.Add(new QuadPoint { X = centerPoint.X, Y = centerPoint.Y, DataIndex = centerId });
 
                 var type = defineCultureType(centerId);
-                //var defineCultureRnd = grid.Rng.Next();
 
                 var expansionism = defineCultureExpansionism(type);
-                //var expansionismRnd = grid.Rng.Next();
 
                 var code = LanguageUtils.Abbreviate(template.Name, codes);
                 codes.Add(code);
                 
-                //var abbreviateRnd = grid.Rng.Next();
-
-                // Random shield
-                //var shieldRnd = grid.Rng.Next();
+                // TODO: Random shield
 
                 var mc = new MapCulture
                 {
@@ -240,8 +225,6 @@ namespace MapGen.Core.Modules
                 // We must mirror the JS: (A || B || C) return "Naval"
                 var cellFeature = pack.GetFeature(cell.FeatureId);
 
-                //var beforeRnd = grid.Rng.Next();
-
                 // JS Check 1: (cells.harbor[i] && f.type !== "lake" && P(0.1))
                 if (cell.Harbor > 0 && havenFeature.Type != FeatureType.Lake)
                 {
@@ -260,8 +243,6 @@ namespace MapGen.Core.Modules
                 {
                     if (grid.Rng.P(0.4)) return CultureType.Naval;
                 }
-
-                //var afterRnd = grid.Rng.Next();
 
                 // 5. River (No RNG consumed)
                 if (cell.RiverId != 0 && cell.Flux > 100)

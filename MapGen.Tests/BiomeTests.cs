@@ -77,46 +77,46 @@ namespace MapGen.Tests
             }
         }
 
-        [Fact]
-        public void DumpBiomeDiagnostics()
-        {
-            // 1. Setup (Standard Pipeline)
-            var mapData = TestMapData.TestData;
-            GridGenerator.Generate(mapData);
-            VoronoiGenerator.CalculateVoronoi(mapData);
-            HeightmapGenerator.Generate(mapData);
-            FeatureModule.MarkupGrid(mapData);
-            GlobeModule.DefineMapSize(mapData);
-            GlobeModule.CalculateMapCoordinates(mapData);
-            ClimateModule.CalculateTemperatures(mapData);
-            ClimateModule.GeneratePrecipitation(mapData);
+        //[Fact]
+        //public void DumpBiomeDiagnostics()
+        //{
+        //    // 1. Setup (Standard Pipeline)
+        //    var mapData = TestMapData.TestData;
+        //    GridGenerator.Generate(mapData);
+        //    VoronoiGenerator.CalculateVoronoi(mapData);
+        //    HeightmapGenerator.Generate(mapData);
+        //    FeatureModule.MarkupGrid(mapData);
+        //    GlobeModule.DefineMapSize(mapData);
+        //    GlobeModule.CalculateMapCoordinates(mapData);
+        //    ClimateModule.CalculateTemperatures(mapData);
+        //    ClimateModule.GeneratePrecipitation(mapData);
 
-            var pack = PackModule.ReGraph(mapData);
-            FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, mapData, allowErosion: true);
+        //    var pack = PackModule.ReGraph(mapData);
+        //    FeatureModule.MarkupPack(pack);
+        //    RiverModule.Generate(pack, mapData, allowErosion: true);
 
-            // 2. Run Module
-            BiomModule.Define(pack, mapData);
+        //    // 2. Run Module
+        //    BiomModule.Define(pack, mapData);
 
-            // 3. Create Dynamic Dump
-            var diagnostics = new
-            {
-                cellCount = pack.Cells.Length,
-                cells = pack.Cells.Select(c => new
-                {
-                    i = c.Index,
-                    b = c.BiomeId,
-                    t = mapData.Cells[c.GridId].Temp,
-                    p = mapData.Cells[c.GridId].Prec,
-                    // Capture intermediate moisture calculation
-                    m = c.Height < 20 ? (int)0 : (int)BiomModule.CalculateMoisture(pack, mapData, c.Index),
-                    //h = c.H,
-                    //r = c.RiverId != 0
-                }).ToList()
-            };
+        //    // 3. Create Dynamic Dump
+        //    var diagnostics = new
+        //    {
+        //        cellCount = pack.Cells.Length,
+        //        cells = pack.Cells.Select(c => new
+        //        {
+        //            i = c.Index,
+        //            b = c.BiomeId,
+        //            t = mapData.Cells[c.GridId].Temp,
+        //            p = mapData.Cells[c.GridId].Prec,
+        //            // Capture intermediate moisture calculation
+        //            m = c.Height < 20 ? (int)0 : (int)BiomModule.CalculateMoisture(pack, mapData, c.Index),
+        //            //h = c.H,
+        //            //r = c.RiverId != 0
+        //        }).ToList()
+        //    };
 
-            string json = JsonConvert.SerializeObject(diagnostics, Formatting.Indented);
-            File.WriteAllText("D:\\downloads\\diagnostics_biomes.json", json);
-        }
+        //    string json = JsonConvert.SerializeObject(diagnostics, Formatting.Indented);
+        //    File.WriteAllText("D:\\downloads\\diagnostics_biomes.json", json);
+        //}
     }
 }
