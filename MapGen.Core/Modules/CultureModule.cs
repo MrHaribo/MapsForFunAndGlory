@@ -74,7 +74,6 @@ namespace MapGen.Core.Modules
                 centers.Add(new QuadPoint { X = centerPoint.X, Y = centerPoint.Y, DataIndex = centerId });
 
                 var type = defineCultureType(centerId);
-
                 var expansionism = defineCultureExpansionism(type);
 
                 var code = LanguageUtils.Abbreviate(template.Name, codes);
@@ -181,8 +180,6 @@ namespace MapGen.Core.Modules
                     int biasedIndex = grid.Rng.Biased(0, max, 5);
                     cellId = sorted[Math.Clamp(biasedIndex, 0, sorted.Count - 1)];
 
-                    Console.WriteLine($"Seatch cell {cellId}");
-
                     spacing *= 0.9;
 
                     var pos = cells[cellId].Point;
@@ -197,7 +194,6 @@ namespace MapGen.Core.Modules
                         break;
                     }
                 }
-                Console.WriteLine($"Culture {name} found at attempt {attempts} spacing {spacing}");
                 return cellId;
             }
 
@@ -238,7 +234,7 @@ namespace MapGen.Core.Modules
                 }
 
                 // JS Check 3: (pack.features[cells.f[i]].group === "isle" && P(0.4))
-                if (cellFeature.Group == FeatureGroup.Island)
+                if (cellFeature.Group == FeatureGroup.Isle)
                 {
                     if (grid.Rng.P(0.4)) return CultureType.Naval;
                 }

@@ -59,11 +59,6 @@ namespace MapGen.Tests
 
             mapData.Rng.Init(mapData.Options.Seed);
 
-            var a = mapData.Rng.Next();
-            var b = mapData.Rng.Next();
-            var c = mapData.Rng.Next();
-
-
             // 3. Execution
             // Note: Use a fixed seed in your IRandom to match the JS dump!
             CultureModule.Generate(pack, mapData, 9);
@@ -94,7 +89,7 @@ namespace MapGen.Tests
                     Assert.Equal(exp.Type.ToLower(), act.Type.ToString().ToLower());
 
                 // Scaling Logic
-                Assert.Equal(exp.Expansionism, act.Expansionism, 1); // 1 decimal precision
+                Assert.Equal(exp.Expansionism, act.Expansionism); // 1 decimal precision
                 Assert.Equal(exp.Shield, act.Shield);
             }
 
