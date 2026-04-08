@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 
 namespace MapGen.Core.Modules
 {
@@ -45,20 +46,18 @@ namespace MapGen.Core.Modules
                     return;
                 }
             }
-            var x = grid.Rng.Next();
-
+            
             // 3. Selection & Preparation
             var selectedTemplates = selectCultures(count);
-
-
             var finalCultures = new List<MapCulture>();
             var codes = new List<string>();
 
             // JS: const centers = d3.quadtree();
             // Create an empty quadtree to track centers as we place them
             var quadDatas = new List<QuadPoint>();
-            var tree = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
+            var centers = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
             var colors = ColorUtil.GetColors(count, grid.Rng);
+
 
             // 4. Main Generation Loop
             for (int i = 0; i < selectedTemplates.Count; i++)
@@ -69,14 +68,34 @@ namespace MapGen.Core.Modules
                 // JS: const sortingFn = c.sort ? c.sort : i => cells.s[i];
                 var sortingFn = template.SortingFn ?? ((int idx) => (double)cells[idx].Suitability);
 
-                // Pass the actual tree reference so it can be searched
-                int center = placeCenter(sortingFn, tree);
+                if (i == 4)
+                {
+                    System.Diagnostics.Debugger.Break();
+                }
 
-                var type = defineCultureType(center);
+                //var beginRnd = grid.Rng.Next();
+
+
+                // Pass the actual tree reference so it can be searched
+                int centerId = placeCenter(sortingFn, centers, template.Name);
+                //var centerRnd = grid.Rng.Next();
+
+                var centerPoint = pack.Cells[centerId].Point;
+                centers.Add(new QuadPoint { X = centerPoint.X, Y = centerPoint.Y, DataIndex = centerId });
+
+                var type = defineCultureType(centerId);
+                //var defineCultureRnd = grid.Rng.Next();
+
                 var expansionism = defineCultureExpansionism(type);
+                //var expansionismRnd = grid.Rng.Next();
 
                 var code = LanguageUtils.Abbreviate(template.Name, codes);
                 codes.Add(code);
+                
+                //var abbreviateRnd = grid.Rng.Next();
+
+                // Random shield
+                //var shieldRnd = grid.Rng.Next();
 
                 var mc = new MapCulture
                 {
@@ -84,16 +103,18 @@ namespace MapGen.Core.Modules
                     Code = code,
                     Name = template.Name,
                     BaseNameId = template.BaseNameId,
-                    CenterCell = center,
+                    CenterCell = centerId,
                     Shield = template.Shield,
-                    Color = "getColors(i)", // Placeholder
+                    Color = colors[i],
                     Type = type,
                     Expansionism = expansionism,
                     // Expansionism, Code, etc will be added in the next step
                 };
+
+
                 
                 finalCultures.Add(mc);
-                cultureIds[center] = (ushort)newId;
+                cultureIds[centerId] = (ushort)newId;
             }
 
             // 5. Finalize Wildlands (JS: cultures.unshift)
@@ -106,7 +127,17 @@ namespace MapGen.Core.Modules
             });
 
             pack.Cultures = finalCultures;
-            // pack.Cells.Culture = cultureIds; (Update the cell-to-culture map)
+
+            // 2. Map the centers to the cells
+            // Note: We assume cultureId 0 is "Wildlands/None", 
+            // so we use the Id from our newly created cultures.
+            foreach (var culture in pack.Cultures)
+            {
+                if (culture.Id == 0) continue; // Skip wildlands template if present
+
+                // Assign the CultureId to the specific cell acting as the center
+                pack.Cells[culture.CenterCell].CultureId = culture.Id;
+            }
 
             // --- LOCAL FUNCTIONS (Placeholders) ---
 
@@ -144,7 +175,7 @@ namespace MapGen.Core.Modules
                 return selected;
             }
 
-            int placeCenter(Func<int, double> sortingFn, QuadTree<QuadPoint, QuadPointNode> tree)
+            int placeCenter(Func<int, double> sortingFn, QuadTree<QuadPoint, QuadPointNode> centers, string name)
             {
 
                 double spacing = (pack.Width + pack.Height) / 2.0 / count;
@@ -159,11 +190,14 @@ namespace MapGen.Core.Modules
                 int max = (int)Math.Floor(sorted.Count / 2.0);
 
                 int cellId = 0;
+                int attempts = 0;
                 for (int i = 0; i < MAX_ATTEMPTS; i++)
                 {
-
+                    attempts++;
                     int biasedIndex = grid.Rng.Biased(0, max, 5);
                     cellId = sorted[Math.Clamp(biasedIndex, 0, sorted.Count - 1)];
+
+                    Console.WriteLine($"Seatch cell {cellId}");
 
                     spacing *= 0.9;
 
@@ -171,7 +205,7 @@ namespace MapGen.Core.Modules
 
                     // JS: !centers.find(x, y, spacing)
                     // Find if ANY point exists within 'spacing'
-                    var existingCenterInRange = tree.Find(pos.X, pos.Y, spacing);
+                    var existingCenterInRange = centers.Find(pos.X, pos.Y, spacing);
 
                     // If no center is found within radius, and cell isn't already a culture center
                     if (existingCenterInRange == null && cultureIds[cellId] == 0)
@@ -179,7 +213,7 @@ namespace MapGen.Core.Modules
                         break;
                     }
                 }
-
+                Console.WriteLine($"Culture {name} found at attempt {attempts} spacing {spacing}");
                 return cellId;
             }
 
@@ -187,45 +221,58 @@ namespace MapGen.Core.Modules
             {
                 var cell = pack.Cells[i];
 
-                // 1. Nomadic: low height (<70) and specific biomes (1, 2, 4)
+                // 1. Nomadic (No RNG consumed)
                 int[] nomadicBiomes = { 1, 2, 4 };
                 if (cell.Height < 70 && nomadicBiomes.Contains(cell.BiomeId))
                     return CultureType.Nomadic;
 
-                // 2. Highland: high elevation (>50)
+                // 2. Highland (No RNG consumed)
                 if (cell.Height > 50)
                     return CultureType.Highland;
 
-                // 3. Lake: Check the feature at the cell's 'haven' (nearest water)
+                // 3. Lake (No RNG consumed)
                 var havenCell = pack.Cells[cell.Haven];
                 var havenFeature = pack.GetFeature(havenCell.FeatureId);
-
                 if (havenFeature.Type == FeatureType.Lake && havenFeature.CellsCount > 5)
                     return CultureType.Lake;
 
-                // 4. Naval: Coastal logic with probability checks
-                // JS: pack.features[cells.f[i]] is the feature the cell itself belongs to
+                // 4. Naval (RNG CONSULPTION ZONE)
+                // We must mirror the JS: (A || B || C) return "Naval"
                 var cellFeature = pack.GetFeature(cell.FeatureId);
 
-                bool isNaval = (cell.Harbor > 0 && havenFeature.Type != FeatureType.Lake && grid.Rng.P(0.1)) ||
-                               (cell.Harbor > 0 && grid.Rng.P(0.6)) ||
-                               (cellFeature.Group == FeatureGroup.Island && grid.Rng.P(0.4));
+                //var beforeRnd = grid.Rng.Next();
 
-                if (isNaval) return CultureType.Naval;
+                // JS Check 1: (cells.harbor[i] && f.type !== "lake" && P(0.1))
+                if (cell.Harbor > 0 && havenFeature.Type != FeatureType.Lake)
+                {
+                    if (grid.Rng.P(0.1)) return CultureType.Naval;
+                }
 
-                // 5. River: Has a river ID and flux > 100
+                // JS Check 2: (cells.harbor[i] === 1 && P(0.6))
+                // Note: In Azgaar JS, harbor is often 1 (on coast) or 0. 
+                if (cell.Harbor == 1)
+                {
+                    if (grid.Rng.P(0.6)) return CultureType.Naval;
+                }
+
+                // JS Check 3: (pack.features[cells.f[i]].group === "isle" && P(0.4))
+                if (cellFeature.Group == FeatureGroup.Island)
+                {
+                    if (grid.Rng.P(0.4)) return CultureType.Naval;
+                }
+
+                //var afterRnd = grid.Rng.Next();
+
+                // 5. River (No RNG consumed)
                 if (cell.RiverId != 0 && cell.Flux > 100)
                     return CultureType.River;
 
-                // 6. Hunting: Temperature > 2 and specific biomes
+                // 6. Hunting: Distance from coast > 2 and specific biomes
                 int[] huntingBiomes = { 3, 7, 8, 9, 10, 12 };
-                // Assuming temperature comes from the grid cell associated with the pack cell
-                double temp = grid.Cells[cell.GridId].Temp;
-
-                if (temp > 2 && huntingBiomes.Contains(cell.BiomeId))
+                double distanceToCoast = pack.Cells[i].Distance;
+                if (distanceToCoast > 2 && huntingBiomes.Contains(cell.BiomeId))
                     return CultureType.Hunting;
 
-                // 7. Default
                 return CultureType.Generic;
             }
 
