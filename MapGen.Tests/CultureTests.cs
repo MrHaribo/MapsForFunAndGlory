@@ -83,6 +83,7 @@ namespace MapGen.Tests
                 Assert.Equal(exp.Name, act.Name);
                 Assert.Equal(exp.Code, act.Code);
                 Assert.Equal(exp.Base, act.BaseNameId);
+                Assert.Equal(exp.Color, act.Color);
 
                 // Geographical Logic Result
                 Assert.Equal(exp.Center, act.CenterCell);

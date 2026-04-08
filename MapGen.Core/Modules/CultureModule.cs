@@ -164,7 +164,6 @@ namespace MapGen.Core.Modules
             {
 
                 double spacing = (pack.Width + pack.Height) / 2.0 / count;
-                const int MAX_ATTEMPTS = 100;
 
                 // Use a stable sort to match JS
                 var sorted = populated
@@ -176,7 +175,7 @@ namespace MapGen.Core.Modules
 
                 int cellId = 0;
                 int attempts = 0;
-                for (int i = 0; i < MAX_ATTEMPTS; i++)
+                for (int i = 0; i < MapConstants.CULTURE_PLACE_CENTER_MAX_ATTEMPTS; i++)
                 {
                     attempts++;
                     int biasedIndex = grid.Rng.Biased(0, max, 5);
