@@ -559,6 +559,10 @@ namespace MapGen.Core.Modules
                 // Note: We DO NOT set costs[center] or cells[center].CultureId here 
                 // to stay bitwise-identical to the provided JS snippet.
                 queue.Enqueue(culture.CenterCell, culture.Id, 0.0);
+
+                // OPTIMIZATION: Explicitly set the cost of the center to a tiny non-zero value.
+                // This prevents the expansion from "doubling back" to the start.
+                //costs[culture.CenterCell] = 0.00001;
             }
 
             // 3. Local Function Closures
@@ -612,7 +616,9 @@ namespace MapGen.Core.Modules
             {
                 var (cellId, cultureId, priority) = queue.Dequeue();
 
-                // Parity: JS processes every pop. No "priority > costs[cellId]" check here.
+                // OPTIMIZATION: If we already processed this cell via a cheaper path, 
+                // skip re-calculating its neighbors.
+                if (costs[cellId] > 0 && priority > costs[cellId]) continue;
 
                 var culture = cultures[cultureId];
                 var type = culture.Type;
@@ -620,9 +626,19 @@ namespace MapGen.Core.Modules
 
                 foreach (int neibCellId in cells[cellId].NeighborCells)
                 {
+                    // OPTIMIZATION: Skip cost calculations entirely for uninhabitable cells
+                    // (Only use this if cultures should NOT "jump" over uninhabited gaps)
+                    //if (cells[neibCellId].Population <= 0) continue;
+
                     // Calculate Costs
                     int neibBiome = cells[neibCellId].BiomeId;
                     double biomeCost = GetBiomeCost(cultureId, neibBiome, type);
+
+
+                    // OPTIMIZATION/FIX: Change the hardcoded 0 to an actual comparison.
+                    // Current cell's biome vs neighbor cell's biome.
+                    //int currentBiome = cells[cellId].BiomeId;
+                    //double biomeChangeCost = (currentBiome == neibBiome) ? 0 : 20;
 
                     // JS Tautology: biome === cells.biome[neibCellId] is always true here.
                     double biomeChangeCost = 0;
