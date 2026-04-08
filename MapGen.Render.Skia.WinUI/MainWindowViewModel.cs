@@ -19,5 +19,6 @@ namespace MapGen.Render.Skia.WinUI
         [ObservableProperty] private bool _showTemperature;
         [ObservableProperty] private bool _showShoreline;
         [ObservableProperty] private bool _showRivers;
+        [ObservableProperty] private bool _showCultures;
     }
 }

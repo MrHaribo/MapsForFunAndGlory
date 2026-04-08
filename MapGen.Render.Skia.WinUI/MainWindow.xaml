@@ -33,6 +33,7 @@
             <CheckBox Content="ShowTemperature" IsChecked="{x:Bind ViewModel.ShowTemperature, Mode=TwoWay}" Click="Show_Click" Margin="5" />
             <CheckBox Content="ShowShoreline" IsChecked="{x:Bind ViewModel.ShowShoreline, Mode=TwoWay}" Click="Show_Click" Margin="5" />
             <CheckBox Content="ShowRivers" IsChecked="{x:Bind ViewModel.ShowRivers, Mode=TwoWay}" Click="Show_Click" Margin="5" />
+            <CheckBox Content="ShowCultures" IsChecked="{x:Bind ViewModel.ShowCultures, Mode=TwoWay}" Click="Show_Click" Margin="5" />
 
         </StackPanel>
 

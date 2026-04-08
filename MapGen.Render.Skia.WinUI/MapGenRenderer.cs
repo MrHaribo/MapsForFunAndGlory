@@ -33,7 +33,7 @@ namespace MapGen.Render.Skia.WinUI
                     fillPaint.Color = new SKColor(landBrightness, landBrightness, landBrightness);
                 }
 
-                using var path = CreateCellPath(cell, map);
+                using var path = CreateCellPath(cell, map.Vertices);
                 canvas.DrawPath(path, fillPaint);
             }
         }
@@ -160,7 +160,7 @@ namespace MapGen.Render.Skia.WinUI
                 }
 
                 // 4. Draw the geometry from the GRID cell
-                using var path = CreateCellPath(gridCell, map);
+                using var path = CreateCellPath(gridCell, map.Vertices);
                 canvas.DrawPath(path, fillPaint);
             }
         }
@@ -184,7 +184,7 @@ namespace MapGen.Render.Skia.WinUI
                 byte g = (byte)((1 - t) * 255);
                 tempPaint.Color = new SKColor(r, g, 50, 180); // Semi-transparent
 
-                using var path = CreateCellPath(cell, map);
+                using var path = CreateCellPath(cell, map.Vertices);
                 canvas.DrawPath(path, tempPaint);
             }
         }
@@ -208,6 +208,39 @@ namespace MapGen.Render.Skia.WinUI
                 float radius = (float)(Math.Sqrt(cell.Prec) * 0.85);
 
                 canvas.DrawCircle((float)cell.Point.X, (float)cell.Point.Y, radius, precPaint);
+            }
+        }
+
+        public static void RenderCultures(SKCanvas canvas, MapPack pack)
+        {
+            // We'll reuse the paint object for performance, just changing the color
+            using var culturePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                IsAntialias = false // Antialiasing can cause thin seams between cells; false is often better for Voronoi fills
+            };
+
+            var cells = pack.Cells;
+            var cultures = pack.Cultures;
+
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = cells[i];
+
+                // Skip cells with no assigned culture (Wildlands)
+                if (cell.CultureId == 0) continue;
+                if (cell.Verticies == null || cell.Verticies.Count < 3) continue;
+
+                // Retrieve the culture color. 
+                // Note: 'Color' is usually stored as a hex string or an object in the pack.
+                // I'll assume your Culture object has an SKColor or can provide one.
+                var culture = cultures[cell.CultureId];
+
+                // Example: If culture.Color is a string like "#ff0000"
+                culturePaint.Color = SKColor.Parse(culture.Color).WithAlpha(180);
+
+                using var path = CreateCellPath(cell, pack.Vertices);
+                canvas.DrawPath(path, culturePaint);
             }
         }
 
@@ -342,15 +375,15 @@ namespace MapGen.Render.Skia.WinUI
         }
 
         // Helper to keep the rendering loops clean
-        public static SKPath CreateCellPath(MapCell cell, MapData map)
+        public static SKPath CreateCellPath(MapCell cell, MapVertex[] vertices)
         {
             var path = new SKPath();
-            var v0 = map.Vertices[cell.Verticies[0]].Point;
+            var v0 = vertices[cell.Verticies[0]].Point;
             path.MoveTo((float)v0.X, (float)v0.Y);
 
             for (int j = 1; j < cell.Verticies.Count; j++)
             {
-                var v = map.Vertices[cell.Verticies[j]].Point;
+                var v = vertices[cell.Verticies[j]].Point;
                 path.LineTo((float)v.X, (float)v.Y);
             }
             path.Close();

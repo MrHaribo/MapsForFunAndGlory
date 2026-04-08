@@ -104,7 +104,15 @@ namespace MapGen.Render.Skia.WinUI
             Trace.WriteLine("BiomModule " + sw.ElapsedMilliseconds);
             sw.Restart();
 
+            FeatureModule.DefineGroups(pack);
+            FeatureModule.RankCells(pack);
+            CultureModule.Generate(pack, mapData, 9);
+            CultureModule.ExpandCultures(pack);
+
             _pack = pack;
+
+            Trace.WriteLine("CultureModule " + sw.ElapsedMilliseconds);
+            sw.Restart();
 
             pack = PackModule.RefineRivers(pack, mapData);
             FeatureModule.MarkupPack(pack);
@@ -113,6 +121,8 @@ namespace MapGen.Render.Skia.WinUI
 
             Trace.WriteLine("Pack Detail " + sw.ElapsedMilliseconds);
             sw.Restart();
+
+
 
             _detailPack = pack;
         }
@@ -156,6 +166,9 @@ namespace MapGen.Render.Skia.WinUI
 
             if (ViewModel.ShowRivers)
                 MapGenRenderer.RenderRivers(canvas, _pack);
+
+            if (ViewModel.ShowCultures)
+                MapGenRenderer.RenderCultures(canvas, _pack);
 
 
             //// 2. Start a new layer for the clipped rivers
