@@ -19,6 +19,8 @@ namespace MapGen.Core.Modules
 
         public static List<MapRiver> GenerateRivers(IMapGraph map, MapData grid, bool allowErosion)
         {
+            grid.Rng.Init(grid.Seed);
+
             var cells = map.Cells;
             var features = map.Features;
             int cellsCount = cells.Length;

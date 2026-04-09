@@ -93,8 +93,6 @@ namespace MapGen.Tests
             FeatureModule.DefineGroups(pack);
             FeatureModule.RankCells(pack);
 
-            mapData.Rng.Init(mapData.Options.Seed);
-
             for (int i = 0; i < rngOffset; i++)
                 mapData.Rng.Next();
 
@@ -168,9 +166,6 @@ namespace MapGen.Tests
             BiomModule.Define(pack, mapData);
             FeatureModule.DefineGroups(pack);
             FeatureModule.RankCells(pack);
-
-            // Reset RNG to the exact state expected before Culture Generation
-            mapData.Rng.Init(mapData.Options.Seed);
 
             // 3. Execution
             // Note: Use the exact count from your JS dump (e.g., 9)

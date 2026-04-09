@@ -262,8 +262,6 @@ namespace MapGen.Render.Skia.WinUI
 
             // Try to get a system emoji font (Windows: Segoe UI Emoji, Mac: Apple Color Emoji, Linux: Noto Color Emoji)
             using var tfEmoji = SKTypeface.FromFamilyName("Segoe UI Emoji")
-                             ?? SKTypeface.FromFamilyName("Apple Color Emoji")
-                             ?? SKTypeface.FromFamilyName("Noto Color Emoji")
                              ?? tfName; // Fallback to name font if no emoji font found
 
             using var fontEmoji = new SKFont(tfEmoji, 14);
