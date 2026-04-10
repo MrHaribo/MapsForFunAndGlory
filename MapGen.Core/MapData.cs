@@ -10,10 +10,12 @@ namespace MapGen.Core
 
     public interface IMapGraph
     {
+        public IRandom Rng { get; }
+        string Seed { get; }
+
         int Width { get; }
         int Height { get; }
         int PointsCount { get; }
-        string Seed { get; }
 
         MapCell[] Cells { get; set; }
         MapVertex[] Vertices { get; set; }
@@ -76,10 +78,13 @@ namespace MapGen.Core
     {
         public MapOptions Options { get; set; }
 
+        // Rng
+        public string Seed => Options.Seed;
+        public IRandom Rng { get; set; }
+
         public int Width => Options.Width;
         public int Height => Options.Height;
         public int PointsCount => Options.PointsCount;
-        public string Seed => Options.Seed;
 
         public MapCell[] Cells { get; set; }
         public MapVertex[] Vertices { get; set; }

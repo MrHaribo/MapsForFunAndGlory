@@ -213,6 +213,7 @@ namespace MapGen.Core.Modules
             // 4. MapPack Assembly
             var pack = new MapPack
             {
+                Rng = data.Rng,
                 Cells = packCells,
                 Vertices = packVertices,
                 Points = newP.ToArray(),
@@ -230,6 +231,7 @@ namespace MapGen.Core.Modules
                 cell.Height = newH[i];
                 cell.GridId = newG[i];
                 cell.Index = i; // Ensure internal index is set
+                cell.Temp = data.Cells[newG[i]].Temp;
 
                 double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);
                 // Area is clamped to ushort.MaxValue (65535)

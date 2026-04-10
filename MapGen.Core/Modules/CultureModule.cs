@@ -23,7 +23,7 @@ namespace MapGen.Core.Modules
 
         #region Generate
 
-        public static void Generate(MapPack pack, MapData grid, int count)
+        public static void Generate(MapPack pack, int count)
         {
             // 1. Initial Setup
             var cells = pack.Cells;
@@ -56,7 +56,7 @@ namespace MapGen.Core.Modules
             // Create an empty quadtree to track centers as we place them
             var quadDatas = new List<QuadPoint>();
             var centers = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
-            var colors = ColorUtil.GetColors(count, grid.Rng);
+            var colors = ColorUtil.GetColors(count, pack.Rng);
 
 
             // 4. Main Generation Loop
@@ -128,7 +128,7 @@ namespace MapGen.Core.Modules
             List<CultureTemplate> selectCultures(int culturesNumber)
             {
                 // Get the full list of available templates for this culture set
-                List<CultureTemplate> defaultCultures = GetDefault(pack, grid, culturesNumber);
+                List<CultureTemplate> defaultCultures = GetDefault(pack, culturesNumber);
                 List<CultureTemplate> selected = new List<CultureTemplate>();
 
                 // 1. Logic for locked/pre-existing cultures (Skipped for fresh generate)
@@ -145,12 +145,12 @@ namespace MapGen.Core.Modules
 
                     do
                     {
-                        rndIdx = grid.Rng.Next(0, defaultCultures.Count - 1);
+                        rndIdx = pack.Rng.Next(0, defaultCultures.Count - 1);
                         picked = defaultCultures[rndIdx];
                         attempt++;
 
                         // JS: while (i < 200 && !P(culture.odd));
-                    } while (attempt < MapConstants.CULTURE_SELECT_MAX_ATTEMPTS && !grid.Rng.P(picked.Odd));
+                    } while (attempt < MapConstants.CULTURE_SELECT_MAX_ATTEMPTS && !pack.Rng.P(picked.Odd));
 
                     selected.Add(picked);
                     defaultCultures.RemoveAt(rndIdx);
@@ -177,7 +177,7 @@ namespace MapGen.Core.Modules
                 for (int i = 0; i < MapConstants.CULTURE_PLACE_CENTER_MAX_ATTEMPTS; i++)
                 {
                     attempts++;
-                    int biasedIndex = grid.Rng.Biased(0, max, 5);
+                    int biasedIndex = pack.Rng.Biased(0, max, 5);
                     cellId = sorted[Math.Clamp(biasedIndex, 0, sorted.Count - 1)];
 
                     spacing *= 0.9;
@@ -223,20 +223,20 @@ namespace MapGen.Core.Modules
                 // JS Check 1: (cells.harbor[i] && f.type !== "lake" && P(0.1))
                 if (cell.Harbor > 0 && havenFeature.Type != FeatureType.Lake)
                 {
-                    if (grid.Rng.P(0.1)) return CultureType.Naval;
+                    if (pack.Rng.P(0.1)) return CultureType.Naval;
                 }
 
                 // JS Check 2: (cells.harbor[i] === 1 && P(0.6))
                 // Note: In Azgaar JS, harbor is often 1 (on coast) or 0. 
                 if (cell.Harbor == 1)
                 {
-                    if (grid.Rng.P(0.6)) return CultureType.Naval;
+                    if (pack.Rng.P(0.6)) return CultureType.Naval;
                 }
 
                 // JS Check 3: (pack.features[cells.f[i]].group === "isle" && P(0.4))
                 if (cellFeature.Group == FeatureGroup.Isle)
                 {
-                    if (grid.Rng.P(0.4)) return CultureType.Naval;
+                    if (pack.Rng.P(0.4)) return CultureType.Naval;
                 }
 
                 // 5. River (No RNG consumed)
@@ -267,7 +267,7 @@ namespace MapGen.Core.Modules
 
                 // JS: rn(((Math.random() * sizeVariety) / 2 + 1) * base, 1)
                 // rng.NextDouble() provides the Math.random() parity
-                double randomFactor = (grid.Rng.Next() * MapConstants.CULTURE_EXPANSIONISM_SIZE_VARIETY / 2) + 1;
+                double randomFactor = (pack.Rng.Next() * MapConstants.CULTURE_EXPANSIONISM_SIZE_VARIETY / 2) + 1;
                 double result = randomFactor * baseExpansion;
 
                 // Rounding to 1 decimal place to match the JS 'rn(val, 1)'
@@ -281,7 +281,7 @@ namespace MapGen.Core.Modules
 
         #region Default Cultures
 
-        public static List<CultureTemplate> GetDefault(MapPack pack, MapData grid, int count)
+        public static List<CultureTemplate> GetDefault(MapPack pack, int count)
         {
             var cultureSet = pack.Options.CultureSet;
 
@@ -294,7 +294,7 @@ namespace MapGen.Core.Modules
             // 2. Exact truthy check parity
             double TD(int i, double goal)
             {
-                double tempValue = grid.Cells[pack.Cells[i].GridId].Temp;
+                double tempValue = pack.Cells[i].Temp;
                 double d = Math.Abs(tempValue - goal);
 
                 // JS 'd ? d + 1 : 1' means if d is exactly 0.0, return 1, else d + 1
@@ -358,16 +358,16 @@ namespace MapGen.Core.Modules
 
                 Culture.English => new List<CultureTemplate>
                 {
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "heater" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "wedged" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "oldFrench" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "spanish" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "hessen" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy5" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy4" },
-                    new CultureTemplate { Name = NameModule.GetBase(grid.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy1" }
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "heater" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "wedged" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "oldFrench" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "swiss" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "spanish" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "hessen" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy5" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy4" },
+                    new CultureTemplate { Name = NameModule.GetBase(pack.Rng, 1, 5, 9, ""), BaseNameId = 1, Odd = 1.0, SortingFn = null, Shield = "fantasy1" }
                 },
 
                 Culture.Antique => new List<CultureTemplate>
@@ -459,15 +459,15 @@ namespace MapGen.Core.Modules
                 {
                     // JS: rand(nameBases.length - 1)
                     // Using your extension: rng.Next(max) is inclusive 0 to max
-                    int rndId = NameModule.GetRandomBaseId(grid.Rng);
+                    int rndId = NameModule.GetRandomBaseId(pack.Rng);
 
                     return new CultureTemplate
                     {
                         BaseNameId = rndId,
-                        Name = NameModule.GetBaseShort(grid.Rng, rndId),
+                        Name = NameModule.GetBaseShort(pack.Rng, rndId),
                         Odd = 1.0,
                         SortingFn = null, // Random cultures use default suitability sorting
-                        Shield = GetRandomShield(grid.Rng)
+                        Shield = GetRandomShield(pack.Rng)
                     };
                 }).ToList(),
 
