@@ -27,6 +27,7 @@ namespace MapGen.Core
         public double GrowthRate { get; set; }
         public int CulturesCount { get; set; }
         public Culture CultureSet { get; set; }
+        public int BurgCount { get; set; }
 
         public static void RandomizeOptions(MapOptions opt, IRandom rng)
         {
@@ -42,6 +43,7 @@ namespace MapGen.Core
             rng.Gauss(4, 2, 0, 10, 1);  // sizeVariety
             opt.GrowthRate = Round(1 + rng.Next(), 1);
             opt.CulturesCount = (int)rng.Gauss(12, 3, 5, 30);
+            opt.BurgCount = 1000;
 
             // --- Culture Set ---
             // RNG Order 8: Selection via weighted dictionary

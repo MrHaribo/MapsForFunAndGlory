@@ -237,7 +237,6 @@ namespace MapGen.Core.Modules
             return name;
         }
 
-
         public static int GetRandomBaseId(IRandom rng)
         {
             return rng.Next(NameBaseCount);
@@ -259,21 +258,9 @@ namespace MapGen.Core.Modules
 
         #region Culture Name
 
-        /// <summary>
-        /// High-level wrapper for culture generation.
-        /// </summary>
-        public static string GetCulture(IRandom rng, int baseId, int min, int max, string dupl)
-        {
-            return GetBase(rng, baseId, min, max, dupl);
-        }
-
-        /// <summary>
-        /// Generates a short name for a culture.
-        /// </summary>
-        public static string GetCultureShort(IRandom rng, int baseId)
-        {
-            return GetBaseShort(rng, baseId);
-        }
+        public static string GetCulture(IRandom rng, int baseId) => GetBase(rng, baseId);
+        public static string GetCulture(IRandom rng, int baseId, int min, int max, string dupl) => GetBase(rng, baseId, min, max, dupl);
+        public static string GetCultureShort(IRandom rng, int baseId) => GetBaseShort(rng, baseId);
 
         #endregion
 

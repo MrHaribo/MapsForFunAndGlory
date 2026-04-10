@@ -81,5 +81,8 @@
         public const int CULTURE_PLACE_CENTER_MAX_ATTEMPTS = 100;
         public const int CULTURE_SELECT_MAX_ATTEMPTS = 200;
         public const double CULTURE_NATURAL_EXPAND_RATE = 1.0;
+
+        // Burg Constants
+        public const int BURG_MAX_COUNT = 1000;
     }
 }

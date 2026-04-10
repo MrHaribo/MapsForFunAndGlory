@@ -91,9 +91,11 @@ namespace MapGen.Core
 
         public List<MapFeature> Features { get; set; } = new List<MapFeature>();
         public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
-        public MapFeature GetFeature(int id) => Features[id - 1];
-
         public List<MapCulture> Cultures { get; set; } = new List<MapCulture>();
+        public List<MapBurg> Burgs { get; set; } = new List<MapBurg>();
+
+        public MapFeature GetFeature(int id) => Features[id - 1];
+        public MapBurg GetBurg(int id) => Burgs[id - 1];
     }
 
     public class MapCell
@@ -128,9 +130,8 @@ namespace MapGen.Core
         // Population
         public short Suitability { get; set; } // cells.s
         public float Population { get; set; }   // cells.pop
-
-        // Culture
         public int CultureId { get; set; }
+        public int BurgId { get; set; }
     }
 
     public class MapVertex
@@ -211,6 +212,19 @@ namespace MapGen.Core
         public double TotalArea { get; set; }
         public double RuralPopulation { get; set; }
         public double UrbanPopulation { get; set; }
+    }
+
+    public class MapBurg
+    {
+        public int Id { get; set; }
+        public int Cell { get; set; }
+        public MapPoint Position { get; set; }
+        public int StateId { get; set; }
+        public int CultureId { get; set; }
+        public int PortId { get; set; }
+        public string Name { get; set; }
+        public ushort FeatureId { get; set; }
+        public bool IsCapital { get; set; }
     }
 
     public readonly struct PointFlux

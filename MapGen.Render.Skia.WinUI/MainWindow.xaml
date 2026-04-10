@@ -9,7 +9,7 @@
     xmlns:skiasharp="using:SkiaSharp.Views.Windows"
     mc:Ignorable="d"
     Activated="Window_Activated"
-    Title="MapGen.Render.Skia.WinUI">
+    Title="Maps for Fun and Glory">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
