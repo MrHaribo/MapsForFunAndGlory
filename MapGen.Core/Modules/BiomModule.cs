@@ -64,7 +64,7 @@ namespace MapGen.Core.Modules
             new Dictionary<string, int>() {{"swamp", 1}}                                // Wetland
         };
 
-        public static void Define(MapPack pack, MapData grid)
+        public static void Define(MapPack pack)
         {
             // Ensure the Biome array is initialized on the pack cells
             for (int i = 0; i < pack.Cells.Length; i++)
@@ -72,11 +72,11 @@ namespace MapGen.Core.Modules
                 var cell = pack.Cells[i];
 
                 // 1. Calculate Moisture
-                double moisture = cell.Height < 20 ? 0 : CalculateMoisture(pack, grid, i);
+                double moisture = cell.Height < 20 ? 0 : CalculateMoisture(pack, i);
 
                 // 2. Get Temperature from Grid Reference
                 // GridId is the link between the 'Pack' cell and the 'Grid' cell
-                double temperature = grid.Cells[cell.GridId].Temp;
+                double temperature = cell.Temp;
 
                 // 3. Determine and assign Biome ID
                 // getId helper we created previously
@@ -84,12 +84,12 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static double CalculateMoisture(MapPack pack, MapData grid, int cellId)
+        public static double CalculateMoisture(MapPack pack, int cellId)
         {
             var cell = pack.Cells[cellId];
 
             // Start with base precipitation from the grid
-            double moisture = grid.Cells[cell.GridId].Prec;
+            double moisture = cell.Prec;
 
             // Apply River Bonus: Math.max(flux / 10, 2)
             if (cell.RiverId != 0)
@@ -101,7 +101,7 @@ namespace MapGen.Core.Modules
             // Filter to only land neighbors, get their precipitation, and include current moisture
             var landNeighborPrec = cell.NeighborCells
                 .Where(nIdx => pack.Cells[nIdx].Height >= 20)
-                .Select(nIdx => (double)grid.Cells[pack.Cells[nIdx].GridId].Prec)
+                .Select(nIdx => (double)pack.Cells[nIdx].Prec)
                 .ToList();
 
             landNeighborPrec.Add(moisture);

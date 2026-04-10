@@ -12,14 +12,14 @@ namespace MapGen.Core.Modules
     {
         #region Generate
 
-        public static void Generate(MapPack pack, MapData grid, bool allowErosion = true)
+        public static void Generate(MapPack pack, bool allowErosion = true)
         {
-            pack.Rivers = GenerateRivers(pack, grid, allowErosion);
+            pack.Rivers = GenerateRivers(pack, allowErosion);
         }
 
-        public static List<MapRiver> GenerateRivers(IMapGraph map, MapData grid, bool allowErosion)
+        public static List<MapRiver> GenerateRivers(IMapGraph map, bool allowErosion)
         {
-            grid.Rng.Init(grid.Seed);
+            map.Rng.Init(map.Seed);
 
             var cells = map.Cells;
             var features = map.Features;
@@ -81,12 +81,12 @@ namespace MapGen.Core.Modules
                     .OrderByDescending(i => h[i])
                     .ToList();
 
-                var lakeOutCells = LakeModule.DefineClimateData(map, grid, h);
+                var lakeOutCells = LakeModule.DefineClimateData(map, h);
 
                 foreach (int i in land)
                 {
                     // Add precipitation flux
-                    byte prec = grid.Cells[map.Cells[i].GridId].Prec;
+                    byte prec = map.Cells[i].Prec;
                     //tempFlux[i] += prec / cellsNumberModifier;
                     cells[i].Flux += Math.Floor(prec / cellsNumberModifier);
 

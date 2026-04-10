@@ -232,6 +232,7 @@ namespace MapGen.Core.Modules
                 cell.GridId = newG[i];
                 cell.Index = i; // Ensure internal index is set
                 cell.Temp = data.Cells[newG[i]].Temp;
+                cell.Prec = data.Cells[newG[i]].Prec;
 
                 double rawArea = PathUtils.CalculatePolygonArea(cell, pack.Vertices);
                 // Area is clamped to ushort.MaxValue (65535)

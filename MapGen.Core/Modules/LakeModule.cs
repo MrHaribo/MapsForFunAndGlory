@@ -199,7 +199,7 @@ namespace MapGen.Core.Modules
             }
         }
 
-        public static Dictionary<int, int> DefineClimateData(IMapGraph map, MapData grid, double[] h)
+        public static Dictionary<int, int> DefineClimateData(IMapGraph map, double[] h)
         {
             var lakeOutCells = new Dictionary<int, int>();
 
@@ -208,16 +208,16 @@ namespace MapGen.Core.Modules
                 if (feature.Type != FeatureType.Lake) continue;
 
                 // 1. Flux (Precipitation on shoreline)
-                feature.Flux = feature.ShorelineCells.Sum(c => (double)grid.Cells[map.Cells[c].GridId].Prec);
+                feature.Flux = feature.ShorelineCells.Sum(c => (double)map.Cells[c].Prec);
 
                 // 2. Temperature (Rounded to 1 decimal, threshold based on CellsCount)
                 if (feature.CellsCount < 6)
                 {
-                    feature.Temp = grid.Cells[map.Cells[feature.FirstCell].GridId].Temp;
+                    feature.Temp = map.Cells[feature.FirstCell].Temp;
                 }
                 else
                 {
-                    double avgTemp = feature.ShorelineCells.Average(c => (double)grid.Cells[map.Cells[c].GridId].Temp);
+                    double avgTemp = feature.ShorelineCells.Average(c => (double)map.Cells[c].Temp);
                     feature.Temp = Math.Round(avgTemp, 1);
                 }
 

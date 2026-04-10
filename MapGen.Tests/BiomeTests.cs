@@ -48,10 +48,10 @@ namespace MapGen.Tests
             FeatureModule.MarkupPack(pack);
 
             // Biomes require river flux for moisture bonuses
-            RiverModule.Generate(pack, mapData, allowErosion: true);
+            RiverModule.Generate(pack, allowErosion: true);
 
             // 3. Run the Module Under Test
-            BiomModule.Define(pack, mapData);
+            BiomModule.Define(pack);
 
             // 4. Assertions
             Assert.Equal(expected.CellCount, pack.Cells.Length);
@@ -69,7 +69,7 @@ namespace MapGen.Tests
 
                 // Check Moisture Calculation Parity (Intermediate)
                 // This is where most logic errors occur due to river flux or averaging
-                double actMoisture = actCell.Height < 20 ? 0 : BiomModule.CalculateMoisture(pack, mapData, exp.Index);
+                double actMoisture = actCell.Height < 20 ? 0 : BiomModule.CalculateMoisture(pack, exp.Index);
                 Assert.Equal(exp.Moisture, actMoisture);
 
                 // Check Biome ID Parity (Final Output)

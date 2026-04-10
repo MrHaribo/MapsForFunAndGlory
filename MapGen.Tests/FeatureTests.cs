@@ -197,8 +197,8 @@ namespace MapGen.Tests
 
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, mapData, allowErosion: true);
-            BiomModule.Define(pack, mapData);
+            RiverModule.Generate(pack, allowErosion: true);
+            BiomModule.Define(pack);
 
             // 3. Run the Logic under test
             FeatureModule.DefineGroups(pack);
@@ -261,8 +261,8 @@ namespace MapGen.Tests
 
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, mapData, allowErosion: true);
-            BiomModule.Define(pack, mapData);
+            RiverModule.Generate(pack, allowErosion: true);
+            BiomModule.Define(pack);
             FeatureModule.DefineGroups(pack);
 
             // 3. Run Logic
