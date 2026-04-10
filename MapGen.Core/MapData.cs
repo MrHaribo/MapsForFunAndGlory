@@ -85,6 +85,7 @@ namespace MapGen.Core
         public int Width => Options.Width;
         public int Height => Options.Height;
         public int PointsCount => Options.PointsCount;
+        public int GridPointsCount { get; set; }
 
         public MapCell[] Cells { get; set; }
         public MapVertex[] Vertices { get; set; }
@@ -136,7 +137,7 @@ namespace MapGen.Core
         public short Suitability { get; set; } // cells.s
         public float Population { get; set; }   // cells.pop
         public int CultureId { get; set; }
-        public int BurgId { get; set; }
+        public ushort BurgId { get; set; }
     }
 
     public class MapVertex

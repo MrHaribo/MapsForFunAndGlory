@@ -217,6 +217,7 @@ namespace MapGen.Core.Modules
                 Cells = packCells,
                 Vertices = packVertices,
                 Points = newP.ToArray(),
+                GridPointsCount = data.Points.Length,
                 Options = data.Options,
 
                 // JS: pack.cells.q.find(x, y)
