@@ -88,7 +88,7 @@ namespace MapGen.Tests
 
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
             BiomModule.Define(pack);
             FeatureModule.DefineGroups(pack);
             FeatureModule.RankCells(pack);
@@ -162,7 +162,7 @@ namespace MapGen.Tests
 
             var pack = PackModule.ReGraph(mapData);
             FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
             BiomModule.Define(pack);
             FeatureModule.DefineGroups(pack);
             FeatureModule.RankCells(pack);

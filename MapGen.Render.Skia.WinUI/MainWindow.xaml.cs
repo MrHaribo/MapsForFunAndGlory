@@ -94,7 +94,7 @@ namespace MapGen.Render.Skia.WinUI
             Trace.WriteLine("MarkupPack " + sw.ElapsedMilliseconds);
             sw.Restart();
 
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
 
             Trace.WriteLine("RiverModule " + sw.ElapsedMilliseconds);
             sw.Restart();
@@ -116,7 +116,7 @@ namespace MapGen.Render.Skia.WinUI
 
             pack = PackModule.RefineRivers(pack, mapData);
             FeatureModule.MarkupPack(pack);
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
             BiomModule.Define(pack);
 
             Trace.WriteLine("Pack Detail " + sw.ElapsedMilliseconds);

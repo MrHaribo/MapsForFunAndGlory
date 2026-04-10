@@ -70,7 +70,7 @@ namespace MapGen.Tests
             FeatureModule.MarkupPack(pack);
 
             // 3. Run
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
 
             // --- STRICT ASSERTIONS ---
 

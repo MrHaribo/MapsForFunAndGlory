@@ -15,10 +15,10 @@ namespace MapGen.Core.Modules
     {
         #region Generate Burgs
 
-        public static void Generate(MapPack pack, MapData mapData)
+        public static void Generate(MapPack pack)
         {
             var cells = pack.Cells;
-            var rng = mapData.Rng;
+            var rng = pack.Rng;
 
             List<MapBurg> burgs = new List<MapBurg>();
             foreach (var cell in cells) cell.BurgId = 0;
@@ -147,7 +147,7 @@ namespace MapGen.Core.Modules
 
             int GetCapitalsNumber()
             {
-                int number = mapData.Options.StatesCount;
+                int number = pack.Options.StatesCount;
                 if (populatedIndices.Count < number * 10)
                     number = populatedIndices.Count / 10;
                 return number;

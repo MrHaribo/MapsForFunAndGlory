@@ -48,7 +48,7 @@ namespace MapGen.Tests
             FeatureModule.MarkupPack(pack);
 
             // Biomes require river flux for moisture bonuses
-            RiverModule.Generate(pack, allowErosion: true);
+            RiverModule.Generate(pack);
 
             // 3. Run the Module Under Test
             BiomModule.Define(pack);
