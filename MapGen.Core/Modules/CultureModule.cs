@@ -23,9 +23,10 @@ namespace MapGen.Core.Modules
 
         #region Generate
 
-        public static void Generate(MapPack pack, int count)
+        public static void Generate(MapPack pack)
         {
             // 1. Initial Setup
+            int count = pack.Options.CulturesCount;
             var cells = pack.Cells;
             ushort[] cultureIds = new ushort[cells.Length]; // Equivalent to Uint16Array
 

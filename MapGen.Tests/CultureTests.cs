@@ -97,8 +97,7 @@ namespace MapGen.Tests
                 mapData.Rng.Next();
 
             // 3. Execution
-            // Note: Use a fixed seed in your IRandom to match the JS dump!
-            CultureModule.Generate(pack, 9);
+            CultureModule.Generate(pack);
 
             // 4. Assertions
             Assert.NotNull(pack.Cultures);
@@ -168,8 +167,7 @@ namespace MapGen.Tests
             FeatureModule.RankCells(pack);
 
             // 3. Execution
-            // Note: Use the exact count from your JS dump (e.g., 9)
-            CultureModule.Generate(pack, 9);
+            CultureModule.Generate(pack);
             CultureModule.ExpandCultures(pack);
 
             // 4. Assertions

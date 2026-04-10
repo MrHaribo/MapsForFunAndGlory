@@ -106,7 +106,7 @@ namespace MapGen.Render.Skia.WinUI
 
             FeatureModule.DefineGroups(pack);
             FeatureModule.RankCells(pack);
-            CultureModule.Generate(pack, 9);
+            CultureModule.Generate(pack);
             CultureModule.ExpandCultures(pack);
 
             _pack = pack;
