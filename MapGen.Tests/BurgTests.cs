@@ -28,11 +28,14 @@ namespace MapGen.Tests
 
     public class BurgTests
     {
-        [Fact]
-        public void TestBurgGeneration()
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        public void TestBurgGeneration(int dataCount)
         {
             // 1. Load Expected Data
-            var json = File.ReadAllText("data/regression_burgs.json");
+            var json = File.ReadAllText($"data/regression_burgs_{dataCount}.json");
             var expected = JsonConvert.DeserializeObject<RegressionBurgData>(json);
 
             // 2. Setup (Full Pipeline as per your streamlined sequence)
@@ -54,6 +57,9 @@ namespace MapGen.Tests
             FeatureModule.RankCells(pack);
             CultureModule.Generate(pack);
             CultureModule.ExpandCultures(pack);
+
+            for (int i = 0; i < dataCount; i++)
+                pack.Rng.Next();
 
             // 3. Execution
             BurgModule.Generate(pack);
