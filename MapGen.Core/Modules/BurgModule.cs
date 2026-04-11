@@ -12,8 +12,6 @@ namespace MapGen.Core.Modules
 {
     public static class BurgModule
     {
-        public static int DEBUG_MARKOV_ITERAION;
-
         #region Generate Burgs
 
         public static void Generate(MapPack pack)
@@ -95,8 +93,8 @@ namespace MapGen.Core.Modules
                     b.Id = bId;
                     b.StateId = bId;
                     b.CultureId = cell.CultureId;
-                    b.Name = "capital";
-                    //b.Name = NameModule.GetCultureShort(rng, culture.BaseNameId);
+                    //b.Name = "capital";
+                    b.Name = NameModule.GetCultureShort(rng, culture.BaseNameId);
                     b.FeatureId = cell.FeatureId;
                     b.IsCapital = true;
 
@@ -124,17 +122,6 @@ namespace MapGen.Core.Modules
                 {
                     for (int i = 0; i < sorted.Count && added < townsNumber; i++)
                     {
-                        var ff = rng.Next();
-                        Console.WriteLine($"CS: Rnd Broke-> i:{i}, added{added}, ff{ff}");
-
-                        DEBUG_MARKOV_ITERAION = i;
-
-                        if (i == 28)
-                        {
-                            Debugger.Break();
-
-                        }
-
                         int cellIdx = sorted[i];
                         if (cells[cellIdx].BurgId > 0) continue;
 
@@ -158,8 +145,8 @@ namespace MapGen.Core.Modules
                             StateId = 0,
                             IsCapital = false,
                             CultureId = cells[cellIdx].CultureId,
-                            //Name = NameModule.GetCulture(rng, culture.BaseNameId),
-                            Name = "town",
+                            Name = NameModule.GetCulture(rng, culture.BaseNameId),
+                            //Name = "town",
                             FeatureId = cells[cellIdx].FeatureId
                         });
 

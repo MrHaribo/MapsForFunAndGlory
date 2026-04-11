@@ -134,88 +134,35 @@ namespace MapGen.Core.Modules
 
             // --- Markov Generation ---
 
-
-            if (BurgModule.DEBUG_MARKOV_ITERAION == 28)
+            for (int i = 0; i < 20; i++)
             {
-                for (int i = 0; i < 20; i++)
+                if (string.IsNullOrEmpty(cur))
                 {
-                    // Log state at START of iteration
-                    Console.WriteLine($"CS_MKV: iter:{i} | w:\"{w}\" | cur:\"{cur}\" | v_len:{v.Count}");
-
-                    if (string.IsNullOrEmpty(cur))
+                    if (w.Length < min)
                     {
-                        if (w.Length < min)
-                        {
-                            Console.WriteLine($"CS_MKV:   [Branch: Word too short - Resetting]");
-                            cur = ""; w = ""; v = chain[""];
-                        }
-                        else
-                        {
-                            Console.WriteLine($"CS_MKV:   [Branch: Word complete - Breaking]");
-                            break;
-                        }
+                        cur = "";
+                        w = "";
+                        v = chain[""];
+                    }
+                    else break;
+                }
+                else
+                {
+                    if (w.Length + cur.Length > max)
+                    {
+                        if (w.Length < min) w += cur;
+                        break;
                     }
                     else
                     {
-                        if (w.Length + cur.Length > max)
-                        {
-                            if (w.Length < min)
-                            {
-                                Console.WriteLine($"CS_MKV:   [Branch: Too long but < min - Forcing add]");
-                                w += cur;
-                            }
-                            Console.WriteLine($"CS_MKV:   [Branch: Word too long - Breaking]");
-                            break;
-                        }
-                        else
-                        {
-                            string lastChar = cur.Substring(cur.Length - 1);
-                            v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
-                            Console.WriteLine($"CS_MKV:   [Branch: Continue - Next key: \"{lastChar}\"]");
-                        }
+                        string lastChar = cur.Substring(cur.Length - 1);
+                        v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
                     }
-
-                    w += cur;
-                    // Check your rng.Ra implementation to ensure it logs its internal pull if necessary
-                    cur = rng.Ra(v.ToArray());
-                    Console.WriteLine($"CS_MKV:   [PULL] Result: \"{cur}\"");
                 }
+
+                w += cur;
+                cur = rng.Ra(v.ToArray());
             }
-
-            else
-            {
-                for (int i = 0; i < 20; i++)
-                {
-                    if (string.IsNullOrEmpty(cur))
-                    {
-                        if (w.Length < min)
-                        {
-                            cur = "";
-                            w = "";
-                            v = chain[""];
-                        }
-                        else break;
-                    }
-                    else
-                    {
-                        if (w.Length + cur.Length > max)
-                        {
-                            if (w.Length < min) w += cur;
-                            break;
-                        }
-                        else
-                        {
-                            string lastChar = cur.Substring(cur.Length - 1);
-                            v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
-                        }
-                    }
-
-                    w += cur;
-                    cur = rng.Ra(v.ToArray());
-                }
-            }
-
-
 
             // --- Post-Processing (The Reducer) ---
             // 1. Trim trailing special characters

@@ -196,9 +196,6 @@ namespace MapGen.Tests
             }
         }
 
-
-
-
         [Fact]
         public void AssertNamesAgainstJsRegressionFile()
         {
@@ -261,8 +258,5 @@ namespace MapGen.Tests
                 Assert.Equal(expected.GetMapName[i], actual);
             }
         }
-
-
-
     }
 }

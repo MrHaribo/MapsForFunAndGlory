@@ -81,11 +81,8 @@ namespace MapGen.Tests
                 Assert.InRange(act.Position.X, exp.X - 0.1, exp.X + 0.1);
                 Assert.InRange(act.Position.Y, exp.Y - 0.1, exp.Y + 0.1);
 
-                // Name check (if using exact same RNG seed and NameModule logic)
-                //if (act.Id != 10 && act.Id != 18 && act.Id != 62 && act.Id != 63)
-                //{
-                //    Assert.Equal(exp.Name, act.Name);
-                //}
+
+                Assert.Equal(exp.Name, act.Name);
             }
 
             // Assert Cell-to-Burg Mapping (the 1-based ID array)
