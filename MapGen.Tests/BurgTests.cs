@@ -68,8 +68,6 @@ namespace MapGen.Tests
             // 3. Execution
             BurgModule.Generate(pack);
 
-            expected.Burgs.Insert(0, null);
-
             // 4. Assertions
 
             // Assert Burg Count
@@ -80,9 +78,6 @@ namespace MapGen.Tests
             {
                 var exp = expected.Burgs[i];
                 var act = pack.Burgs[i]; // List is 0-indexed, so GetBurg(exp.Id) would be Burgs[i]
-
-                if (exp == null)
-                    continue;
 
                 Assert.Equal(exp.Id, act.Id);
                 Assert.Equal(exp.Cell, act.Cell);

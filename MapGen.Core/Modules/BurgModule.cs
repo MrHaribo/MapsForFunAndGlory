@@ -1,12 +1,8 @@
 ﻿using D3Sharp.QuadTree;
 using MapGen.Core.Helpers;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text.Json.Serialization;
 
 namespace MapGen.Core.Modules
 {
@@ -19,8 +15,7 @@ namespace MapGen.Core.Modules
             var cells = pack.Cells;
             var rng = pack.Rng;
 
-            // ALIGNMENT: Start with a null/empty entry at index 0 to match JS [0]
-            List<MapBurg> burgs = new List<MapBurg> { null };
+            List<MapBurg> burgs = new List<MapBurg> { };
             foreach (var cell in cells) cell.BurgId = 0;
 
             var populatedIndices = new List<int>();
@@ -54,13 +49,12 @@ namespace MapGen.Core.Modules
 
                 var sorted = populatedIndices
                     .OrderByDescending(i => scores[i])
-                    //.ThenBy(i => i) // Tie-breaker
                     .ToList();
                 int capitalsNumber = GetCapitalsNumber();
                 double spacing = (pack.Width + pack.Height) / 2.0 / capitalsNumber;
 
                 // JS Alignment: check against length which includes the padding
-                for (int i = 0; (burgs.Count - 1) < capitalsNumber; i++)
+                for (int i = 0; burgs.Count < capitalsNumber; i++)
                 {
                     int cellIdx = sorted[i];
                     var p = cells[cellIdx].Point;
@@ -75,25 +69,23 @@ namespace MapGen.Core.Modules
                     {
                         quadtree = new QuadTree<QuadPoint, QuadPointNode>(new List<QuadPoint>());
                         burgs.Clear();
-                        burgs.Add(null); // Re-add padding after clear
                         spacing /= 1.2;
                         i = -1;
                     }
                 }
 
                 // Skip index 0 (padding)
-                for (int i = 1; i < burgs.Count; i++)
+                for (int i = 0; i < burgs.Count; i++)
                 {
                     var b = burgs[i];
                     var cell = cells[b.Cell];
 
-                    int bId = i; // The index IS the ID now because of padding
+                    int bId = i + 1; // The index IS the ID now because of padding
                     var culture = pack.Cultures[cell.CultureId];
 
                     b.Id = bId;
                     b.StateId = bId;
                     b.CultureId = cell.CultureId;
-                    //b.Name = "capital";
                     b.Name = NameModule.GetCultureShort(rng, culture.BaseNameId);
                     b.FeatureId = cell.FeatureId;
                     b.IsCapital = true;
@@ -112,7 +104,6 @@ namespace MapGen.Core.Modules
 
                 var sorted = populatedIndices
                     .OrderByDescending(i => scores[i])
-                    //.ThenBy(i => i) // Tie-breaker
                     .ToList();
                 int townsNumber = GetTownsNumber(pack.Options);
                 double spacing = (pack.Width + pack.Height) / 150.0 / (Math.Pow(townsNumber, 0.7) / 66.0);
@@ -132,8 +123,7 @@ namespace MapGen.Core.Modules
                         if (found != null)
                             continue;
 
-                        // JS Alignment: burgId = burgs.length
-                        int bId = burgs.Count;
+                        int bId = burgs.Count + 1;
 
                         var culture = pack.Cultures[cells[cellIdx].CultureId];
 
@@ -150,6 +140,7 @@ namespace MapGen.Core.Modules
                             FeatureId = cells[cellIdx].FeatureId
                         });
 
+                        // Nasty 6h to fix bug by Gemeni
                         //quadtree.Add(new QuadPoint { X = p.X, Y = p.Y, DataIndex = bId });
                         cells[cellIdx].BurgId = (ushort)bId;
                         added++;
@@ -188,8 +179,7 @@ namespace MapGen.Core.Modules
 
             var featurePortCandidates = new Dictionary<int, List<MapBurg>>();
 
-            // Start from 1 to skip padding
-            for (int i = 1; i < burgs.Count; i++)
+            for (int i = 0; i < burgs.Count; i++)
             {
                 var burg = burgs[i];
                 burg.PortId = 0;
@@ -226,7 +216,7 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            for (int i = 1; i < burgs.Count; i++)
+            for (int i = 0; i < burgs.Count; i++)
             {
                 var burg = burgs[i];
                 if (burg.PortId > 0 || cells[burg.Cell].RiverId == 0) continue;
