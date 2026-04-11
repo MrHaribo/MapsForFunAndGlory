@@ -1,4 +1,5 @@
-﻿using MapGen.Core.Modules;
+﻿using MapGen.Core;
+using MapGen.Core.Modules;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,9 @@ namespace MapGen.Tests
     {
         public int Id { get; set; }
         public string Name { get; set; }
+        public int Culture { get; set; }
+        public bool Capital { get; set; }
+        public int State { get; set; }
         public int Cell { get; set; }
         public double X { get; set; }
         public double Y { get; set; }
@@ -80,15 +84,17 @@ namespace MapGen.Tests
                 if (exp == null)
                     continue;
 
+                Assert.Equal(exp.Id, act.Id);
                 Assert.Equal(exp.Cell, act.Cell);
+                Assert.Equal(exp.State, act.StateId);
+                Assert.Equal(exp.Culture, act.CultureId);
+                Assert.Equal(exp.Capital, act.IsCapital);
                 Assert.Equal(exp.Port, act.PortId);
+                Assert.Equal(exp.Name, act.Name);
 
                 // Coordinate Check: Tolerance of 0.01 due to potential Math.Round/float precision diffs
                 Assert.InRange(act.Position.X, exp.X - 0.1, exp.X + 0.1);
                 Assert.InRange(act.Position.Y, exp.Y - 0.1, exp.Y + 0.1);
-
-
-                Assert.Equal(exp.Name, act.Name);
             }
 
             // Assert Cell-to-Burg Mapping (the 1-based ID array)
