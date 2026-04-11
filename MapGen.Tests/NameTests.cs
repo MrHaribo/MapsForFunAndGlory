@@ -1,14 +1,112 @@
 ﻿using MapGen.Core;
 using MapGen.Core.Helpers;
 using MapGen.Core.Modules;
-using Moq;
 using Newtonsoft.Json;
 
 namespace MapGen.Tests
 {
+    public class JsChainDump
+    {
+        public int index { get; set; }
+        public string name { get; set; }
+        // Maps key (prev char) to list of syllables
+        public Dictionary<string, List<string>> chain { get; set; }
+    }
 
     public class NameTests
     {
+
+        private readonly List<JsChainDump> _jsReferenceData;
+
+        public NameTests()
+        {
+            // Load the JS dump file once for all tests in this class
+            string jsonContent = File.ReadAllText("data/markov_chains_regression.json");
+            _jsReferenceData = JsonConvert.DeserializeObject<List<JsChainDump>>(jsonContent);
+        }
+
+        [Theory]
+        // Real-world bases by Azgaar
+        [InlineData(0)]  // German
+        [InlineData(1)]  // English
+        [InlineData(2)]  // French
+        [InlineData(3)]  // Italian
+        [InlineData(4)]  // Castillian
+        [InlineData(5)]  // Ruthenian
+        [InlineData(6)]  // Nordic
+        [InlineData(7)]  // Greek
+        [InlineData(8)]  // Roman
+        [InlineData(9)]  // Finnic
+        [InlineData(10)] // Korean
+        [InlineData(11)] // Chinese
+        [InlineData(12)] // Japanese
+        [InlineData(13)] // Portuguese
+        [InlineData(14)] // Nahuatl
+        [InlineData(15)] // Hungarian
+        [InlineData(16)] // Turkish
+        [InlineData(17)] // Berber
+        [InlineData(18)] // Arabic
+        [InlineData(19)] // Inuit
+        [InlineData(20)] // Basque
+        [InlineData(21)] // Nigerian
+        [InlineData(22)] // Celtic
+        [InlineData(23)] // Mesopotamian
+        [InlineData(24)] // Iranian
+        [InlineData(25)] // Hawaiian
+        [InlineData(26)] // Karnataka
+        [InlineData(27)] // Quechua
+        [InlineData(28)] // Swahili
+        [InlineData(29)] // Vietnamese
+        [InlineData(30)] // Cantonese
+        [InlineData(31)] // Mongolian
+
+        // Fantasy bases by Dopu
+        [InlineData(32)] // Human Generic
+        [InlineData(33)] // Elven
+        [InlineData(34)] // Dark Elven
+        [InlineData(35)] // Dwarven
+        [InlineData(36)] // Goblin
+        [InlineData(37)] // Orc
+        [InlineData(38)] // Giant
+        [InlineData(39)] // Draconic
+        [InlineData(40)] // Arachnid
+        [InlineData(41)] // Serpents
+
+        // Additional bases by Avengium
+        [InlineData(42)] // Levantine
+        public void CalculateChain_OutputMatchesJSReference(int baseIndex)
+        {
+            // 1. Arrange: Find the reference data for this index
+            var reference = _jsReferenceData.FirstOrDefault(d => d.index == baseIndex);
+            Assert.NotNull(reference);
+
+            var nameBase = NameModule.GetNameBases()[baseIndex];
+
+            // 2. Act: Run your C# implementation
+            var actualChain = NameModule.CalculateChain(nameBase.BaseContent);
+
+            // 3. Assert: 
+            // First, check that the set of keys (previous characters) is identical
+            var expectedKeys = reference.chain.Keys.OrderBy(k => k).ToList();
+            var actualKeys = actualChain.Keys.OrderBy(k => k).ToList();
+
+            Assert.True(expectedKeys.SequenceEqual(actualKeys),
+                $"Key mismatch for {reference.name}. " +
+                $"JS has {expectedKeys.Count} keys, CS has {actualKeys.Count} keys.");
+
+            // Second, check the syllable lists for every key
+            foreach (var key in expectedKeys)
+            {
+                var expectedSyllables = reference.chain[key];
+                var actualSyllables = actualChain[key];
+
+                Assert.True(expectedSyllables.SequenceEqual(actualSyllables),
+                    $"Syllable mismatch for {reference.name} at key '{key}'.\n" +
+                    $"Expected: {string.Join(",", expectedSyllables)}\n" +
+                    $"Actual:   {string.Join(",", actualSyllables)}");
+            }
+        }
+
         [Fact]
         public void AssertNamesAgainstJsRegressionFile()
         {
@@ -81,76 +179,6 @@ namespace MapGen.Tests
             public List<string> GetState { get; set; }
             public List<string> GetMapName { get; set; }
         }
-
-        //[Fact]
-        //public void ChainTest()
-        //{
-        //    // Use a fixed seed for the first test to ensure reproducibility
-        //    IRandom rng = new AleaRandom("42");
-
-        //    Console.WriteLine("=== NAME MODULE COMPREHENSIVE TEST ===");
-        //    Console.WriteLine();
-
-        //    // 1. Test Base IDs (Testing Lazy Loading of multiple different chains)
-        //    // We'll test German (0), English (1), and French (2)
-        //    int[] testBases = { 0, 1, 2 };
-        //    string[] baseNames = { "German", "English", "French" };
-
-        //    for (int i = 0; i < testBases.Length; i++)
-        //    {
-        //        int id = testBases[i];
-        //        Console.WriteLine($"--- Base: {baseNames[i]} (ID: {id}) ---");
-
-        //        // Standard Base Generation
-        //        var names = Enumerable.Range(0, 5).Select(_ => NameModule.GetBase(rng, id, 5, 10, "")).ToList();
-        //        Console.WriteLine($"Standard (5-10 chars): {string.Join(", ", names)}");
-
-        //        // Short Base (Used for Culture Templates)
-        //        var shorts = Enumerable.Range(0, 5).Select(_ => NameModule.GetBaseShort(rng, id)).ToList();
-        //        Console.WriteLine($"Short Version:         {string.Join(", ", shorts)}");
-        //        Console.WriteLine();
-        //    }
-
-        //    // 2. Test Random Culture Selection Logic
-        //    Console.WriteLine("--- Random Culture Selection Simulation ---");
-        //    for (int i = 0; i < 3; i++)
-        //    {
-        //        int randomId = NameModule.GetRandomBaseId(rng);
-        //        string cultureName = NameModule.GetCultureShort(rng, randomId);
-        //        Console.WriteLine($"Picked Base {randomId} -> Generated Culture Name: {cultureName}");
-        //    }
-        //    Console.WriteLine();
-
-        //    // 3. Test English Culture Template (Fixed Parameters)
-        //    // Simulating: new CultureTemplate { Name = NameModule.GetBase(rng, 1, 5, 9, ""), BaseNameId = 1 }
-        //    Console.WriteLine("--- English Culture Template Simulation (Base 1, 5-9 chars) ---");
-        //    var englishNames = Enumerable.Range(0, 5).Select(_ => NameModule.GetBase(rng, 1, 5, 9, "")).ToList();
-        //    Console.WriteLine($"Results: {string.Join(", ", englishNames)}");
-        //    Console.WriteLine();
-
-        //    // 4. Test State Name Logic (Suffixes and Transformations)
-        //    Console.WriteLine("--- State Name Generation (Transforming Base Names) ---");
-        //    // We'll take a generated name and turn it into a State
-        //    string root = NameModule.GetBase(rng, 0, 5, 8, ""); // German root
-        //    string stateLand = NameModule.GetStateName(rng, root, baseIndex: 0); // Should favor -land
-
-        //    string root2 = NameModule.GetBase(rng, 18, 5, 8, ""); // Arabic root
-        //    string stateAl = NameModule.GetStateName(rng, root2, baseIndex: 18); // Might add "Al"
-
-        //    Console.WriteLine($"German Root: {root} -> State: {stateLand}");
-        //    Console.WriteLine($"Arabic Root: {root2} -> State: {stateAl}");
-        //    Console.WriteLine();
-
-        //    // 5. Test Map Name
-        //    Console.WriteLine("--- Map Name Generation ---");
-        //    for (int i = 0; i < 3; i++)
-        //    {
-        //        Console.WriteLine($"Map Name {i + 1}: {NameModule.GetMapName(rng)}");
-        //    }
-
-        //    Console.WriteLine();
-        //    Console.WriteLine("=== TEST COMPLETE ===");
-        //}
 
     }
 }

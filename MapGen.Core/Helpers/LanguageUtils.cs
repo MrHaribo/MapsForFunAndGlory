@@ -34,7 +34,7 @@ namespace MapGen.Core.Helpers
         public static bool IsVowel(char c)
         {
             const string vowels = "aeiouyɑ'əøɛœæɶɒɨɪɔɐʊɤɯаоиеёэыуюяàèìòùỳẁȁȅȉȍȕáéíóúýẃőűâêîôûŷŵäëïöüÿẅãẽĩõũỹąęįǫųāēīōūȳăĕĭŏŭǎěǐǒǔȧėȯẏẇạẹịọụỵẉḛḭṵṳ";
-            return vowels.Contains(char.ToLowerInvariant(c));
+            return vowels.Contains(c);
         }
     }
 }

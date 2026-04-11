@@ -10,7 +10,7 @@ namespace MapGen.Core.Modules
 {
     public static class NameModule
     {
-        private class NameBase
+        public class NameBase
         {
             public string Name { get; set; }
             public int Index { get; set; }
@@ -20,7 +20,7 @@ namespace MapGen.Core.Modules
             public double Morbidity { get; set; }
             public string BaseContent { get; set; }
         }
-        private class NameChain : Dictionary<string, List<string>> { }
+        public class NameChain : Dictionary<string, List<string>> { }
 
         private readonly static ConcurrentDictionary<int, NameChain> _chains = new ConcurrentDictionary<int, NameChain>();
         private readonly static List<NameBase> _nameBases = GetNameBases();
@@ -31,19 +31,16 @@ namespace MapGen.Core.Modules
 
         #region Markov Chain
 
-        private static NameChain GetChain(int baseId) => _chains.GetOrAdd(baseId, id =>
+        public static NameChain GetChain(int baseId) => _chains.GetOrAdd(baseId, id =>
         {
             var nb = GetNameBase(id);
-            return CalculateChain(nb.BaseContent, nb.Index);
+            return CalculateChain(nb.BaseContent);
         });
 
-        private static NameChain CalculateChain(string content, int index)
+        public static NameChain CalculateChain(string content)
         {
             var chain = new NameChain();
             string[] array = content.Split(',');
-
-            bool isArabic = content.Contains("Abha,Ajman,Alabar");
-            if (isArabic) Console.WriteLine("Chain Start");
 
             foreach (string n in array)
             {
@@ -64,22 +61,30 @@ namespace MapGen.Core.Modules
 
                         syllable += that;
 
+                        if (that == ' ' || that == '-') break;
                         if (syllable == " " || syllable == "-") break;
                         if (!next.HasValue || next == ' ' || next == '-') break;
 
                         if (IsVowel(that)) v = 1;
 
+                        // Inside the inner loop of CalculateChain:
                         bool isException = false;
                         if (that == 'y' && next == 'e') isException = true;
+
                         if (basic)
                         {
-                            if (that == 'o' && next == 'e' || (that == 'o' && next == 'o')) isException = true; // Added oo/ee logic
-                            if (that == 'e' && next == 'e') isException = true;
-                            if (that == 'a' && next == 'e') isException = true;
-                            if (that == 'c' && next == 'h') isException = true;
+                            // ONLY these four match the JS "basic" rules
+                            if (that == 'o' && next == 'o') isException = true; // 'oo'
+                            if (that == 'e' && next == 'e') isException = true; // 'ee'
+                            if (that == 'a' && next == 'e') isException = true; // 'ae'
+                            if (that == 'c' && next == 'h') isException = true; // 'ch'
                         }
 
                         if (isException) continue;
+
+                        // Only enable this if you are CERTAIN the JS vowel() returns a string.
+                        // If JS vowel() returns boolean, this break should be commented out.
+                        //if (IsVowel(that) && next.HasValue && that == next.Value) break;
 
                         // JS: if (vowel(that) === next) break;
                         // Note: vowel() in JS returns the character if it's a vowel, else undefined.
@@ -96,11 +101,6 @@ namespace MapGen.Core.Modules
 
                     if (!chain.ContainsKey(prev)) chain[prev] = new List<string>();
                     chain[prev].Add(syllable);
-
-                    if (isArabic)
-                    {
-                        Console.WriteLine($"CS > Word: \"{name}\" | Prev: \"{prev}\" | Syllable: \"{syllable}\"");
-                    }
 
                     i += (syllable.Length > 0) ? syllable.Length : 1;
                 }
@@ -133,35 +133,89 @@ namespace MapGen.Core.Modules
             string w = "";
 
             // --- Markov Generation ---
-            for (int i = 0; i < 20; i++)
+
+
+            if (BurgModule.DEBUG_MARKOV_ITERAION == 28)
             {
-                if (string.IsNullOrEmpty(cur))
+                for (int i = 0; i < 20; i++)
                 {
-                    if (w.Length < min)
+                    // Log state at START of iteration
+                    Console.WriteLine($"CS_MKV: iter:{i} | w:\"{w}\" | cur:\"{cur}\" | v_len:{v.Count}");
+
+                    if (string.IsNullOrEmpty(cur))
                     {
-                        cur = "";
-                        w = "";
-                        v = chain[""];
-                    }
-                    else break;
-                }
-                else
-                {
-                    if (w.Length + cur.Length > max)
-                    {
-                        if (w.Length < min) w += cur;
-                        break;
+                        if (w.Length < min)
+                        {
+                            Console.WriteLine($"CS_MKV:   [Branch: Word too short - Resetting]");
+                            cur = ""; w = ""; v = chain[""];
+                        }
+                        else
+                        {
+                            Console.WriteLine($"CS_MKV:   [Branch: Word complete - Breaking]");
+                            break;
+                        }
                     }
                     else
                     {
-                        string lastChar = cur.Substring(cur.Length - 1);
-                        v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
+                        if (w.Length + cur.Length > max)
+                        {
+                            if (w.Length < min)
+                            {
+                                Console.WriteLine($"CS_MKV:   [Branch: Too long but < min - Forcing add]");
+                                w += cur;
+                            }
+                            Console.WriteLine($"CS_MKV:   [Branch: Word too long - Breaking]");
+                            break;
+                        }
+                        else
+                        {
+                            string lastChar = cur.Substring(cur.Length - 1);
+                            v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
+                            Console.WriteLine($"CS_MKV:   [Branch: Continue - Next key: \"{lastChar}\"]");
+                        }
                     }
-                }
 
-                w += cur;
-                cur = rng.Ra(v.ToArray());
+                    w += cur;
+                    // Check your rng.Ra implementation to ensure it logs its internal pull if necessary
+                    cur = rng.Ra(v.ToArray());
+                    Console.WriteLine($"CS_MKV:   [PULL] Result: \"{cur}\"");
+                }
             }
+
+            else
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    if (string.IsNullOrEmpty(cur))
+                    {
+                        if (w.Length < min)
+                        {
+                            cur = "";
+                            w = "";
+                            v = chain[""];
+                        }
+                        else break;
+                    }
+                    else
+                    {
+                        if (w.Length + cur.Length > max)
+                        {
+                            if (w.Length < min) w += cur;
+                            break;
+                        }
+                        else
+                        {
+                            string lastChar = cur.Substring(cur.Length - 1);
+                            v = chain.ContainsKey(lastChar) ? chain[lastChar] : chain[""];
+                        }
+                    }
+
+                    w += cur;
+                    cur = rng.Ra(v.ToArray());
+                }
+            }
+
+
 
             // --- Post-Processing (The Reducer) ---
             // 1. Trim trailing special characters
@@ -251,7 +305,7 @@ namespace MapGen.Core.Modules
             int min = nameBase.Min - 1;
             int max = Math.Max(nameBase.Max - 2, min);
 
-            return GetBase(rng, baseId, min, max, nameBase.Duplication);
+            return GetBase(rng, baseId, min, max, "");
         }
 
         #endregion
@@ -456,7 +510,7 @@ namespace MapGen.Core.Modules
 
         #region Base Names
 
-        private static List<NameBase> GetNameBases() => new List<NameBase>
+        public static List<NameBase> GetNameBases() => new List<NameBase>
         {
             // real-world bases by Azgaar:
             new NameBase { Name = "German", Index = 0, Min = 5, Max = 12, Duplication = "lt", Morbidity = 0, BaseContent =              "Achern,Aichhalden,Aitern,Albbruck,Alpirsbach,Altensteig,Althengstett,Appenweier,Auggen,Badenen,Badenweiler,Baiersbronn,Ballrechten,Bellingen,Berghaupten,Bernau,Biberach,Biederbach,Binzen,Birkendorf,Birkenfeld,Bischweier,Blumberg,Bollen,Bollschweil,Bonndorf,Bosingen,Braunlingen,Breisach,Breisgau,Breitnau,Brigachtal,Buchenbach,Buggingen,Buhl,Buhlertal,Calw,Dachsberg,Dobel,Donaueschingen,Dornhan,Dornstetten,Dottingen,Dunningen,Durbach,Durrheim,Ebhausen,Ebringen,Efringen,Egenhausen,Ehrenkirchen,Ehrsberg,Eimeldingen,Eisenbach,Elzach,Elztal,Emmendingen,Endingen,Engelsbrand,Enz,Enzklosterle,Eschbronn,Ettenheim,Ettlingen,Feldberg,Fischerbach,Fischingen,Fluorn,Forbach,Freiamt,Freiburg,Freudenstadt,Friedenweiler,Friesenheim,Frohnd,Furtwangen,Gaggenau,Geisingen,Gengenbach,Gernsbach,Glatt,Glatten,Glottertal,Gorwihl,Gottenheim,Grafenhausen,Grenzach,Griesbach,Gutach,Gutenbach,Hag,Haiterbach,Hardt,Harmersbach,Hasel,Haslach,Hausach,Hausen,Hausern,Heitersheim,Herbolzheim,Herrenalb,Herrischried,Hinterzarten,Hochenschwand,Hofen,Hofstetten,Hohberg,Horb,Horben,Hornberg,Hufingen,Ibach,Ihringen,Inzlingen,Kandern,Kappel,Kappelrodeck,Karlsbad,Karlsruhe,Kehl,Keltern,Kippenheim,Kirchzarten,Konigsfeld,Krozingen,Kuppenheim,Kussaberg,Lahr,Lauchringen,Lauf,Laufenburg,Lautenbach,Lauterbach,Lenzkirch,Liebenzell,Loffenau,Loffingen,Lorrach,Lossburg,Mahlberg,Malsburg,Malsch,March,Marxzell,Marzell,Maulburg,Monchweiler,Muhlenbach,Mullheim,Munstertal,Murg,Nagold,Neubulach,Neuenburg,Neuhausen,Neuried,Neuweiler,Niedereschach,Nordrach,Oberharmersbach,Oberkirch,Oberndorf,Oberbach,Oberried,Oberwolfach,Offenburg,Ohlsbach,Oppenau,Ortenberg,otigheim,Ottenhofen,Ottersweier,Peterstal,Pfaffenweiler,Pfalzgrafenweiler,Pforzheim,Rastatt,Renchen,Rheinau,Rheinfelden,Rheinmunster,Rickenbach,Rippoldsau,Rohrdorf,Rottweil,Rummingen,Rust,Sackingen,Sasbach,Sasbachwalden,Schallbach,Schallstadt,Schapbach,Schenkenzell,Schiltach,Schliengen,Schluchsee,Schomberg,Schonach,Schonau,Schonenberg,Schonwald,Schopfheim,Schopfloch,Schramberg,Schuttertal,Schwenningen,Schworstadt,Seebach,Seelbach,Seewald,Sexau,Simmersfeld,Simonswald,Sinzheim,Solden,Staufen,Stegen,Steinach,Steinen,Steinmauern,Straubenhardt,Stuhlingen,Sulz,Sulzburg,Teinach,Tiefenbronn,Tiengen,Titisee,Todtmoos,Todtnau,Todtnauberg,Triberg,Tunau,Tuningen,uhlingen,Unterkirnach,Reichenbach,Utzenfeld,Villingen,Villingendorf,Vogtsburg,Vohrenbach,Waldachtal,Waldbronn,Waldkirch,Waldshut,Wehr,Weil,Weilheim,Weisenbach,Wembach,Wieden,Wiesental,Wildbad,Wildberg,Winzeln,Wittlingen,Wittnau,Wolfach,Wutach,Wutoschingen,Wyhlen,Zavelstein"},
