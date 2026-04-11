@@ -1,11 +1,12 @@
-﻿using MapGen.Core;
+﻿using Castle.Components.DictionaryAdapter.Xml;
+using MapGen.Core;
 using MapGen.Core.Helpers;
 using MapGen.Core.Modules;
 using Newtonsoft.Json;
 
 namespace MapGen.Tests
 {
-    public class JsChainDump
+    public class RegressionChainDump
     {
         public int index { get; set; }
         public string name { get; set; }
@@ -13,71 +14,156 @@ namespace MapGen.Tests
         public Dictionary<string, List<string>> chain { get; set; }
     }
 
+    public class RegressionJson
+    {
+        public string Seed { get; set; }
+        public List<double> RngCheck { get; set; } // Added this
+        public List<string> GetBase { get; set; }
+        public List<string> GetBaseShort { get; set; }
+        public List<string> GetState { get; set; }
+        public List<string> GetMapName { get; set; }
+    }
+
+    public class RegressionNameData 
+    { 
+        public int index { get; set; } 
+        public string baseName { get; set; } 
+        public List<string> names { get; set; }
+    }
+
     public class NameTests
     {
-
-        private readonly List<JsChainDump> _jsReferenceData;
+        private readonly List<RegressionChainDump> _chainReferenceData;
+        private readonly List<RegressionNameData> _nameReferenceData;
 
         public NameTests()
         {
-            // Load the JS dump file once for all tests in this class
-            string jsonContent = File.ReadAllText("data/markov_chains_regression.json");
-            _jsReferenceData = JsonConvert.DeserializeObject<List<JsChainDump>>(jsonContent);
+            string chainData = File.ReadAllText("data/markov_chains_regression.json");
+            _chainReferenceData = JsonConvert.DeserializeObject<List<RegressionChainDump>>(chainData);
+
+            var nameData = File.ReadAllText("data/regression_name_generation.json");
+            _nameReferenceData = JsonConvert.DeserializeObject<List<RegressionNameData>>(nameData);
+        }
+
+
+        [Theory]
+        // Real-world bases by Azgaar
+        [InlineData(0, "German")]
+        [InlineData(1, "English")]
+        [InlineData(2, "French")]
+        [InlineData(3, "Italian")]
+        [InlineData(4, "Castillian")]
+        [InlineData(5, "Ruthenian")]
+        [InlineData(6, "Nordic")]
+        [InlineData(7, "Greek")]
+        [InlineData(8, "Roman")]
+        [InlineData(9, "Finnic")]
+        [InlineData(10, "Korean")]
+        [InlineData(11, "Chinese")]
+        [InlineData(12, "Japanese")]
+        [InlineData(13, "Portuguese")]
+        [InlineData(14, "Nahuatl")]
+        [InlineData(15, "Hungarian")]
+        [InlineData(16, "Turkish")]
+        [InlineData(17, "Berber")]
+        [InlineData(18, "Arabic")]
+        [InlineData(19, "Inuit")]
+        [InlineData(20, "Basque")]
+        [InlineData(21, "Nigerian")]
+        [InlineData(22, "Celtic")]
+        [InlineData(23, "Mesopotamian")]
+        [InlineData(24, "Iranian")]
+        [InlineData(25, "Hawaiian")]
+        [InlineData(26, "Karnataka")]
+        [InlineData(27, "Quechua")]
+        [InlineData(28, "Swahili")]
+        [InlineData(29, "Vietnamese")]
+        [InlineData(30, "Cantonese")]
+        [InlineData(31, "Mongolian")]
+        // Fantasy bases by Dopu
+        [InlineData(32, "Human Generic")]
+        [InlineData(33, "Elven")]
+        [InlineData(34, "Dark Elven")]
+        [InlineData(35, "Dwarven")]
+        [InlineData(36, "Goblin")]
+        [InlineData(37, "Orc")]
+        [InlineData(38, "Giant")]
+        [InlineData(39, "Draconic")]
+        [InlineData(40, "Arachnid")]
+        [InlineData(41, "Serpents")]
+        // Additional by Avengium
+        [InlineData(42, "Levantine")]
+        public void GenerateName_MatchesJSReference(int baseIndex, string expectedBaseName)
+        {
+            // 1. Load data
+            var rng = new AleaRandom("42");
+            var reference = _nameReferenceData[baseIndex];
+
+            // 2. Setup the NameBase (ensure it has the same chain logic we just fixed)
+            //var nameBase = NameModule.GetNameBases()[baseIndex];
+
+            Assert.Equal(baseIndex, reference.index);
+            Assert.Equal(expectedBaseName, reference.baseName);
+            Assert.Equal(100, reference.names.Count);
+
+            for (int i = 0; i < 100; i++) 
+            {
+                string actualName = NameModule.GetBase(rng, baseIndex);
+                Assert.Equal(actualName, reference.names[i]);
+            }
         }
 
         [Theory]
         // Real-world bases by Azgaar
-        [InlineData(0)]  // German
-        [InlineData(1)]  // English
-        [InlineData(2)]  // French
-        [InlineData(3)]  // Italian
-        [InlineData(4)]  // Castillian
-        [InlineData(5)]  // Ruthenian
-        [InlineData(6)]  // Nordic
-        [InlineData(7)]  // Greek
-        [InlineData(8)]  // Roman
-        [InlineData(9)]  // Finnic
-        [InlineData(10)] // Korean
-        [InlineData(11)] // Chinese
-        [InlineData(12)] // Japanese
-        [InlineData(13)] // Portuguese
-        [InlineData(14)] // Nahuatl
-        [InlineData(15)] // Hungarian
-        [InlineData(16)] // Turkish
-        [InlineData(17)] // Berber
-        [InlineData(18)] // Arabic
-        [InlineData(19)] // Inuit
-        [InlineData(20)] // Basque
-        [InlineData(21)] // Nigerian
-        [InlineData(22)] // Celtic
-        [InlineData(23)] // Mesopotamian
-        [InlineData(24)] // Iranian
-        [InlineData(25)] // Hawaiian
-        [InlineData(26)] // Karnataka
-        [InlineData(27)] // Quechua
-        [InlineData(28)] // Swahili
-        [InlineData(29)] // Vietnamese
-        [InlineData(30)] // Cantonese
-        [InlineData(31)] // Mongolian
-
+        [InlineData(0, "German")]
+        [InlineData(1, "English")]
+        [InlineData(2, "French")]
+        [InlineData(3, "Italian")]
+        [InlineData(4, "Castillian")]
+        [InlineData(5, "Ruthenian")]
+        [InlineData(6, "Nordic")]
+        [InlineData(7, "Greek")]
+        [InlineData(8, "Roman")]
+        [InlineData(9, "Finnic")]
+        [InlineData(10, "Korean")]
+        [InlineData(11, "Chinese")]
+        [InlineData(12, "Japanese")]
+        [InlineData(13, "Portuguese")]
+        [InlineData(14, "Nahuatl")]
+        [InlineData(15, "Hungarian")]
+        [InlineData(16, "Turkish")]
+        [InlineData(17, "Berber")]
+        [InlineData(18, "Arabic")]
+        [InlineData(19, "Inuit")]
+        [InlineData(20, "Basque")]
+        [InlineData(21, "Nigerian")]
+        [InlineData(22, "Celtic")]
+        [InlineData(23, "Mesopotamian")]
+        [InlineData(24, "Iranian")]
+        [InlineData(25, "Hawaiian")]
+        [InlineData(26, "Karnataka")]
+        [InlineData(27, "Quechua")]
+        [InlineData(28, "Swahili")]
+        [InlineData(29, "Vietnamese")]
+        [InlineData(30, "Cantonese")]
+        [InlineData(31, "Mongolian")]
         // Fantasy bases by Dopu
-        [InlineData(32)] // Human Generic
-        [InlineData(33)] // Elven
-        [InlineData(34)] // Dark Elven
-        [InlineData(35)] // Dwarven
-        [InlineData(36)] // Goblin
-        [InlineData(37)] // Orc
-        [InlineData(38)] // Giant
-        [InlineData(39)] // Draconic
-        [InlineData(40)] // Arachnid
-        [InlineData(41)] // Serpents
-
-        // Additional bases by Avengium
-        [InlineData(42)] // Levantine
-        public void CalculateChain_OutputMatchesJSReference(int baseIndex)
+        [InlineData(32, "Human Generic")]
+        [InlineData(33, "Elven")]
+        [InlineData(34, "Dark Elven")]
+        [InlineData(35, "Dwarven")]
+        [InlineData(36, "Goblin")]
+        [InlineData(37, "Orc")]
+        [InlineData(38, "Giant")]
+        [InlineData(39, "Draconic")]
+        [InlineData(40, "Arachnid")]
+        [InlineData(41, "Serpents")]
+        // Additional by Avengium
+        [InlineData(42, "Levantine")]
+        public void CalculateChain_OutputMatchesJSReference(int baseIndex, string expectedBaseName)
         {
             // 1. Arrange: Find the reference data for this index
-            var reference = _jsReferenceData.FirstOrDefault(d => d.index == baseIndex);
+            var reference = _chainReferenceData.FirstOrDefault(d => d.index == baseIndex);
             Assert.NotNull(reference);
 
             var nameBase = NameModule.GetNameBases()[baseIndex];
@@ -89,6 +175,9 @@ namespace MapGen.Tests
             // First, check that the set of keys (previous characters) is identical
             var expectedKeys = reference.chain.Keys.OrderBy(k => k).ToList();
             var actualKeys = actualChain.Keys.OrderBy(k => k).ToList();
+
+            Assert.Equal(baseIndex, nameBase.Index);
+            Assert.Equal(expectedBaseName, nameBase.Name);
 
             Assert.True(expectedKeys.SequenceEqual(actualKeys),
                 $"Key mismatch for {reference.name}. " +
@@ -106,6 +195,9 @@ namespace MapGen.Tests
                     $"Actual:   {string.Join(",", actualSyllables)}");
             }
         }
+
+
+
 
         [Fact]
         public void AssertNamesAgainstJsRegressionFile()
@@ -170,15 +262,7 @@ namespace MapGen.Tests
             }
         }
 
-        public class RegressionJson
-        {
-            public string Seed { get; set; }
-            public List<double> RngCheck { get; set; } // Added this
-            public List<string> GetBase { get; set; }
-            public List<string> GetBaseShort { get; set; }
-            public List<string> GetState { get; set; }
-            public List<string> GetMapName { get; set; }
-        }
+
 
     }
 }
