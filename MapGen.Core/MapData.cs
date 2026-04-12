@@ -99,6 +99,7 @@ namespace MapGen.Core
         public List<MapRiver> Rivers { get; set; } = new List<MapRiver>();
         public List<MapCulture> Cultures { get; set; } = new List<MapCulture>();
         public List<MapBurg> Burgs { get; set; } = new List<MapBurg>();
+        public List<MapState> States { get; set; } = new List<MapState>();
 
         public MapFeature GetFeature(int id) => Features[id - 1];
         public MapBurg GetBurg(int id) => Burgs[id - 1];
@@ -231,6 +232,40 @@ namespace MapGen.Core
         public string Name { get; set; }
         public ushort FeatureId { get; set; }
         public bool IsCapital { get; set; }
+    }
+
+    public class MapState
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Color { get; set; }
+
+        // Expansion logic properties
+        public double Expansionism { get; set; }
+        public int CenterCell { get; set; }
+        public int CapitalId { get; set; }
+
+        // Demographic/Culture properties
+        public int CultureId { get; set; }
+        public CultureType Type { get; set; } // e.g., "Naval", "Nomadic", "Highland"
+
+        // Visuals
+        public MapCoA CoA { get; set; }
+
+        // Geographic properties (calculated in later steps)
+        public double[] Pole { get; set; } // [x, y] coordinates for label placement
+        public List<int> Neighbors { get; set; } = new List<int>();
+
+        // Stats
+        public int Area { get; set; }
+        public int Population { get; set; }
+        public int BurgsCount { get; set; }
+    }
+
+    public class MapCoA
+    {
+        public string Shield { get; set; }
+        public CultureType Type { get; set; }
     }
 
     public readonly struct PointFlux

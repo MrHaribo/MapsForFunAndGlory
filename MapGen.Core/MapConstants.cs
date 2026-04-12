@@ -84,5 +84,8 @@
 
         // Burg Constants
         public const int BURG_MAX_COUNT = 1000;
+
+        // State Constants
+        public const double STATE_SIZE_VARIETY = 1.0f; 
     }
 }
