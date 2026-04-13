@@ -144,7 +144,36 @@ namespace MapGen.Core.Modules
                     }
 
                     // 4. Determine Downhill (Min)
-                    int min = GetLowestNeighbor(i, lakeOutCells.ContainsKey(i) ? (int?)lakeOutCells[i] : null);
+                    int min = -1;
+                    if (lakeOutCells.TryGetValue(i, out int lakeOutFeatureId))
+                    {
+                        // 1. Emulate JS: filter() creates a new array, sort() doesn't affect the original
+                        var filtered = cells[i].NeighborCells
+                            .Where(c => cells[c].FeatureId != lakeOutFeatureId)
+                            .OrderBy(c => h[c]) // OrderBy is a stable sort
+                            .ToList();
+
+                        if (filtered.Count > 0) min = filtered[0];
+                    }
+                    else if (cells[i].Haven > 0)
+                    {
+                        min = cells[i].Haven;
+                    }
+                    else
+                    {
+                        // 2. Emulate JS: sort() MUTATES the global array!
+                        // We reassign the NeighborCells list to the height-sorted version.
+                        var sortedNeighbors = cells[i].NeighborCells
+                            .OrderBy(c => h[c]) // Stable sort matches modern JS V8
+                            .ToList();
+
+                        // TODO: Azgaar "Bug" in-place sorting changes neighbor ordering for some cells
+                        cells[i].NeighborCells = sortedNeighbors; // PERMANENT MUTATION
+
+                        if (sortedNeighbors.Count > 0) min = sortedNeighbors[0];
+                    }
+
+                    if (min == -1) continue; // Safety check
 
                     // Depression check
                     if (h[i] <= h[min]) continue;

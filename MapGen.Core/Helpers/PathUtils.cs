@@ -94,5 +94,113 @@ namespace MapGen.Core.Helpers
             }
             return area / 2.0;
         }
+
+        /// <summary>
+        /// Finds the Pole of Inaccessibility (the point furthest from the borders) 
+        /// for groups of cells defined by a specific type accessor.
+        /// </summary>
+        public static Dictionary<int, MapPoint> GetPolesOfInaccessibility(MapPack pack, Func<int, int> getType)
+        {
+            var cells = pack.Cells;
+            var poles = new Dictionary<int, MapPoint>();
+
+            // 1. Group cells by their Type (e.g., StateId)
+            var cellsByType = new Dictionary<int, List<int>>();
+            for (int i = 0; i < cells.Length; i++)
+            {
+                int type = getType(i);
+                if (type == 0) continue; // 0 usually means None/Neutral
+
+                if (!cellsByType.ContainsKey(type))
+                    cellsByType[type] = new List<int>();
+
+                cellsByType[type].Add(i);
+            }
+
+            // 2. Find the deepest cell for each type using a Distance Transform
+            foreach (var kvp in cellsByType)
+            {
+                int type = kvp.Key;
+                var typeCells = kvp.Value;
+
+                var distances = new Dictionary<int, double>();
+                var queue = new Queue<int>();
+
+                // Step A: Identify borders
+                foreach (int cellId in typeCells)
+                {
+                    bool isBorder = cells[cellId].Border > 0; // Touches map edge
+
+                    if (!isBorder)
+                    {
+                        foreach (int n in cells[cellId].NeighborCells)
+                        {
+                            if (getType(n) != type)
+                            {
+                                isBorder = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isBorder)
+                    {
+                        distances[cellId] = 0;
+                        queue.Enqueue(cellId);
+                    }
+                    else
+                    {
+                        distances[cellId] = double.MaxValue;
+                    }
+                }
+
+                // Step B: Multi-source BFS to propagate distance inward
+                int deepestCell = -1;
+                double maxDist = -1;
+
+                while (queue.Count > 0)
+                {
+                    int curr = queue.Dequeue();
+                    double currDist = distances[curr];
+
+                    // Track the cell with the highest distance
+                    if (currDist > maxDist)
+                    {
+                        maxDist = currDist;
+                        deepestCell = curr;
+                    }
+
+                    foreach (int n in cells[curr].NeighborCells)
+                    {
+                        if (getType(n) == type)
+                        {
+                            // Calculate actual geographic distance between cell centers
+                            double distToNeighbor = currDist + Math.Sqrt(
+                                Math.Pow(cells[curr].Point.X - cells[n].Point.X, 2) +
+                                Math.Pow(cells[curr].Point.Y - cells[n].Point.Y, 2));
+
+                            if (distToNeighbor < distances[n])
+                            {
+                                distances[n] = distToNeighbor;
+                                queue.Enqueue(n);
+                            }
+                        }
+                    }
+                }
+
+                // Step C: Record the pole
+                if (deepestCell != -1)
+                {
+                    poles[type] = cells[deepestCell].Point;
+                }
+                else if (typeCells.Count > 0)
+                {
+                    // Fallback: If it's a 1-cell state, just use its center
+                    poles[type] = cells[typeCells[0]].Point;
+                }
+            }
+
+            return poles;
+        }
     }
 }

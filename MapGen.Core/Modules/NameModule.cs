@@ -267,23 +267,22 @@ namespace MapGen.Core.Modules
 
         #region State Name
 
-        public static string GetStateName(IRandom rng, string name, int? culture = null, int? baseIndex = null)
+        public static string GetStateName(IRandom rng, string name, int baseIndex)
         {
             if (string.IsNullOrEmpty(name)) return "Unknown";
 
-            int b = baseIndex ?? 0;
+            int b = baseIndex; // Explicitly map it
 
             // 1. Clean up multi-word names for states
             if (name.Contains(" "))
             {
-                // JS: splits, capitalizes parts, and joins with NO space
                 string cleaned = name.Replace(" ", "").ToLowerInvariant();
-                name = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned);
+                name = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned);
             }
 
             // 2. Remove common settlement endings
-            if (name.Length > 6 && name.EndsWith("berg")) name = name.Substring(0, name.Length - 4);
-            if (name.Length > 5 && name.EndsWith("ton")) name = name.Substring(0, name.Length - 3);
+            if (name.Length > 6 && name.EndsWith("berg")) name = name[..^4];
+            if (name.Length > 5 && name.EndsWith("ton")) name = name[..^3];
 
             // 3. Culture-specific root adjustments
             if (b == 5 && (name.EndsWith("sk") || name.EndsWith("ev") || name.EndsWith("ov")))
@@ -292,33 +291,28 @@ namespace MapGen.Core.Modules
             }
             else if (b == 12)
             {
-                // Japanese: returns immediately in JS logic
                 return IsVowel(name[name.Length - 1]) ? name : name + "u";
             }
             else if (b == 18 && rng.P(0.4))
             {
-                // Arabic prefix "Al"
-                // IMPORTANT: Update 'name' and DO NOT return. 
-                // This allows the suffix logic below to run on the new name.
                 bool startsWithVowel = IsVowel(name[0]);
                 name = startsWithVowel ? "Al" + name.ToLowerInvariant() : "Al " + name;
             }
 
-            // 4. Fantasy bases (33-41) usually don't get suffixes
+            // 4. Fantasy bases (33-41)
             if (b > 32 && b < 42) return name;
 
             // 5. Determine if we should trim the root before adding a suffix
             bool useSuffix = true;
             if (name.Length > 3 && IsVowel(name[name.Length - 1]))
             {
-                // Check if the penultimate character is also a vowel
                 if (IsVowel(name[name.Length - 2]) && rng.P(0.85))
                 {
-                    name = name.Substring(0, name.Length - 2); // trim double vowel
+                    name = name[..^2]; // trim double vowel
                 }
                 else if (rng.P(0.7))
                 {
-                    name = name.Substring(0, name.Length - 1); // trim single vowel
+                    name = name[..^1]; // trim single vowel
                 }
                 else
                 {
@@ -334,7 +328,7 @@ namespace MapGen.Core.Modules
 
             // 6. Define the suffix based on Culture Base
             string suffix = "ia";
-            double rnd = rng.Next(); // This must be called here to match JS RNG consumption
+            double rnd = rng.Next(); // Pulled at the exact same spot as JS
             int l = name.Length;
 
             if ((b == 3 || b == 4 || b == 13) && rnd < 0.03 && l < 7) suffix = "terra";

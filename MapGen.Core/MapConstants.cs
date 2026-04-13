@@ -86,6 +86,8 @@
         public const int BURG_MAX_COUNT = 1000;
 
         // State Constants
-        public const double STATE_SIZE_VARIETY = 1.0f; 
+        public const double STATE_SIZE_VARIETY = 4.3;
+        public const double STATE_GLOBAL_GROWTH_RATE = 1.8;
+        public const double STATE_GROWTH_RATE = 1.0;
     }
 }

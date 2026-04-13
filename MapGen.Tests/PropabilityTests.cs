@@ -90,7 +90,7 @@ namespace MapGen.Tests
         public void GetNumberInRange_WholeNumber_ZeroRngConsumption()
         {
             // IMPORTANT: Passing "10" must not call rng.Next() to preserve sequence
-            var result = Probability.GetNumberInRange(_mockRng.Object, "10");
+            var result = Propability.GetNumberInRange(_mockRng.Object, "10");
 
             Assert.Equal(10, result);
             _mockRng.Verify(r => r.Next(), Times.Never);
@@ -102,7 +102,7 @@ namespace MapGen.Tests
             // "5-10" calls Next(5, 10)
             // Roll 0.5: Floor(0.5 * 6) + 5 = 3 + 5 = 8
             _mockRng.Setup(r => r.Next()).Returns(0.5);
-            var result = Probability.GetNumberInRange(_mockRng.Object, "5-10");
+            var result = Propability.GetNumberInRange(_mockRng.Object, "5-10");
 
             Assert.Equal(8, result);
         }
@@ -113,7 +113,7 @@ namespace MapGen.Tests
             // "-10--5" -> min: -10, max: -5. Range size: 6.
             // Roll 0.5: Floor(0.5 * 6) - 10 = 3 - 10 = -7
             _mockRng.Setup(r => r.Next()).Returns(0.5);
-            var result = Probability.GetNumberInRange(_mockRng.Object, "-10--5");
+            var result = Propability.GetNumberInRange(_mockRng.Object, "-10--5");
 
             Assert.Equal(-7, result);
         }
@@ -124,7 +124,7 @@ namespace MapGen.Tests
             // "10--5" -> min: 10, max: -5. Range size: 16 (from -5 to 10 inclusive)
             // Roll 0.5: Floor(0.5 * 16) - 5 = 8 - 5 = 3
             _mockRng.Setup(r => r.Next()).Returns(0.5);
-            var result = Probability.GetNumberInRange(_mockRng.Object, "10--5");
+            var result = Propability.GetNumberInRange(_mockRng.Object, "10--5");
             Assert.Equal(3, result);
         }
 
@@ -154,7 +154,7 @@ namespace MapGen.Tests
                 .Returns(0.8);
 
             // We mostly want to test the clamping/rounding logic here
-            var result = Probability.Gauss(_mockRng.Object, expected: 100, deviation: 10, min: 150, max: 200);
+            var result = Propability.Gauss(_mockRng.Object, expected: 100, deviation: 10, min: 150, max: 200);
 
             // Since expected is 100 but min is 150, the result MUST be 150
             Assert.Equal(150, result);
@@ -164,7 +164,7 @@ namespace MapGen.Tests
         public void GenerateSeed_ProducesNineDigitString()
         {
             _mockRng.Setup(r => r.Next()).Returns(0.123456789);
-            var seed = Probability.GenerateSeed(_mockRng.Object);
+            var seed = Propability.GenerateSeed(_mockRng.Object);
 
             // 0.123456789 * 1e9 = 123456789
             Assert.Equal("123456789", seed);

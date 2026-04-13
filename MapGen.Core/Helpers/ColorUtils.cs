@@ -39,33 +39,68 @@ namespace MapGen.Core.Helpers
 
         public static string GetRandomColor(IRandom rng)
         {
-            return GetRainbowHex(rng.Next());
+            return GetRainbowHex(rng.Next()); // Consumes exactly 1 RNG call
         }
 
         public static string GetMixedColor(string color, IRandom rng, double mix = 0.2, double bright = 0.3)
         {
-            // If provided color is not hex (e.g. hatching), generate random one
+            // If provided color is not hex, generate random one
             string c = (!string.IsNullOrEmpty(color) && color.StartsWith("#")) ? color : GetRandomColor(rng);
             string randomColor = GetRandomColor(rng);
 
             var (r1, g1, b1) = HexToRgb(c);
             var (r2, g2, b2) = HexToRgb(randomColor);
 
-            // 1. d3.interpolate(c, getRandomColor())(mix) -> Standard RGB linear interpolation
-            double rMix = r1 * (1 - mix) + r2 * mix;
-            double gMix = g1 * (1 - mix) + g2 * mix;
-            double bMix = b1 * (1 - mix) + b2 * mix;
+            // 1. Emulate D3 Interpolate Stringification (Math.round in JS)
+            int rMix = (int)Math.Floor(r1 * (1 - mix) + r2 * mix + 0.5);
+            int gMix = (int)Math.Floor(g1 * (1 - mix) + g2 * mix + 0.5);
+            int bMix = (int)Math.Floor(b1 * (1 - mix) + b2 * mix + 0.5);
 
-            // 2. .brighter(bright) -> D3 multiplies channels by (1 / 0.7) ^ k
+            // 2. Emulate D3 .brighter(bright)
             double k = Math.Pow(1.0 / 0.7, bright);
-            rMix *= k;
-            gMix *= k;
-            bMix *= k;
+            double rBright = rMix * k;
+            double gBright = gMix * k;
+            double bBright = bMix * k;
 
-            // Clamp values between 0 and 255
-            int rFinal = (int)Math.Clamp(Math.Round(rMix), 0, 255);
-            int gFinal = (int)Math.Clamp(Math.Round(gMix), 0, 255);
-            int bFinal = (int)Math.Clamp(Math.Round(bMix), 0, 255);
+            // 3. Emulate D3 .hex() (Math.round in JS)
+            int rFinal = (int)Math.Clamp(Math.Floor(rBright + 0.5), 0, 255);
+            int gFinal = (int)Math.Clamp(Math.Floor(gBright + 0.5), 0, 255);
+            int bFinal = (int)Math.Clamp(Math.Floor(bBright + 0.5), 0, 255);
+
+            return $"#{rFinal:x2}{gFinal:x2}{bFinal:x2}";
+        }
+
+        private static string GetRainbowHex(double t)
+        {
+            if (t < 0 || t > 1) t -= Math.Floor(t);
+            double ts = Math.Abs(t - 0.5);
+
+            double h = 360 * t - 100;
+            double s = 1.5 - 1.5 * ts;
+            double l = 0.8 - 0.9 * ts; // FIXED: D3 uses 0.9!
+
+            // Cubehelix magic constants
+            double A = -0.14861;
+            double B = 1.78277;
+            double C = -0.29227;
+            double D = -0.90649;
+            double E = 1.97294;
+
+            double hRad = (h + 120) * (Math.PI / 180.0);
+            double a = s * l * (1.0 - l);
+
+            double cosh = Math.Cos(hRad);
+            double sinh = Math.Sin(hRad);
+
+            // D3 d3-color Cubehelix to RGB Conversion
+            double r = 255 * (l + a * (A * cosh + B * sinh));
+            double g = 255 * (l + a * (C * cosh + D * sinh));
+            double b = 255 * (l + a * (E * cosh)); // FIXED: Back to E * cosh
+
+            // JS Math.round logic
+            int rFinal = (int)Math.Clamp(Math.Floor(r + 0.5), 0, 255);
+            int gFinal = (int)Math.Clamp(Math.Floor(g + 0.5), 0, 255);
+            int bFinal = (int)Math.Clamp(Math.Floor(b + 0.5), 0, 255);
 
             return $"#{rFinal:x2}{gFinal:x2}{bFinal:x2}";
         }
@@ -86,17 +121,6 @@ namespace MapGen.Core.Helpers
             }
 
             return "";
-        }
-
-        private static string GetRainbowHex(double t)
-        {
-            t = Math.Clamp(t, 0, 1);
-            // Standard D3 Rainbow interpolation formula
-            double r = Math.Round(255 * (0.5 + 0.5 * Math.Sin(Math.PI * (2 * t + 0.5))));
-            double g = Math.Round(255 * (0.5 + 0.5 * Math.Sin(Math.PI * (2 * t + 0.5 + 2.0 / 3.0))));
-            double b = Math.Round(255 * (0.5 + 0.5 * Math.Sin(Math.PI * (2 * t + 0.5 + 4.0 / 3.0))));
-
-            return $"#{((int)r):x2}{((int)g):x2}{((int)b):x2}";
         }
 
         private static (int r, int g, int b) HexToRgb(string hex)

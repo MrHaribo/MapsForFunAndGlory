@@ -85,7 +85,7 @@ namespace MapGen.Core.Modules
 
         private static void AddHill(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
-            int count = Probability.GetNumberInRange(rng, countArg);
+            int count = Propability.GetNumberInRange(rng, countArg);
             while (count > 0)
             {
                 AddOneHill(data, rng, rangeX, rangeY, heightArg);
@@ -98,7 +98,7 @@ namespace MapGen.Core.Modules
             // 1. Setup
             double blobPower = GetBlobPower(data.PointsCount);
             double[] change = new double[data.Cells.Length];
-            int h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
+            int h = Math.Clamp(Propability.GetNumberInRange(rng, heightArg), 0, 100);
 
             int start = -1;
             int limit = 0;
@@ -153,7 +153,7 @@ namespace MapGen.Core.Modules
 
         private static void AddPit(MapData data, IRandom rng, string countArg, string heightArg, string rangeX, string rangeY)
         {
-            int count = Probability.GetNumberInRange(rng, countArg);
+            int count = Propability.GetNumberInRange(rng, countArg);
             while (count > 0)
             {
                 AddOnePit(data, rng, rangeX, rangeY, heightArg);
@@ -166,7 +166,7 @@ namespace MapGen.Core.Modules
             byte[] used = new byte[data.Cells.Length];
             double blobPower = GetBlobPower(data.PointsCount);
             int limit = 0, start = -1;
-            double h = Math.Clamp(Probability.GetNumberInRange(rng, heightArg), 0, 100);
+            double h = Math.Clamp(Propability.GetNumberInRange(rng, heightArg), 0, 100);
 
             // 1. Find Start Point
             do

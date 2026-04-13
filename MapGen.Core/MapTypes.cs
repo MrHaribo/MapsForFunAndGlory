@@ -31,4 +31,28 @@ namespace MapGen.Core
         River,
         Hunting
     }
+
+    public enum DiplomacyRelation
+    {
+        None,       // Replaces "x"
+        Ally,
+        Friendly,
+        Neutral,
+        Suspicion,
+        Rival,
+        Unknown,
+        Vassal,
+        Suzerain,
+        Enemy
+    }
+
+    public enum StateForm
+    {
+        Undefined,
+        Monarchy,
+        Republic,
+        Union,
+        Theocracy,
+        Anarchy
+    }
 }

@@ -100,6 +100,7 @@ namespace MapGen.Core
         public List<MapCulture> Cultures { get; set; } = new List<MapCulture>();
         public List<MapBurg> Burgs { get; set; } = new List<MapBurg>();
         public List<MapState> States { get; set; } = new List<MapState>();
+        public List<List<string>> DiplomacyChronicle { get; set; } = new List<List<string>>();
 
         public MapFeature GetFeature(int id) => Features[id - 1];
         public MapBurg GetBurg(int id) => Burgs[id - 1];
@@ -254,13 +255,29 @@ namespace MapGen.Core
         public MapCoA CoA { get; set; }
 
         // Geographic properties (calculated in later steps)
-        public double[] Pole { get; set; } // [x, y] coordinates for label placement
+        public MapPoint Pole { get; set; } // [x, y] coordinates for label placement
         public List<int> Neighbors { get; set; } = new List<int>();
 
         // Stats
         public int Area { get; set; }
         public int Population { get; set; }
         public int BurgsCount { get; set; }
+
+        public DiplomacyRelation[] Diplomacy { get; set; }
+        public StateForm Form { get; set; }
+        // FormName (e.g. "Grand Duchy", "Khaganate") stays string since it's directly printed
+        public string FormName { get; set; }
+        public string FullName { get; set; }
+        public List<MapCampaign> Campaigns { get; set; } = new List<MapCampaign>();
+    }
+
+    public class MapCampaign
+    {
+        public string Name { get; set; }
+        public int Start { get; set; }
+        public int End { get; set; }
+        public int Attacker { get; set; }
+        public int Defender { get; set; }
     }
 
     public class MapCoA

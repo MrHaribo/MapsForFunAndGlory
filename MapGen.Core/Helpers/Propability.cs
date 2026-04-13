@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace MapGen.Core.Helpers
 {
-    public static class Probability
+    public static class Propability
     {
         // --- Basic Range Extensions ---
 
@@ -34,7 +35,6 @@ namespace MapGen.Core.Helpers
 
         public static T Ra<T>(this IRandom rng, T[] array)
             => array[rng.Next(0, array.Length - 1)];
-
         public static string Rw(this IRandom rng, Dictionary<string, int> obj)
         {
             var list = new List<string>();
@@ -52,6 +52,11 @@ namespace MapGen.Core.Helpers
                     list.Add(kvp.Key);
 
             return rng.Ra(list.ToArray());
+        }
+
+        public static Func<int, bool> Each(int n)
+        {
+            return i => i % n == 0;
         }
 
         public static int Biased(this IRandom rng, int min, int max, double ex)
