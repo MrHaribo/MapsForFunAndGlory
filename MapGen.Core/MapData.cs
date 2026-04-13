@@ -139,6 +139,7 @@ namespace MapGen.Core
         public float Population { get; set; }   // cells.pop
         public int CultureId { get; set; }
         public ushort BurgId { get; set; }
+        public int StateId { get; set; }
     }
 
     public class MapVertex

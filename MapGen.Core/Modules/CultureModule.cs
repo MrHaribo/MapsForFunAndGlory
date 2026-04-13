@@ -57,7 +57,7 @@ namespace MapGen.Core.Modules
             // Create an empty quadtree to track centers as we place them
             var quadDatas = new List<QuadPoint>();
             var centers = new QuadTree<QuadPoint, QuadPointNode>(quadDatas);
-            var colors = ColorUtil.GetColors(count, pack.Rng);
+            var colors = ColorUtils.GetColors(count, pack.Rng);
 
 
             // 4. Main Generation Loop
@@ -539,7 +539,7 @@ namespace MapGen.Core.Modules
             double neutralRate = MapConstants.CULTURE_NATURAL_EXPAND_RATE;
             double maxExpansionCost = cells.Length * 0.6 * neutralRate;
 
-            var queue = new MinHeap();
+            var queue = new PriorityQueue<(int cellId, int cultureId), double>();
             // In JS, the 'cost' array is sparse. We use 0.0 to represent 'undefined' 
             // because path costs in this algorithm are always > 0.
             double[] costs = new double[cells.Length];
@@ -559,7 +559,7 @@ namespace MapGen.Core.Modules
                 // JS: queue.push({cellId: culture.center, cultureId: culture.i, priority: 0}, 0);
                 // Note: We DO NOT set costs[center] or cells[center].CultureId here 
                 // to stay bitwise-identical to the provided JS snippet.
-                queue.Enqueue(culture.CenterCell, culture.Id, 0.0);
+                queue.Enqueue((culture.CenterCell, culture.Id), 0.0);
 
                 // OPTIMIZATION: Explicitly set the cost of the center to a tiny non-zero value.
                 // This prevents the expansion from "doubling back" to the start.
@@ -613,9 +613,11 @@ namespace MapGen.Core.Modules
             }
 
             // 4. Main Expansion Loop
-            while (queue.Count > 0)
+            while (queue.TryDequeue(out var item, out double priority))
             {
-                var (cellId, cultureId, priority) = queue.Dequeue();
+                // Unpack the tuple
+                int cellId = item.cellId;
+                int cultureId = item.cultureId;
 
                 // OPTIMIZATION: If we already processed this cell via a cheaper path, 
                 // skip re-calculating its neighbors.
@@ -663,65 +665,9 @@ namespace MapGen.Core.Modules
                         }
 
                         costs[neibCellId] = totalCost;
-                        queue.Enqueue(neibCellId, cultureId, totalCost);
+                        queue.Enqueue((neibCellId, cultureId), totalCost);
                     }
                 }
-            }
-        }
-
-
-
-        #endregion
-
-        #region MinHeap
-
-        private class MinHeap
-        {
-            private readonly List<(int cellId, int cultureId, double priority)> _nodes = new List<(int, int, double)>();
-
-            public int Count => _nodes.Count;
-
-            public void Enqueue(int cellId, int cultureId, double priority)
-            {
-                _nodes.Add((cellId, cultureId, priority));
-                int i = _nodes.Count - 1;
-                while (i > 0)
-                {
-                    int parent = (i - 1) / 2;
-                    if (_nodes[i].priority >= _nodes[parent].priority) break;
-                    Swap(i, parent);
-                    i = parent;
-                }
-            }
-
-            public (int cellId, int cultureId, double priority) Dequeue()
-            {
-                var root = _nodes[0];
-                _nodes[0] = _nodes[_nodes.Count - 1];
-                _nodes.RemoveAt(_nodes.Count - 1);
-
-                int i = 0;
-                while (true)
-                {
-                    int left = 2 * i + 1;
-                    int right = 2 * i + 2;
-                    int smallest = i;
-
-                    if (left < _nodes.Count && _nodes[left].priority < _nodes[smallest].priority) smallest = left;
-                    if (right < _nodes.Count && _nodes[right].priority < _nodes[smallest].priority) smallest = right;
-
-                    if (smallest == i) break;
-                    Swap(i, smallest);
-                    i = smallest;
-                }
-                return root;
-            }
-
-            private void Swap(int a, int b)
-            {
-                var temp = _nodes[a];
-                _nodes[a] = _nodes[b];
-                _nodes[b] = temp;
             }
         }
 
