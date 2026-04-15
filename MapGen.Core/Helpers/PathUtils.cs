@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace MapGen.Core.Helpers
 {
     public static class PathUtils
     {
+        #region Connect Vertices
+
         public static List<int> ConnectVertices(MapPack pack, int startingVertex, Func<int, bool> ofSameType, Action<int> addToChecked = null, bool closeRing = false)
         {
             var vertices = pack.Vertices;
@@ -45,6 +48,10 @@ namespace MapGen.Core.Helpers
             return chain;
         }
 
+        #endregion
+
+        #region Polygon Area
+
         public static double CalculatePolygonArea(MapCell cell, MapVertex[] vertices)
         {
             double area = 0;
@@ -56,21 +63,6 @@ namespace MapGen.Core.Helpers
             }
             return area / 2.0;
         }
-
-        //public static double CalculatePolygonArea(List<MapPoint> points)
-        //{
-        //    if (points.Count < 3) return 0;
-        //    double area = 0;
-        //    var b = points[points.Count - 1];
-
-        //    for (int i = 0; i < points.Count; i++)
-        //    {
-        //        var a = b;
-        //        b = points[i];
-        //        area += a.Y * b.X - a.X * b.Y;
-        //    }
-        //    return area / 2.0;
-        //}
 
         public static double CalculatePolygonArea(List<MapPoint> points)
         {
@@ -94,6 +86,10 @@ namespace MapGen.Core.Helpers
             }
             return area / 2.0;
         }
+
+        #endregion
+
+        #region PolesOfInaccessibility
 
         /// <summary>
         /// Finds the Pole of Inaccessibility (the point furthest from the borders) 
@@ -201,6 +197,89 @@ namespace MapGen.Core.Helpers
             }
 
             return poles;
+        }
+
+        #endregion
+
+        #region Find Path
+
+        /// <summary>
+        /// Finds the shortest path between two cells using a cost-based pathfinding algorithm.
+        /// </summary>
+        public static List<int> FindPath(MapPack pack, int start, Func<int, bool> isExit, Func<int, int, double> getCost)
+        {
+            if (isExit(start)) return null;
+
+            int cellsCount = pack.Cells.Length;
+
+            // Using arrays instead of Dictionaries for O(1) lookups to match JS performance
+            int[] from = new int[cellsCount];
+            double[] cost = new double[cellsCount];
+
+            for (int i = 0; i < cellsCount; i++)
+            {
+                from[i] = -1;
+                cost[i] = double.PositiveInfinity;
+            }
+
+            // Using your existing PriorityQueue
+            var queue = new PriorityQueue<int, double>();
+            queue.Enqueue(start, 0.0);
+            cost[start] = 0.0;
+
+            while (queue.Count > 0)
+            {
+                // Extract the current cell and its cost
+                queue.TryDequeue(out int current, out double currentCost);
+
+                foreach (int next in pack.Cells[current].NeighborCells)
+                {
+                    // Greedily check for the exit to match JS early-exit optimization
+                    if (isExit(next))
+                    {
+                        from[next] = current;
+                        return RestorePath(next, start, from);
+                    }
+
+                    double nextCost = getCost(current, next);
+                    if (double.IsInfinity(nextCost)) continue; // Impassable cell
+
+                    double totalCost = currentCost + nextCost;
+
+                    if (totalCost >= cost[next]) continue; // Has cheaper path
+
+                    from[next] = current;
+                    cost[next] = totalCost;
+
+                    queue.Enqueue(next, totalCost);
+                }
+            }
+
+            return null; // No path found
+        }
+
+        private static List<int> RestorePath(int exit, int start, int[] from)
+        {
+            var pathCells = new List<int>();
+
+            int current = exit;
+            while (current != start)
+            {
+                pathCells.Add(current);
+                current = from[current];
+            }
+
+            pathCells.Add(start);
+            pathCells.Reverse();
+
+            return pathCells;
+        }
+
+        #endregion
+
+        public static double Dist2(MapPoint p1, MapPoint p2)
+        {
+            return Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2);
         }
     }
 }

@@ -61,7 +61,7 @@ namespace MapGen.Core.Modules
 
                     if (quadtree.Find(p.X, p.Y, spacing) == null)
                     {
-                        burgs.Add(new MapBurg { Cell = cellIdx, Position = new MapPoint(p.X, p.Y) });
+                        burgs.Add(new MapBurg { CellId = cellIdx, Position = new MapPoint(p.X, p.Y) });
                         quadtree.Add(new QuadPoint { X = p.X, Y = p.Y, DataIndex = burgs.Count - 1 });
                     }
 
@@ -78,7 +78,7 @@ namespace MapGen.Core.Modules
                 for (int i = 0; i < burgs.Count; i++)
                 {
                     var b = burgs[i];
-                    var cell = cells[b.Cell];
+                    var cell = cells[b.CellId];
 
                     int bId = i + 1; // The index IS the ID now because of padding
                     var culture = pack.Cultures[cell.CultureId];
@@ -130,7 +130,7 @@ namespace MapGen.Core.Modules
                         burgs.Add(new MapBurg
                         {
                             Id = bId,
-                            Cell = cellIdx,
+                            CellId = cellIdx,
                             Position = new MapPoint(p.X, p.Y),
                             StateId = 0,
                             IsCapital = false,
@@ -184,7 +184,7 @@ namespace MapGen.Core.Modules
                 var burg = burgs[i];
                 burg.PortId = 0;
 
-                int cellId = burg.Cell;
+                int cellId = burg.CellId;
                 int havenIdx = cells[cellId].Haven;
                 int featureId = cells[havenIdx].FeatureId;
 
@@ -210,8 +210,8 @@ namespace MapGen.Core.Modules
                 foreach (var burg in kvp.Value)
                 {
                     burg.PortId = kvp.Key;
-                    int havenIdx = cells[burg.Cell].Haven;
-                    var (x, y) = GetCloseToEdgePoint(cells, pack, burg.Cell, havenIdx);
+                    int havenIdx = cells[burg.CellId].Haven;
+                    var (x, y) = GetCloseToEdgePoint(cells, pack, burg.CellId, havenIdx);
                     burg.Position = new MapPoint(x, y);
                 }
             }
@@ -219,9 +219,9 @@ namespace MapGen.Core.Modules
             for (int i = 0; i < burgs.Count; i++)
             {
                 var burg = burgs[i];
-                if (burg.PortId > 0 || cells[burg.Cell].RiverId == 0) continue;
+                if (burg.PortId > 0 || cells[burg.CellId].RiverId == 0) continue;
 
-                int cellId = burg.Cell;
+                int cellId = burg.CellId;
                 double fluxShift = Math.Min(cells[cellId].Flux / 150.0, 1.0);
 
                 double newX = burg.Position.X;

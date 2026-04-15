@@ -101,6 +101,8 @@ namespace MapGen.Core
         public List<MapBurg> Burgs { get; set; } = new List<MapBurg>();
         public List<MapState> States { get; set; } = new List<MapState>();
         public List<List<string>> DiplomacyChronicle { get; set; } = new List<List<string>>();
+        public List<MapRoute> Routes { get; set; } = new List<MapRoute>();
+        public Dictionary<int, Dictionary<int, int>> RouteLinks { get; set; } = new Dictionary<int, Dictionary<int, int>>();
 
         public MapFeature GetFeature(int id) => Features[id - 1];
         public MapBurg GetBurg(int id) => Burgs[id - 1];
@@ -226,7 +228,7 @@ namespace MapGen.Core
     public class MapBurg
     {
         public int Id { get; set; }
-        public int Cell { get; set; }
+        public int CellId { get; set; }
         public MapPoint Position { get; set; }
         public int StateId { get; set; }
         public int CultureId { get; set; }
@@ -234,6 +236,7 @@ namespace MapGen.Core
         public string Name { get; set; }
         public ushort FeatureId { get; set; }
         public bool IsCapital { get; set; }
+        public bool IsPort => PortId > 0;
     }
 
     public class MapState
@@ -280,6 +283,14 @@ namespace MapGen.Core
         public int Defender { get; set; }
     }
 
+    public class MapRoute
+    {
+        public int Id { get; set; }         // JS: i
+        public string Group { get; set; }   // JS: group ("roads", "trails", "searoutes")
+        public int FeatureId { get; set; }  // JS: feature
+        public List<MapRoutePoint> Points { get; set; } = new List<MapRoutePoint>();    // JS: points (Array of [x, y, cell])
+    }
+
     public class MapCoA
     {
         public string Shield { get; set; }
@@ -289,7 +300,7 @@ namespace MapGen.Core
     public readonly struct PointFlux
     {
         public readonly double X, Y, Flux;
-        public PointFlux(double x, double y, double f) { X = x; Y = y; Flux = f; }
+        public PointFlux(double x, double y, double f) => (X, Y, Flux) = (x, y, f);
         public override string ToString() => $"[{X}, {Y}][{Flux}]";
     }
 
@@ -298,5 +309,13 @@ namespace MapGen.Core
         public readonly double X, Y;
         public MapPoint(double x, double y) => (X, Y) = (x, y);
         public override string ToString() => $"[{X}, {Y}]";
+    }
+
+    public readonly struct MapRoutePoint
+    {
+        public readonly double X, Y;
+        public readonly int CellId;
+        public MapRoutePoint(double x, double y, int cellId) => (X, Y, CellId) = (x, y, cellId);
+        public override string ToString() => $"[{X}, {Y}, {CellId}]";
     }
 }

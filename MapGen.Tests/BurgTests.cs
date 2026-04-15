@@ -80,7 +80,7 @@ namespace MapGen.Tests
                 var act = pack.Burgs[i]; // List is 0-indexed, so GetBurg(exp.Id) would be Burgs[i]
 
                 Assert.Equal(exp.Id, act.Id);
-                Assert.Equal(exp.Cell, act.Cell);
+                Assert.Equal(exp.Cell, act.CellId);
                 Assert.Equal(exp.State, act.StateId);
                 Assert.Equal(exp.Culture, act.CultureId);
                 Assert.Equal(exp.Capital, act.IsCapital);

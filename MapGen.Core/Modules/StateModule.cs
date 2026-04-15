@@ -73,7 +73,7 @@ namespace MapGen.Core.Modules
                     //bool isEach5th = (each5thCounter++ % 5 == 0);
 
                     // JS: const basename = burg.name.length < 9 && each5th(burg.cell) ? ...
-                    string basename = (burg.Name.Length < 9 && each5th(burg.Cell))
+                    string basename = (burg.Name.Length < 9 && each5th(burg.CellId))
                         ? burg.Name
                         : NameModule.GetCultureShort(rng, cultures[burg.CultureId].BaseNameId);
 
@@ -89,7 +89,7 @@ namespace MapGen.Core.Modules
                         Expansionism = expansionism,
                         CapitalId = burg.Id,
                         Type = type,
-                        CenterCell = burg.Cell,
+                        CenterCell = burg.CellId,
                         CultureId = burg.CultureId,
                         CoA = coa
                     };
@@ -135,7 +135,7 @@ namespace MapGen.Core.Modules
             {
                 if (state.Id == 0) continue; // Skip Neutrals
 
-                int capitalCell = burgs[state.CapitalId - 1].Cell; // Remember: Burg Id is 1-based, list is 0-based
+                int capitalCell = burgs[state.CapitalId - 1].CellId; // Remember: Burg Id is 1-based, list is 0-based
                 cells[capitalCell].StateId = state.Id;
 
                 int cultureCenter = cultures[state.CultureId].CenterCell;
@@ -195,7 +195,7 @@ namespace MapGen.Core.Modules
             // Reassign non-capital burgs to the state that captured their cell
             foreach (var burg in burgs)
             {
-                burg.StateId = cells[burg.Cell].StateId;
+                burg.StateId = cells[burg.CellId].StateId;
             }
         }
 
