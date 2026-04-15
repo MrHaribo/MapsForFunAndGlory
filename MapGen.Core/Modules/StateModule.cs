@@ -387,7 +387,6 @@ namespace MapGen.Core.Modules
             var states = pack.States;
             var valid = states.Where(s => s.Id > 0).ToList();
 
-            // Strictly Integer weights mimicking Azgaar exactly
             var neibs = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Ally, 1 }, { DiplomacyRelation.Friendly, 2 }, { DiplomacyRelation.Neutral, 1 }, { DiplomacyRelation.Suspicion, 10 }, { DiplomacyRelation.Rival, 9 } };
             var neibsOfNeibs = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Ally, 10 }, { DiplomacyRelation.Friendly, 8 }, { DiplomacyRelation.Neutral, 5 }, { DiplomacyRelation.Suspicion, 1 } };
             var far = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Friendly, 1 }, { DiplomacyRelation.Neutral, 12 }, { DiplomacyRelation.Suspicion, 2 }, { DiplomacyRelation.Unknown, 6 } };
@@ -399,11 +398,15 @@ namespace MapGen.Core.Modules
             }
 
             if (valid.Count < 2) return;
-            double areaMean = valid.Average(s => s.Area);
             var rng = pack.Rng;
+
+            // BUG REPLICATION: d3.mean([undefined]) returns undefined (NaN)
+            double areaMean = double.NaN;
 
             for (int f = 1; f < states.Count; f++)
             {
+                if (states[f].Id == 0) continue;
+
                 int suzerainF = Array.IndexOf(states[f].Diplomacy, DiplomacyRelation.Vassal);
                 if (suzerainF > 0)
                 {
@@ -425,6 +428,8 @@ namespace MapGen.Core.Modules
 
                 for (int t = f + 1; t < states.Count; t++)
                 {
+                    if (states[t].Id == 0) continue;
+
                     int suzerainT = Array.IndexOf(states[t].Diplomacy, DiplomacyRelation.Vassal);
                     if (suzerainT > 0)
                     {
@@ -436,14 +441,17 @@ namespace MapGen.Core.Modules
                                  cells[states[f].CenterCell].FeatureId != cells[states[t].CenterCell].FeatureId;
 
                     bool neib = !naval && states[f].Neighbors.Contains(t);
-                    bool neibOfNeib = !naval && !neib && states[f].Neighbors.Any(n => states[n].Neighbors.Contains(t));
+
+                    // AZGAAR STRING JOIN BUG REPLICATION
+                    string jsBugString = string.Join("", states[f].Neighbors.Select(n => string.Join(",", states[n].Neighbors)));
+                    bool neibOfNeib = !naval && !neib && jsBugString.Contains(t.ToString());
 
                     DiplomacyRelation status = naval ? rng.Rw(navals) :
-                                    neib ? rng.Rw(neibs) :
-                                    neibOfNeib ? rng.Rw(neibsOfNeibs) : rng.Rw(far);
+                                               neib ? rng.Rw(neibs) :
+                                               neibOfNeib ? rng.Rw(neibsOfNeibs) : rng.Rw(far);
 
-                    // rng.Next() returns a double [0.0 - 1.0)
-                    if (neib && rng.Next() < 0.8 && states[f].Area > areaMean && states[t].Area < areaMean && states[f].Area / (double)Math.Max(states[t].Area, 1) > 2)
+                    // BUG REPLICATION: NaN bypasses the vassal area checks
+                    if (neib && rng.P(0.8) && double.NaN > areaMean && double.NaN < areaMean && (double.NaN / Math.Max(double.NaN, 1)) > 2)
                     {
                         status = DiplomacyRelation.Vassal;
                     }
@@ -453,19 +461,235 @@ namespace MapGen.Core.Modules
                 }
             }
 
-            // Declare Wars
             int currentYear = pack.Options.Year;
             pack.DiplomacyChronicle.Clear();
 
             for (int attacker = 1; attacker < states.Count; attacker++)
             {
+                if (states[attacker].Id == 0) continue;
+
                 var ad = states[attacker].Diplomacy;
                 if (!ad.Contains(DiplomacyRelation.Rival) || ad.Contains(DiplomacyRelation.Vassal) || ad.Contains(DiplomacyRelation.Enemy)) continue;
 
                 var possibleDefenders = ad.Select((r, d) => r == DiplomacyRelation.Rival && !states[d].Diplomacy.Contains(DiplomacyRelation.Vassal) ? d : 0).Where(d => d != 0).ToList();
                 if (possibleDefenders.Count == 0) continue;
 
-                // Use IRandom.Ra to pick a random element
+                int defender = rng.Ra(possibleDefenders.ToArray());
+
+                // BUG REPLICATION: undefined * exp = NaN. NaN < NaN evaluates to false.
+                double ap = double.NaN;
+                double dp = double.NaN;
+                if (ap < dp * rng.Gauss(1.6, 0.8, 0, 10, 2)) continue;
+
+                var attackers = new List<int> { attacker };
+                var defenders = new List<int> { defender };
+                var dd = states[defender].Diplomacy;
+
+                string an = states[attacker].Name;
+                string dn = states[defender].Name;
+                string trimmedDn = LanguageUtils.TrimVowels(dn);
+
+                string warName = $"{an}-{trimmedDn}ian War";
+                int startYear = currentYear - (int)Math.Floor(rng.Gauss(2, 3, 0, 10) + 0.5);
+
+                var warRecord = new List<string> { warName, $"{an} declared a war on its rival {dn}" };
+
+                var campaign = new MapCampaign { Name = warName, Start = startYear, Attacker = attacker, Defender = defender };
+                states[attacker].Campaigns.Add(campaign);
+                states[defender].Campaigns.Add(campaign);
+
+                for (int d = 1; d < ad.Length; d++)
+                {
+                    if (ad[d] == DiplomacyRelation.Suzerain) { attackers.Add(d); warRecord.Add($"{an}'s vassal {states[d].Name} joined the war on attackers side"); }
+                }
+                for (int d = 1; d < dd.Length; d++)
+                {
+                    if (dd[d] == DiplomacyRelation.Suzerain) { defenders.Add(d); warRecord.Add($"{dn}'s vassal {states[d].Name} joined the war on defenders side"); }
+                }
+
+                // BUG REPLICATION: d3.sum([NaN]) strips out invalid values and returns 0!
+                ap = 0;
+                dp = 0;
+
+                // Defender allies join
+                for (int d = 1; d < dd.Length; d++)
+                {
+                    if (dd[d] != DiplomacyRelation.Ally || states[d].Diplomacy.Contains(DiplomacyRelation.Vassal)) continue;
+
+                    // 0/0 naturally evaluates to NaN. NaN > value is false.
+                    if (states[d].Diplomacy[attacker] != DiplomacyRelation.Rival && (ap / dp) > 2 * rng.Gauss(1.6, 0.8, 0, 10, 2))
+                    {
+                        string reason = states[d].Diplomacy.Contains(DiplomacyRelation.Enemy) ? "Being already at war," : $"Frightened by {an},";
+                        warRecord.Add($"{reason} {states[d].Name} severed the defense pact with {dn}");
+                        dd[d] = states[d].Diplomacy[defender] = DiplomacyRelation.Suspicion;
+                        continue;
+                    }
+
+                    defenders.Add(d);
+
+                    // BUG REPLICATION: dp += NaN immediately turns dp into NaN for the rest of the loop!
+                    dp += double.NaN;
+                    warRecord.Add($"{dn}'s ally {states[d].Name} joined the war on defenders side");
+
+                    for (int v = 1; v < states[d].Diplomacy.Length; v++)
+                    {
+                        if (states[d].Diplomacy[v] == DiplomacyRelation.Suzerain)
+                        {
+                            defenders.Add(v);
+                            dp += double.NaN;
+                            warRecord.Add($"{states[d].Name}'s vassal {states[v].Name} joined the war on defenders side");
+                        }
+                    }
+                }
+
+                // Attacker allies join
+                for (int d = 1; d < ad.Length; d++)
+                {
+                    if (ad[d] != DiplomacyRelation.Ally || states[d].Diplomacy.Contains(DiplomacyRelation.Vassal) || defenders.Contains(d)) continue;
+                    string allyName = states[d].Name;
+
+                    // If dp became NaN earlier, 0 <= NaN is false, forcing the ally to join!
+                    if (states[d].Diplomacy[defender] != DiplomacyRelation.Rival && (rng.P(0.2) || ap <= dp * 1.2))
+                    {
+                        warRecord.Add($"{an}'s ally {allyName} avoided entering the war");
+                        continue;
+                    }
+
+                    bool alliesOnBothSides = false;
+                    for (int aIdx = 1; aIdx < states[d].Diplomacy.Length; aIdx++)
+                    {
+                        if (states[d].Diplomacy[aIdx] == DiplomacyRelation.Ally && defenders.Contains(aIdx))
+                        {
+                            alliesOnBothSides = true;
+                            break;
+                        }
+                    }
+
+                    if (alliesOnBothSides)
+                    {
+                        warRecord.Add($"{an}'s ally {allyName} did not join the war as its allies are in war on both sides");
+                        continue;
+                    }
+
+                    attackers.Add(d);
+                    ap += double.NaN;
+                    warRecord.Add($"{an}'s ally {allyName} joined the war on attackers side");
+
+                    for (int v = 1; v < states[d].Diplomacy.Length; v++)
+                    {
+                        if (states[d].Diplomacy[v] == DiplomacyRelation.Suzerain)
+                        {
+                            attackers.Add(v);
+                            dp += double.NaN; // PRESERVING AZGAAR'S DP TYPO!
+                            warRecord.Add($"{states[d].Name}'s vassal {states[v].Name} joined the war on attackers side");
+                        }
+                    }
+                }
+
+                foreach (int a in attackers)
+                {
+                    foreach (int def in defenders)
+                    {
+                        states[a].Diplomacy[def] = states[def].Diplomacy[a] = DiplomacyRelation.Enemy;
+                    }
+                }
+                pack.DiplomacyChronicle.Add(warRecord);
+            }
+        }
+
+        public static void GenerateDiplomacyWithoutNaNBug(MapPack pack)
+        {
+            var cells = pack.Cells;
+            var states = pack.States;
+            var valid = states.Where(s => s.Id > 0).ToList();
+
+            var neibs = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Ally, 1 }, { DiplomacyRelation.Friendly, 2 }, { DiplomacyRelation.Neutral, 1 }, { DiplomacyRelation.Suspicion, 10 }, { DiplomacyRelation.Rival, 9 } };
+            var neibsOfNeibs = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Ally, 10 }, { DiplomacyRelation.Friendly, 8 }, { DiplomacyRelation.Neutral, 5 }, { DiplomacyRelation.Suspicion, 1 } };
+            var far = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Friendly, 1 }, { DiplomacyRelation.Neutral, 12 }, { DiplomacyRelation.Suspicion, 2 }, { DiplomacyRelation.Unknown, 6 } };
+            var navals = new Dictionary<DiplomacyRelation, int> { { DiplomacyRelation.Neutral, 1 }, { DiplomacyRelation.Suspicion, 2 }, { DiplomacyRelation.Rival, 1 }, { DiplomacyRelation.Unknown, 1 } };
+
+            foreach (var s in valid)
+            {
+                s.Diplomacy = Enumerable.Repeat(DiplomacyRelation.None, states.Count).ToArray();
+            }
+
+            if (valid.Count < 2) return;
+            double areaMean = valid.Average(s => s.Area);
+            var rng = pack.Rng;
+
+            for (int f = 1; f < states.Count; f++)
+            {
+                if (states[f].Id == 0) continue;
+
+                int suzerainF = Array.IndexOf(states[f].Diplomacy, DiplomacyRelation.Vassal);
+                if (suzerainF > 0)
+                {
+                    for (int i = 1; i < states.Count; i++)
+                    {
+                        if (i == f || i == suzerainF) continue;
+                        states[f].Diplomacy[i] = states[suzerainF].Diplomacy[i];
+                        if (states[suzerainF].Diplomacy[i] == DiplomacyRelation.Suzerain) states[f].Diplomacy[i] = DiplomacyRelation.Ally;
+
+                        for (int e = 1; e < states.Count; e++)
+                        {
+                            if (e == f || e == suzerainF) continue;
+                            if (states[e].Diplomacy[suzerainF] == DiplomacyRelation.Suzerain || states[e].Diplomacy[suzerainF] == DiplomacyRelation.Vassal) continue;
+                            states[e].Diplomacy[f] = states[e].Diplomacy[suzerainF];
+                        }
+                    }
+                    continue;
+                }
+
+                for (int t = f + 1; t < states.Count; t++)
+                {
+                    if (states[t].Id == 0) continue;
+
+                    int suzerainT = Array.IndexOf(states[t].Diplomacy, DiplomacyRelation.Vassal);
+                    if (suzerainT > 0)
+                    {
+                        states[f].Diplomacy[t] = states[f].Diplomacy[suzerainT];
+                        continue;
+                    }
+
+                    bool naval = states[f].Type == CultureType.Naval && states[t].Type == CultureType.Naval &&
+                                 cells[states[f].CenterCell].FeatureId != cells[states[t].CenterCell].FeatureId;
+
+                    bool neib = !naval && states[f].Neighbors.Contains(t);
+
+                    // AZGAAR STRING JOIN BUG REPLICATION
+                    string jsBugString = string.Join("", states[f].Neighbors.Select(n => string.Join(",", states[n].Neighbors)));
+                    bool neibOfNeib = !naval && !neib && jsBugString.Contains(t.ToString());
+
+                    DiplomacyRelation status = naval ? rng.Rw(navals) :
+                                               neib ? rng.Rw(neibs) :
+                                               neibOfNeib ? rng.Rw(neibsOfNeibs) : rng.Rw(far);
+
+                    // INLINED rng.P(0.8) to perfectly preserve JS && short-circuiting
+                    if (neib && rng.P(0.8) && states[f].Area > areaMean && states[t].Area < areaMean && ((double)states[f].Area / (double)Math.Max(states[t].Area, 1)) > 2)
+                    {
+                        status = DiplomacyRelation.Vassal;
+                    }
+
+                    states[f].Diplomacy[t] = status == DiplomacyRelation.Vassal ? DiplomacyRelation.Suzerain : status;
+                    states[t].Diplomacy[f] = status;
+                }
+            }
+
+            int currentYear = pack.Options.Year;
+            pack.DiplomacyChronicle.Clear();
+
+            for (int attacker = 1; attacker < states.Count; attacker++)
+            {
+                if (states[attacker].Id == 0) continue;
+
+                Console.WriteLine($"[C#] Attacker {attacker} start | Mochania Dip: {string.Join(",", states[2].Diplomacy)}");
+
+                var ad = states[attacker].Diplomacy;
+                if (!ad.Contains(DiplomacyRelation.Rival) || ad.Contains(DiplomacyRelation.Vassal) || ad.Contains(DiplomacyRelation.Enemy)) continue;
+
+                var possibleDefenders = ad.Select((r, d) => r == DiplomacyRelation.Rival && !states[d].Diplomacy.Contains(DiplomacyRelation.Vassal) ? d : 0).Where(d => d != 0).ToList();
+                if (possibleDefenders.Count == 0) continue;
+
                 int defender = rng.Ra(possibleDefenders.ToArray());
 
                 double ap = states[attacker].Area * states[attacker].Expansionism;
@@ -481,7 +705,7 @@ namespace MapGen.Core.Modules
                 string trimmedDn = LanguageUtils.TrimVowels(dn);
 
                 string warName = $"{an}-{trimmedDn}ian War";
-                int startYear = currentYear - (int)Math.Round(rng.Gauss(2, 3, 0, 10));
+                int startYear = currentYear - (int)Math.Floor(rng.Gauss(2, 3, 0, 10) + 0.5);
 
                 var warRecord = new List<string> { warName, $"{an} declared a war on its rival {dn}" };
 
@@ -501,10 +725,13 @@ namespace MapGen.Core.Modules
                 ap = attackers.Sum(a => states[a].Area * states[a].Expansionism);
                 dp = defenders.Sum(d => states[d].Area * states[d].Expansionism);
 
+                // Defender allies join
                 for (int d = 1; d < dd.Length; d++)
                 {
                     if (dd[d] != DiplomacyRelation.Ally || states[d].Diplomacy.Contains(DiplomacyRelation.Vassal)) continue;
-                    if (states[d].Diplomacy[attacker] != DiplomacyRelation.Rival && ap / Math.Max(dp, 1) > 2 * rng.Gauss(1.6, 0.8, 0, 10, 2))
+
+                    // Native double division. 0/0 naturally evaluates to NaN, instantly failing the > check just like JS!
+                    if (states[d].Diplomacy[attacker] != DiplomacyRelation.Rival && (ap / dp) > 2 * rng.Gauss(1.6, 0.8, 0, 10, 2))
                     {
                         string reason = states[d].Diplomacy.Contains(DiplomacyRelation.Enemy) ? "Being already at war," : $"Frightened by {an},";
                         warRecord.Add($"{reason} {states[d].Name} severed the defense pact with {dn}");
@@ -527,18 +754,72 @@ namespace MapGen.Core.Modules
                     }
                 }
 
+                // Attacker allies join
+                for (int d = 1; d < ad.Length; d++)
+                {
+                    // Inside the Attacker Allies loop: for (int d = 1; d < ad.Length; d++)
+                    if (attacker == 5 && d == 17)
+                    {
+                        // HOVER OVER THESE:
+                        // 1. ap (Attacker Power)
+                        // 2. dp (Defender Power)
+                        // 3. ap <= dp * 1.2
+                        System.Diagnostics.Debugger.Break();
+                    }
+
+
+                    if (ad[d] != DiplomacyRelation.Ally || states[d].Diplomacy.Contains(DiplomacyRelation.Vassal) || defenders.Contains(d)) continue;
+                    string allyName = states[d].Name;
+                    var checkDimplomacy = states[d].Diplomacy[defender];
+
+                    // INLINED rng.P(0.2) to strictly maintain short-circuiting parity!
+                    if (checkDimplomacy != DiplomacyRelation.Rival && (rng.P(0.2) || ap <= dp * 1.2))
+                    {
+                        warRecord.Add($"{an}'s ally {allyName} avoided entering the war");
+                        continue;
+                    }
+
+                    bool alliesOnBothSides = false;
+                    for (int aIdx = 1; aIdx < states[d].Diplomacy.Length; aIdx++)
+                    {
+                        if (states[d].Diplomacy[aIdx] == DiplomacyRelation.Ally && defenders.Contains(aIdx))
+                        {
+                            alliesOnBothSides = true;
+                            break;
+                        }
+                    }
+
+                    if (alliesOnBothSides)
+                    {
+                        warRecord.Add($"{an}'s ally {allyName} did not join the war as its allies are in war on both sides");
+                        continue;
+                    }
+
+                    attackers.Add(d);
+                    ap += states[d].Area * states[d].Expansionism;
+                    warRecord.Add($"{an}'s ally {allyName} joined the war on attackers side");
+
+                    for (int v = 1; v < states[d].Diplomacy.Length; v++)
+                    {
+                        if (states[d].Diplomacy[v] == DiplomacyRelation.Suzerain)
+                        {
+                            attackers.Add(v);
+                            dp += states[v].Area * states[v].Expansionism; // PRESERVING AZGAAR'S DP TYPO!
+                            warRecord.Add($"{states[d].Name}'s vassal {states[v].Name} joined the war on attackers side");
+                        }
+                    }
+                }
+
                 foreach (int a in attackers)
                 {
-                    foreach (int d in defenders)
+                    foreach (int def in defenders)
                     {
-                        states[a].Diplomacy[d] = states[d].Diplomacy[a] = DiplomacyRelation.Enemy;
+                        states[a].Diplomacy[def] = states[def].Diplomacy[a] = DiplomacyRelation.Enemy;
                     }
                 }
                 pack.DiplomacyChronicle.Add(warRecord);
             }
         }
-
-
 
         #endregion
 
@@ -723,40 +1004,33 @@ namespace MapGen.Core.Modules
         public static void GenerateCampaigns(MapPack pack)
         {
             var rng = pack.Rng;
-
-            // Assuming Year is stored in MapOptions. If not, default to 1000.
             int currentYear = pack.Options.Year;
 
             foreach (var state in pack.States)
             {
-                if (state.Id == 0) continue; // Skip Neutrals
+                if (state.Id == 0) continue;
 
-                // If a state has no neighbors (e.g., an island), pretend it has neighbor '0' 
-                // so it still generates at least one historical campaign/expedition.
                 var neighbors = state.Neighbors.Count > 0 ? state.Neighbors : new List<int> { 0 };
                 var campaigns = new List<MapCampaign>();
 
                 foreach (int neibId in neighbors)
                 {
-                    // rng.Next() returns double [0.0 - 1.0)
-                    bool useNeighborName = neibId > 0 && rng.Next() < 0.8;
-
+                    // 1. Base Name
+                    bool useNeighborName = neibId > 0 && rng.P(0.8);
                     string baseName = useNeighborName
                         ? pack.States[neibId].Name
                         : NameModule.GetCultureShort(rng, pack.Cultures[state.CultureId].BaseNameId);
 
-                    // Generate the name (e.g., "The Vandean Crusade")
+                    // 2. Start (JS Gauss evaluates first)
+                    int start = (int)rng.Gauss(currentYear - 100, 150, 1, currentYear - 6);
+
+                    // 3. End (JS Gauss evaluates second)
+                    int end = start + (int)rng.Gauss(4, 5, 1, currentYear - start - 1);
+
+                    // 4. Adjective and WarType (JS evaluates these inside the return statement)
                     string adj = LanguageUtils.GetAdjective(baseName, rng);
                     string warType = rng.Rw(WarsDict);
                     string campaignName = $"{adj} {warType}";
-
-                    // JS: gauss(options.year - 100, 150, 1, options.year - 6)
-                    // Start year is clustered around 100 years ago
-                    int start = (int)Math.Round(rng.Gauss(currentYear - 100, 150, 1, currentYear - 6));
-
-                    // JS: start + gauss(4, 5, 1, options.year - start - 1)
-                    // Duration is clustered around 4 years
-                    int end = start + (int)Math.Round(rng.Gauss(4, 5, 1, currentYear - start - 1));
 
                     campaigns.Add(new MapCampaign
                     {

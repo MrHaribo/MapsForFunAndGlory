@@ -45,7 +45,7 @@ namespace MapGen.Core
             opt.GrowthRate = Round(1 + rng.Next(), 1);
             opt.CulturesCount = (int)rng.Gauss(12, 3, 5, 30);
             opt.BurgCount = 1000;
-            opt.Year = 1000;
+            opt.Year = 1002;
 
             // --- Culture Set ---
             // RNG Order 8: Selection via weighted dictionary

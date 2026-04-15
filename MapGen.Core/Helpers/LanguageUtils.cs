@@ -63,7 +63,7 @@ namespace MapGen.Core.Helpers
             foreach (var rule in AdjectivizationRules)
             {
                 // P(rule.probability) equivalent
-                if ((rng.Next() < rule.Probability) && rule.Condition.IsMatch(noun))
+                if (rng.P(rule.Probability) && rule.Condition.IsMatch(noun))
                 {
                     return rule.Action(noun);
                 }
@@ -80,13 +80,13 @@ namespace MapGen.Core.Helpers
             if (mod100 >= 11 && mod100 <= 13)
                 return n + "th";
 
-            switch (mod10)
+            return mod10 switch
             {
-                case 1: return n + "st";
-                case 2: return n + "nd";
-                case 3: return n + "rd";
-                default: return n + "th";
-            }
+                1 => n + "st",
+                2 => n + "nd",
+                3 => n + "rd",
+                _ => n + "th",
+            };
         }
 
         // get two-letters code (abbreviation) from string
