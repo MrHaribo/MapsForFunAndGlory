@@ -306,27 +306,24 @@ namespace MapGen.Core.Modules
 
         public static void GetPoles(MapPack pack)
         {
-            var cells = pack.Cells;
             var states = pack.States;
 
-            // JS: const poles = getPolesOfInaccessibility(pack, i => cells.state[i]);
-            var poles = PathUtils.GetPolesOfInaccessibility(pack, i => cells[i].StateId);
+            // Replaces the BFS Distance Transform with Mapbox Polylabel
+            var poles = PolylabelUtils.CalculateStatePoles(pack);
 
             foreach (var state in states)
             {
-                if (state.Id == 0) continue; // Skip Neutrals
+                if (state.Id == 0) continue;
 
-                // JS: s.pole = poles[s.i] || s.center;
                 if (poles.TryGetValue(state.Id, out var polePoint))
                 {
-                    // Convert MapPoint to double[] array formatted to 2 decimal places (JS rn() equivalent)
-                    state.Pole = new MapPoint(Math.Round(polePoint.X, 2), Math.Round(polePoint.Y, 2));
+                    // Match JS rn() which rounds away from zero
+                    state.Pole = new MapPoint(NumberUtils.Round(polePoint.X), NumberUtils.Round(polePoint.Y));
                 }
                 else
                 {
-                    // Fallback to the State's center cell if no pole could be calculated
-                    var centerPoint = cells[state.CenterCell].Point;
-                    state.Pole = new MapPoint(Math.Round(centerPoint.X, 2), Math.Round(centerPoint.Y, 2));
+                    var centerPoint = pack.Cells[state.CenterCell].Point;
+                    state.Pole = new MapPoint(NumberUtils.Round(centerPoint.X), NumberUtils.Round(centerPoint.Y));
                 }
             }
         }

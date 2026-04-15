@@ -216,6 +216,8 @@ namespace MapGen.Tests
         [Fact]
         public void StatePoles_MatchRegression()
         {
+            var poles = _pack.States.Select(s => s.Pole);
+
             foreach (var actualState in _pack.States)
             {
                 var expectedState = _expectedDict[actualState.Id];
