@@ -83,15 +83,8 @@ namespace MapGen.Tests
                     var actualPoint = actualRoute.Points[p];
 
                     Assert.Equal(expectedPoint.cellId, actualPoint.CellId);
-                    //Assert.Equal(expectedPoint.x, actualPoint.X, 2);
-                    //Assert.Equal(expectedPoint.y, actualPoint.Y, 2);
-
-                    // 2. VISUAL Parity: Accommodate microscopic CLR vs V8 float rounding crossings
-                    Assert.True(Math.Abs(expectedPoint.x - actualPoint.X) <= 0.02,
-                        $"X deviation {expectedPoint.x} vs {actualPoint.X} on Route {actualRoute.Id}, Cell {actualPoint.CellId}");
-
-                    Assert.True(Math.Abs(expectedPoint.y - actualPoint.Y) <= 0.02,
-                        $"Y deviation {expectedPoint.y} vs {actualPoint.Y} on Route {actualRoute.Id}, Cell {actualPoint.CellId}");
+                    Assert.Equal(expectedPoint.x, actualPoint.X);
+                    Assert.Equal(expectedPoint.y, actualPoint.Y);
                 }
             }
 

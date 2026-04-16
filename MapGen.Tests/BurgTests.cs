@@ -88,8 +88,8 @@ namespace MapGen.Tests
                 Assert.Equal(exp.Name, act.Name);
 
                 // Coordinate Check: Tolerance of 0.01 due to potential Math.Round/float precision diffs
-                Assert.Equal(act.Position.X, exp.X, 0.1);
-                Assert.Equal(act.Position.Y, exp.Y, 0.1);
+                Assert.Equal(act.Position.X, exp.X);
+                Assert.Equal(act.Position.Y, exp.Y);
             }
 
             // Assert Cell-to-Burg Mapping (the 1-based ID array)

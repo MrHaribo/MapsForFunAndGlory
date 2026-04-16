@@ -331,6 +331,17 @@ namespace MapGen.Core.Modules
                     if (burgId > 0)
                     {
                         var burg = pack.GetBurg(burgId);
+
+
+                        // --- DIAGNOSTIC TRAP 1 ---
+                        if (Math.Abs(burg.Position.X - 685.85) < 0.1 || Math.Abs(burg.Position.Y - 685.85) < 0.1)
+                        {
+                            // HOVER OVER `burgId` to find out WHICH burg this is!
+                            System.Diagnostics.Debugger.Break();
+                        }
+                        // -------------------------
+
+
                         points.Add(new MapPoint(burg.Position.X, burg.Position.Y));
                     }
                     else
@@ -379,17 +390,6 @@ namespace MapGen.Core.Modules
                                 newX = NumberUtils.Round((curr.X + middleX) / 2.0, 2);
                                 newY = NumberUtils.Round((curr.Y + middleY) / 2.0, 2);
                             }
-
-                            // --- TARGETED BREAKPOINT ---
-                            if (Math.Abs(newX - 685) < 2 || Math.Abs(newY - 685) < 2)
-                            {
-                                // HOVER OVER:
-                                // 1. curr.X and curr.Y
-                                // 2. middleX and middleY
-                                // 3. The exact unrounded double value of the division
-                                System.Diagnostics.Debugger.Break();
-                            }
-                            // ---------------------------
 
                             if (pack.FindCell(newX, newY) == cellId)
                             {

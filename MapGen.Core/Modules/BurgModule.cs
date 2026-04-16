@@ -230,7 +230,7 @@ namespace MapGen.Core.Modules
                 newX = (cellId % 2 != 0) ? newX + fluxShift : newX - fluxShift;
                 newY = (cells[cellId].RiverId % 2 != 0) ? newY + fluxShift : newY - fluxShift;
 
-                burg.Position = new MapPoint(Math.Round(newX, 2), Math.Round(newY, 2));
+                burg.Position = new MapPoint(NumberUtils.Round(newX, 2), NumberUtils.Round(newY, 2));
             }
         }
 
@@ -249,8 +249,8 @@ namespace MapGen.Core.Modules
             double xEdge = (v1.X + v2.X) / 2.0;
             double yEdge = (v1.Y + v2.Y) / 2.0;
 
-            double x = Math.Round(c1.Point.X + 0.95 * (xEdge - c1.Point.X), 2);
-            double y = Math.Round(c1.Point.Y + 0.95 * (yEdge - c1.Point.Y), 2);
+            double x = NumberUtils.Round(c1.Point.X + 0.95 * (xEdge - c1.Point.X), 2);
+            double y = NumberUtils.Round(c1.Point.Y + 0.95 * (yEdge - c1.Point.Y), 2);
 
             return (x, y);
         }
