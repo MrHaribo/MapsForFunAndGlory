@@ -103,6 +103,7 @@ namespace MapGen.Core
         public List<List<string>> DiplomacyChronicle { get; set; } = new List<List<string>>();
         public List<MapRoute> Routes { get; set; } = new List<MapRoute>();
         public Dictionary<int, Dictionary<int, int>> RouteLinks { get; set; } = new Dictionary<int, Dictionary<int, int>>();
+        public List<MapReligion> Religions { get; set; } = new List<MapReligion>();
 
         public MapFeature GetFeature(int id) => Features[id - 1];
         public MapBurg GetBurg(int id) => Burgs[id - 1];
@@ -143,6 +144,7 @@ namespace MapGen.Core
         public int CultureId { get; set; }
         public ushort BurgId { get; set; }
         public int StateId { get; set; }
+        public int ReligionId { get; set; }
     }
 
     public class MapVertex
@@ -233,6 +235,7 @@ namespace MapGen.Core
         public int StateId { get; set; }
         public int CultureId { get; set; }
         public int PortId { get; set; }
+        public double Population { get; set; }
         public string Name { get; set; }
         public ushort FeatureId { get; set; }
         public bool IsCapital { get; set; }
@@ -289,6 +292,31 @@ namespace MapGen.Core
         public RouteType Group { get; set; }   // JS: group ("roads", "trails", "searoutes")
         public int FeatureId { get; set; }  // JS: feature
         public List<MapRoutePoint> Points { get; set; } = new List<MapRoutePoint>();    // JS: points (Array of [x, y, cell])
+    }
+
+    public class MapReligion
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Color { get; set; }
+        public int CenterCell { get; set; }
+        public int CultureId { get; set; }
+
+        public ReligionGroup Group { get; set; } // Folk, Organized, Cult, Heresy
+        public string Form { get; set; }         // e.g., "Shamanism", "Dualism"
+        public string Type { get; set; }         // e.g., "Beliefs", "Church"
+
+        public string Deity { get; set; }
+        public string Expansion { get; set; }
+        public double Expansionism { get; set; }
+
+        public string Code { get; set; }
+        public List<int> Origins { get; set; } = new List<int>();
+
+        public int CellsCount { get; set; }
+        public double TotalArea { get; set; }
+        public double RuralPopulation { get; set; }
+        public double UrbanPopulation { get; set; }
     }
 
     public class MapCoA

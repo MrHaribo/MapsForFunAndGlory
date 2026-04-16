@@ -62,4 +62,12 @@ namespace MapGen.Core
         Trails,
         Searoutes
     }
+
+    public enum ReligionGroup 
+    { 
+        Folk, 
+        Organized, 
+        Cult, 
+        Heresy 
+    }
 }
