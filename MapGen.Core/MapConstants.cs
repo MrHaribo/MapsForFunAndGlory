@@ -89,5 +89,10 @@
         public const double STATE_SIZE_VARIETY = 4.3;
         public const double STATE_GLOBAL_GROWTH_RATE = 1.8;
         public const double STATE_GROWTH_RATE = 1.0;
+
+        // Routes
+        public const double ROUTES_SHARP_ANGLE = 135.0;
+        public const double ROUTES_VERY_SHARP_ANGLE = 115.0;
+        public const int ROUTES_MIN_PASSABLE_SEA_TEMP = -4;
     }
 }

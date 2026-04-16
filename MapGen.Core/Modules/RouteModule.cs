@@ -8,10 +8,6 @@ namespace MapGen.Core.Modules
 {
     public static class RouteModule
     {
-        private const double ROUTES_SHARP_ANGLE = 135.0;
-        private const double ROUTES_VERY_SHARP_ANGLE = 115.0;
-        private const int MIN_PASSABLE_SEA_TEMP = -4;
-
         private static readonly Dictionary<int, double> RouteTypeModifiers = new Dictionary<int, double>
         {
             { -1, 1.0 }, // coastline
@@ -194,7 +190,7 @@ namespace MapGen.Core.Modules
                         if (nextCell.Height >= 20) return double.PositiveInfinity;
 
                         // Because you mapped Temp directly to MapCell, we can check it right here!
-                        if (nextCell.Temp < MIN_PASSABLE_SEA_TEMP) return double.PositiveInfinity;
+                        if (nextCell.Temp < MapConstants.ROUTES_MIN_PASSABLE_SEA_TEMP) return double.PositiveInfinity;
 
                         double distanceCost = PathUtils.Dist2(pack.Cells[current].Point, nextCell.Point);
 
@@ -272,22 +268,22 @@ namespace MapGen.Core.Modules
                 MergeRoutes(mainRoads);
                 foreach (var route in mainRoads.Where(r => !r.Merged))
                 {
-                    var points = GetPoints("roads", route.Cells, pointsArray);
-                    routes.Add(new MapRoute { Id = routes.Count, Group = "roads", FeatureId = route.Feature, Points = points });
+                    var points = GetPoints(RouteType.Roads, route.Cells, pointsArray);
+                    routes.Add(new MapRoute { Id = routes.Count, Group = RouteType.Roads, FeatureId = route.Feature, Points = points });
                 }
 
                 MergeRoutes(trails);
                 foreach (var route in trails.Where(r => !r.Merged))
                 {
-                    var points = GetPoints("trails", route.Cells, pointsArray);
-                    routes.Add(new MapRoute { Id = routes.Count, Group = "trails", FeatureId = route.Feature, Points = points });
+                    var points = GetPoints(RouteType.Trails, route.Cells, pointsArray);
+                    routes.Add(new MapRoute { Id = routes.Count, Group = RouteType.Trails, FeatureId = route.Feature, Points = points });
                 }
 
                 MergeRoutes(seaRoutes);
                 foreach (var route in seaRoutes.Where(r => !r.Merged))
                 {
-                    var points = GetPoints("searoutes", route.Cells, pointsArray);
-                    routes.Add(new MapRoute { Id = routes.Count, Group = "searoutes", FeatureId = route.Feature, Points = points });
+                    var points = GetPoints(RouteType.Searoutes, route.Cells, pointsArray);
+                    routes.Add(new MapRoute { Id = routes.Count, Group = RouteType.Searoutes, FeatureId = route.Feature, Points = points });
                 }
 
                 return routes;
@@ -331,17 +327,6 @@ namespace MapGen.Core.Modules
                     if (burgId > 0)
                     {
                         var burg = pack.GetBurg(burgId);
-
-
-                        // --- DIAGNOSTIC TRAP 1 ---
-                        if (Math.Abs(burg.Position.X - 685.85) < 0.1 || Math.Abs(burg.Position.Y - 685.85) < 0.1)
-                        {
-                            // HOVER OVER `burgId` to find out WHICH burg this is!
-                            System.Diagnostics.Debugger.Break();
-                        }
-                        // -------------------------
-
-
                         points.Add(new MapPoint(burg.Position.X, burg.Position.Y));
                     }
                     else
@@ -352,11 +337,11 @@ namespace MapGen.Core.Modules
                 return points;
             }
 
-            List<MapRoutePoint> GetPoints(string group, List<int> cells, List<MapPoint> pointsArray)
+            List<MapRoutePoint> GetPoints(RouteType group, List<int> cells, List<MapPoint> pointsArray)
             {
                 var data = cells.Select(cellId => new MapRoutePoint(pointsArray[cellId].X, pointsArray[cellId].Y, cellId)).ToList();
 
-                if (group != "searoutes")
+                if (group != RouteType.Searoutes)
                 {
                     for (int i = 1; i < cells.Count - 1; i++)
                     {
@@ -374,13 +359,13 @@ namespace MapGen.Core.Modules
 
                         double angle = Math.Abs((Math.Atan2(dAx * dBy - dAy * dBx, dAx * dBx + dAy * dBy) * 180.0) / Math.PI);
 
-                        if (angle < ROUTES_SHARP_ANGLE)
+                        if (angle < MapConstants.ROUTES_SHARP_ANGLE)
                         {
                             double middleX = (prev.X + next.X) / 2.0;
                             double middleY = (prev.Y + next.Y) / 2.0;
                             double newX, newY;
 
-                            if (angle < ROUTES_VERY_SHARP_ANGLE)
+                            if (angle < MapConstants.ROUTES_VERY_SHARP_ANGLE)
                             {
                                 newX = NumberUtils.Round((curr.X + middleX * 2) / 3.0, 2);
                                 newY = NumberUtils.Round((curr.Y + middleY * 2) / 3.0, 2);

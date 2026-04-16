@@ -286,7 +286,7 @@ namespace MapGen.Core
     public class MapRoute
     {
         public int Id { get; set; }         // JS: i
-        public string Group { get; set; }   // JS: group ("roads", "trails", "searoutes")
+        public RouteType Group { get; set; }   // JS: group ("roads", "trails", "searoutes")
         public int FeatureId { get; set; }  // JS: feature
         public List<MapRoutePoint> Points { get; set; } = new List<MapRoutePoint>();    // JS: points (Array of [x, y, cell])
     }

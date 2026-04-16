@@ -55,4 +55,11 @@ namespace MapGen.Core
         Theocracy,
         Anarchy
     }
+
+    public enum RouteType
+    {
+        Roads,
+        Trails,
+        Searoutes
+    }
 }

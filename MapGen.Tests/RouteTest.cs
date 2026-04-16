@@ -1,4 +1,5 @@
-﻿using MapGen.Core.Modules;
+﻿using MapGen.Core;
+using MapGen.Core.Modules;
 using Newtonsoft.Json;
 
 namespace MapGen.Tests
@@ -15,7 +16,7 @@ namespace MapGen.Tests
     public class RegressionRoute
     {
         public int id { get; set; }
-        public string group { get; set; }
+        public RouteType group { get; set; }
         public int featureId { get; set; }
         public List<RegressionRoutePoint> points { get; set; }
     }
