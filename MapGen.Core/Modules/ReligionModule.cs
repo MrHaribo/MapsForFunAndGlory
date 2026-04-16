@@ -9,14 +9,14 @@ namespace MapGen.Core.Modules
     {
         #region Data Definition
 
-        // --- 1. COMPACT BASE DATA ---
+        // --- 1. EXACT JS PARITY BASE DATA ---
         private static readonly string[] BaseNumber = "One,Two,Three,Four,Five,Six,Seven,Eight,Nine,Ten,Eleven,Twelve".Split(',');
-        private static readonly string[] BaseBeing = "Ancestor,Ancient,Avatar,Brother,Champion,Chief,Council,Creator,Deity,Divine One,Elder,Enlightened Being,Father,Forebear,Forefather,God,Goddess,Guardian,Immortal,Judge,Lord,Maker,Master,Mother,Omnipotent,Omnipresent,Prime,Protector,Ruler,Sister,Spirit,Supreme,Titan,Watcher".Split(',');
-        private static readonly string[] BaseAdjective = "Absolute,Almighty,Bashing,Benevolent,Blind,Brave,Bright,Broken,Burning,Chosen,Cosmic,Crimson,Dark,Defeated,Divine,Earthly,Elevated,Eternal,Everlasting,Exalted,Fallen,Flaming,Forgiving,Golden,Great,Heavenly,Holy,Honorable,Illuminated,Immortal,Infallible,Infinite,Invisible,Iron,Last,Light,Living,Loving,Luminous,Magic,Merciful,Mighty,Night,Old,Omnipotent,Omniscient,Peaceful,Radiant,Sacred,Secret,Silent,Silver,Sleeping,Solitary,Sorrowful,Starry,Stone,Sun,Supreme,True,Ultimate,Underground,Universal,Unseen,Vengeful,Weeping,White,Wise,World".Split(',');
-        private static readonly string[] BaseColor = "Amber,Black,Blue,Brown,Carmine,Cyan,Dark,Emerald,Gold,Gray,Green,Jade,Light,Olive,Orange,Pink,Purple,Red,Rose,Ruby,Sapphire,Silver,Violet,White,Yellow".Split(',');
-        private static readonly string[] BaseAnimal = "Ape,Badger,Bear,Beaver,Bird,Boar,Bull,Cat,Condor,Cow,Coyote,Crane,Crow,Deer,Dog,Dragon,Eagle,Elephant,Elk,Falcon,Fox,Goat,Griffon,Hare,Hawk,Horse,Hound,Jackal,Jaguar,Leopard,Lion,Mantis,Monkey,Moose,Owl,Panther,Pegasus,Pelican,Puma,Rabbit,Rat,Raven,Rhino,Seagull,Serpent,Shark,Sheep,Snake,Spider,Stag,Tiger,Toad,Tortoise,Turtle,Whale,Wolf,Wolverine,Worm".Split(',');
-        private static readonly string[] BaseGenitive = "Ancestors,Autumn,Blood,Bones,Chaos,Creation,Darkness,Death,Despair,Destruction,Dreams,Earth,Eternity,Fate,Fire,Fools,Forests,Glory,Gods,Gold,Harmony,Hatred,Heaven,Hell,Hope,Ice,Justice,Knowledge,Life,Light,Love,Lust,Magic,Men,Mercy,Minds,Miracles,Nature,Night,Order,Pain,Peace,Pestilence,Power,Rain,Retribution,Rivers,Seas,Shadows,Skies,Sorrow,Souls,Spring,Stars,Storms,Summer,Sun,Tears,Thunder,Time,Truth,Vengeance,War,Water,Wealth,Wind,Winter,Wisdom,World".Split(',');
-        private static readonly string[] BaseTheocracy = "Brotherhood,Church,Coven,Cult,Faith,Order,Religion,Sect,Temple".Split(',');
+        private static readonly string[] BaseBeing = "Ancestor,Ancient,Avatar,Brother,Champion,Chief,Council,Creator,Deity,Divine One,Elder,Enlightened Being,Father,Forebear,Forefather,Giver,God,Goddess,Guardian,Guide,Hierach,Lady,Lord,Maker,Master,Mother,Numen,Oracle,Overlord,Protector,Reaper,Ruler,Sage,Seer,Sister,Spirit,Supreme Being,Transcendent,Virgin".Split(',');
+        private static readonly string[] BaseAnimal = "Antelope,Ape,Badger,Basilisk,Bear,Beaver,Bison,Boar,Buffalo,Camel,Cat,Centaur,Cerberus,Chimera,Cobra,Cockatrice,Crane,Crocodile,Crow,Cyclope,Deer,Dog,Direwolf,Drake,Dragon,Eagle,Elephant,Elk,Falcon,Fox,Goat,Goose,Gorgon,Gryphon,Hare,Hawk,Heron,Hippogriff,Horse,Hound,Hyena,Ibis,Jackal,Jaguar,Kitsune,Kraken,Lark,Leopard,Lion,Manticore,Mantis,Marten,Minotaur,Moose,Mule,Narwhal,Owl,Ox,Panther,Pegasus,Phoenix,Python,Rat,Raven,Roc,Rook,Scorpion,Serpent,Shark,Sheep,Snake,Sphinx,Spider,Swan,Tiger,Turtle,Unicorn,Viper,Vulture,Walrus,Wolf,Wolverine,Worm,Wyvern,Yeti".Split(',');
+        private static readonly string[] BaseAdjective = "Aggressive,Almighty,Ancient,Beautiful,Benevolent,Big,Blind,Blond,Bloody,Brave,Broken,Brutal,Burning,Calm,Celestial,Cheerful,Crazy,Cruel,Dead,Deadly,Devastating,Distant,Disturbing,Divine,Dying,Eternal,Ethernal,Empyreal,Enigmatic,Enlightened,Evil,Explicit,Fair,Far,Fat,Fatal,Favorable,Flying,Friendly,Frozen,Giant,Good,Grateful,Great,Happy,High,Holy,Honest,Huge,Hungry,Illustrious,Immutable,Ineffable,Infallible,Inherent,Last,Latter,Lost,Loud,Lucky,Mad,Magical,Main,Major,Marine,Mythical,Mystical,Naval,New,Noble,Old,Otherworldly,Patient,Peaceful,Pregnant,Prime,Proud,Pure,Radiant,Resplendent,Sacred,Sacrosanct,Sad,Scary,Secret,Selected,Serene,Severe,Silent,Sleeping,Slumbering,Sovereign,Strong,Sunny,Superior,Supernatural,Sustainable,Transcendent,Transcendental,Troubled,Unearthly,Unfathomable,Unhappy,Unknown,Unseen,Waking,Wild,Wise,Worried,Young".Split(',');
+        private static readonly string[] BaseGenitive = "Cold,Day,Death,Doom,Fate,Fire,Fog,Frost,Gates,Heaven,Home,Ice,Justice,Life,Light,Lightning,Love,Nature,Night,Pain,Snow,Springs,Summer,Thunder,Time,Victory,War,Winter".Split(',');
+        private static readonly string[] BaseTheGenitive = "Abyss,Blood,Dawn,Earth,East,Eclipse,Fall,Harvest,Moon,North,Peak,Rainbow,Sea,Sky,South,Stars,Storm,Sun,Tree,Underworld,West,Wild,Word,World".Split(',');
+        private static readonly string[] BaseColor = "Amber,Black,Blue,Bright,Bronze,Brown,Coral,Crimson,Dark,Emerald,Golden,Green,Grey,Indigo,Lavender,Light,Magenta,Maroon,Orange,Pink,Plum,Purple,Red,Ruby,Sapphire,Teal,Turquoise,White,Yellow".Split(',');
 
         // --- 2. HIERARCHICAL DICTIONARIES ---
         private static readonly Dictionary<string, int> ApproachWeights = new Dictionary<string, int>
@@ -326,9 +326,63 @@ namespace MapGen.Core.Modules
             string GetDeityName(int cultureId)
             {
                 var culture = cultures[cultureId];
-                // JS: const supreme = Names.getCulture(culture);
-                string supreme = NameModule.GetCulture(pack.Rng, culture.BaseNameId);
 
+                // 1. EXACT PARITY FIX: Generate meaning FIRST to consume RNG in the correct order
+                string meaning = GenerateMeaning();
+
+                // 2. EXACT PARITY FIX: Pass 0, 0, "" to disable letter duplication like JS!
+                string cultureName = NameModule.GetCulture(pack.Rng, culture.BaseNameId, 0, 0, "");
+
+                return cultureName + ", The " + meaning;
+            }
+
+            (string name, string expansion) GenerateReligionName(ReligionGroup variety, string form, string supreme, int center)
+            {
+                // EXACT PARITY: JS removed the Non-theism override here. It strictly rolls Types[form]
+                string type = pack.Rng.Rw(Types[form]);
+
+                string deity = string.IsNullOrEmpty(supreme) ? "" : supreme.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)[0];
+
+                var culture = cultures[cells[center].CultureId];
+                string cultureName = culture.Name;
+                int baseId = culture.BaseNameId;
+
+                // EXACT PARITY FIX: Pass 0, 0, "" to disable letter duplication like JS!
+                string RandomName() => NameModule.GetCulture(pack.Rng, baseId, 0, 0, "");
+
+                string GetPlace(bool adj)
+                {
+                    int burgId = cells[center].BurgId;
+                    int stateId = cells[center].StateId;
+                    string baseName = burgId > 0 ? pack.Burgs[burgId].Name : (stateId > 0 ? pack.States[stateId].Name : cultureName);
+                    string placeName = LanguageUtils.TrimVowels(baseName.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)[0]);
+
+                    // NOTE: Ensure your LanguageUtils.GetAdjective does NOT consume rng (pack.Rng). 
+                    // JS getAdjective is pure string regex.
+                    return adj ? LanguageUtils.GetAdjective(placeName, pack.Rng) : placeName;
+                }
+
+                string m = pack.Rng.Rw(NamingMethods[variety]);
+
+                // All random() usages now point to RandomName() for exact string/length/RNG parity.
+                // (Removed all accidental usages of GetCultureShort)
+                if (m == "Random + type") return ($"{RandomName()} {type}", "global");
+                if (m == "Random + ism") return ($"{LanguageUtils.TrimVowels(RandomName())}ism", "global");
+                if (m == "Supreme + ism" && !string.IsNullOrEmpty(deity)) return ($"{LanguageUtils.TrimVowels(deity)}ism", "global");
+                if (m == "Faith of + Supreme" && !string.IsNullOrEmpty(deity)) return ($"{pack.Rng.Ra(new[] { "Faith", "Way", "Path", "Word", "Witnesses" })} of {deity}", "global");
+                if (m == "Place + ism") return ($"{GetPlace(false)}ism", "state");
+                if (m == "Culture + ism") return ($"{LanguageUtils.TrimVowels(cultureName)}ism", "culture");
+                if (m == "Place + ian + type") return ($"{GetPlace(true)} {type}", "state");
+                if (m == "Culture + type") return ($"{cultureName} {type}", "culture");
+                if (m == "Burg + ian + type") return ($"{GetPlace(true)} {type}", "global");
+                if (m == "Random + ian + type") return ($"{LanguageUtils.GetAdjective(RandomName(), pack.Rng)} {type}", "global");
+                if (m == "Type + of the + meaning") return ($"{type} of the {GenerateMeaning()}", "global");
+
+                return ($"{LanguageUtils.TrimVowels(RandomName())}ism", "global"); // JS 'else' condition
+            }
+
+            string GenerateMeaning()
+            {
                 string approach = pack.Rng.Ra(Approaches.ToArray());
                 switch (approach)
                 {
@@ -342,52 +396,15 @@ namespace MapGen.Core.Modules
                     case "Color + Being": return $"{pack.Rng.Ra(BaseColor)} {pack.Rng.Ra(BaseBeing)}";
                     case "Color + Genitive": return $"{pack.Rng.Ra(BaseColor)} {pack.Rng.Ra(BaseGenitive)}";
                     case "Being + of + Genitive": return $"{pack.Rng.Ra(BaseBeing)} of {pack.Rng.Ra(BaseGenitive)}";
-                    case "Being + of the + Genitive": return $"{pack.Rng.Ra(BaseBeing)} of the {pack.Rng.Ra(BaseGenitive)}";
+
+                    // EXACT PARITY: Uses the dedicated 'theGenitive' array
+                    case "Being + of the + Genitive": return $"{pack.Rng.Ra(BaseBeing)} of the {pack.Rng.Ra(BaseTheGenitive)}";
+
                     case "Animal + of + Genitive": return $"{pack.Rng.Ra(BaseAnimal)} of {pack.Rng.Ra(BaseGenitive)}";
                     case "Adjective + Being + of + Genitive": return $"{pack.Rng.Ra(BaseAdjective)} {pack.Rng.Ra(BaseBeing)} of {pack.Rng.Ra(BaseGenitive)}";
                     case "Adjective + Animal + of + Genitive": return $"{pack.Rng.Ra(BaseAdjective)} {pack.Rng.Ra(BaseAnimal)} of {pack.Rng.Ra(BaseGenitive)}";
-                    default: return supreme;
+                    default: throw new ArgumentOutOfRangeException();
                 }
-            }
-
-            (string name, string expansion) GenerateReligionName(ReligionGroup variety, string form, string supreme, int center)
-            {
-                // JS: const type = form === "Non-theism" ? "Beliefs" : rw(types[form]);
-                string type = form == "Non-theism" ? "Beliefs" : pack.Rng.Rw(Types[form]);
-
-                // JS: const deity = supreme.split(/[ ,]+/)[0];
-                string deity = string.IsNullOrEmpty(supreme) ? "" : supreme.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)[0];
-
-                var culture = cultures[cells[center].CultureId];
-                string cultureName = culture.Name;
-                int baseId = culture.BaseNameId;
-
-                string GetPlace(bool adj)
-                {
-                    int burgId = cells[center].BurgId;
-                    int stateId = cells[center].StateId;
-
-                    string baseName = burgId > 0 ? pack.Burgs[burgId].Name : (stateId > 0 ? pack.States[stateId].Name : cultureName);
-                    string placeName = LanguageUtils.TrimVowels(baseName.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)[0]);
-                    return adj ? LanguageUtils.GetAdjective(placeName, pack.Rng) : placeName;
-                }
-
-                string m = pack.Rng.Rw(NamingMethods[variety]);
-
-                // Integrates perfectly with NameModule using the Culture's BaseNameId
-                if (m == "Random + type") return ($"{NameModule.GetCultureShort(pack.Rng, baseId)} {type}", "global");
-                if (m == "Random + ism") return ($"{LanguageUtils.TrimVowels(NameModule.GetCulture(pack.Rng, baseId))}ism", "global");
-                if (m == "Supreme + ism" && !string.IsNullOrEmpty(deity)) return ($"{LanguageUtils.TrimVowels(deity)}ism", "global");
-                if (m == "Faith of + Supreme" && !string.IsNullOrEmpty(deity)) return ($"{pack.Rng.Ra(new[] { "Faith", "Way", "Path", "Word", "Witnesses" })} of {deity}", "global");
-                if (m == "Place + ism") return ($"{GetPlace(false)}ism", "state");
-                if (m == "Culture + ism") return ($"{LanguageUtils.TrimVowels(cultureName)}ism", "culture");
-                if (m == "Place + ian + type") return ($"{GetPlace(true)} {type}", "state");
-                if (m == "Culture + type") return ($"{cultureName} {type}", "culture");
-                if (m == "Burg + ian + type") return ($"{GetPlace(true)} {type}", "global");
-                if (m == "Random + ian + type") return ($"{LanguageUtils.GetAdjective(NameModule.GetCultureShort(pack.Rng, baseId), pack.Rng)} {type}", "global");
-                if (m == "Type + of the + meaning") return ($"{type} of the {NameModule.GetCultureShort(pack.Rng, baseId)}", "global");
-
-                return ($"{GetPlace(true)} {type}", "global");
             }
         }
 
