@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace MapGen.Core.Modules
 {
-    public static class RoutesModule
+    public static class RouteModule
     {
         private const double ROUTES_SHARP_ANGLE = 135.0;
         private const double ROUTES_VERY_SHARP_ANGLE = 115.0;
@@ -189,13 +189,17 @@ namespace MapGen.Core.Modules
                 {
                     return (current, next) =>
                     {
-                        if (pack.Cells[next].Height >= 20) return double.PositiveInfinity;
+                        var nextCell = pack.Cells[next];
 
-                        // Assumes Grid Temp is mapped
-                        if (pack.Cells[next].Temp < MIN_PASSABLE_SEA_TEMP) return double.PositiveInfinity;
+                        if (nextCell.Height >= 20) return double.PositiveInfinity;
 
-                        double distanceCost = PathUtils.Dist2(pack.Cells[current].Point, pack.Cells[next].Point);
-                        double typeModifier = RouteTypeModifiers.TryGetValue(0 /*pack.Cells[next].Type*/, out double mod) ? mod : 8.0;
+                        // Because you mapped Temp directly to MapCell, we can check it right here!
+                        if (nextCell.Temp < MIN_PASSABLE_SEA_TEMP) return double.PositiveInfinity;
+
+                        double distanceCost = PathUtils.Dist2(pack.Cells[current].Point, nextCell.Point);
+
+                        // FIX: Use nextCell.Distance to get the sea depth (-1, -2, -3, -4)
+                        double typeModifier = RouteTypeModifiers.TryGetValue(nextCell.Distance, out double mod) ? mod : 8.0;
                         double connectionModifier = connectionsSet.Contains((current, next)) ? 0.5 : 1.0;
 
                         return distanceCost * typeModifier * connectionModifier;
@@ -205,17 +209,24 @@ namespace MapGen.Core.Modules
                 {
                     return (current, next) =>
                     {
-                        if (pack.Cells[next].Height < 20) return double.PositiveInfinity;
+                        var nextCell = pack.Cells[next];
 
-                        int biome = pack.Cells[next].BiomeId;
+                        if (nextCell.Height < 20) return double.PositiveInfinity;
+
+                        int biome = nextCell.BiomeId;
+
+                        // NOTE: Ensure `bioms` is accessible in your scope (e.g., passed in or a static config)
                         int habitability = bioms[biome].Habitability;
+
                         if (habitability == 0) return double.PositiveInfinity;
 
-                        double distanceCost = PathUtils.Dist2(pack.Cells[current].Point, pack.Cells[next].Point);
+                        double distanceCost = PathUtils.Dist2(pack.Cells[current].Point, nextCell.Point);
                         double habitabilityModifier = 1.0 + Math.Max(100 - habitability, 0) / 1000.0;
-                        double heightModifier = 1.0 + Math.Max(pack.Cells[next].Height - 25, 25) / 25.0;
+                        double heightModifier = 1.0 + Math.Max(nextCell.Height - 25, 25) / 25.0;
                         double connectionModifier = connectionsSet.Contains((current, next)) ? 0.5 : 1.0;
-                        double burgModifier = pack.Cells[next].BurgId > 0 ? 1.0 : 3.0;
+
+                        // FIX: Use your BurgId property to check if a burg exists
+                        double burgModifier = nextCell.BurgId > 0 ? 1.0 : 3.0;
 
                         return distanceCost * habitabilityModifier * heightModifier * connectionModifier * burgModifier;
                     };
@@ -285,10 +296,10 @@ namespace MapGen.Core.Modules
             // Using iterative loop rather than JS recursive iteration to avoid stack depth issues
             void MergeRoutes(List<RawRoute> routesList)
             {
-                bool routesMerged;
+                int routesMerged;
                 do
                 {
-                    routesMerged = false;
+                    routesMerged = 0;
                     for (int i = 0; i < routesList.Count; i++)
                     {
                         var thisRoute = routesList[i];
@@ -301,13 +312,14 @@ namespace MapGen.Core.Modules
 
                             if (nextRoute.Cells.First() == thisRoute.Cells.Last())
                             {
-                                routesMerged = true;
+                                routesMerged++;
                                 thisRoute.Cells.AddRange(nextRoute.Cells.Skip(1));
                                 nextRoute.Merged = true;
                             }
                         }
                     }
-                } while (routesMerged);
+                }
+                while (routesMerged > 1); // EXACT PARITY: Replicates Azgaar's > 1 early-termination bug!
             }
 
             List<MapPoint> PreparePointsArray()
@@ -318,7 +330,8 @@ namespace MapGen.Core.Modules
                     int burgId = pack.Cells[i].BurgId;
                     if (burgId > 0)
                     {
-                        points.Add(new MapPoint(pack.Burgs[burgId].Position.X, pack.Burgs[burgId].Position.Y));
+                        var burg = pack.GetBurg(burgId);
+                        points.Add(new MapPoint(burg.Position.X, burg.Position.Y));
                     }
                     else
                     {
@@ -358,14 +371,25 @@ namespace MapGen.Core.Modules
 
                             if (angle < ROUTES_VERY_SHARP_ANGLE)
                             {
-                                newX = Math.Round((curr.X + middleX * 2) / 3.0, 2, MidpointRounding.AwayFromZero);
-                                newY = Math.Round((curr.Y + middleY * 2) / 3.0, 2, MidpointRounding.AwayFromZero);
+                                newX = NumberUtils.Round((curr.X + middleX * 2) / 3.0, 2);
+                                newY = NumberUtils.Round((curr.Y + middleY * 2) / 3.0, 2);
                             }
                             else
                             {
-                                newX = Math.Round((curr.X + middleX) / 2.0, 2, MidpointRounding.AwayFromZero);
-                                newY = Math.Round((curr.Y + middleY) / 2.0, 2, MidpointRounding.AwayFromZero);
+                                newX = NumberUtils.Round((curr.X + middleX) / 2.0, 2);
+                                newY = NumberUtils.Round((curr.Y + middleY) / 2.0, 2);
                             }
+
+                            // --- TARGETED BREAKPOINT ---
+                            if (Math.Abs(newX - 685) < 2 || Math.Abs(newY - 685) < 2)
+                            {
+                                // HOVER OVER:
+                                // 1. curr.X and curr.Y
+                                // 2. middleX and middleY
+                                // 3. The exact unrounded double value of the division
+                                System.Diagnostics.Debugger.Break();
+                            }
+                            // ---------------------------
 
                             if (pack.FindCell(newX, newY) == cellId)
                             {
@@ -408,17 +432,44 @@ namespace MapGen.Core.Modules
             // Port of observablehq.com/@mbostock/urquhart-graph
             List<(int, int)> CalculateUrquhartEdges(List<MapPoint> points)
             {
+                var edges = new List<(int, int)>();
+
+                // 1. Guard against < 3 points (DelaunatorSharp explicitly throws here)
+                if (points.Count < 3)
+                {
+                    // STRICT JS PARITY: 
+                    // JS returns an empty list, meaning 2 burgs on an island get no road.
+                    // If you want strict JS parity, leave this returning empty.
+                    //
+                    // OPTIONAL FIX: If there are exactly 2 points, connect them!
+                    //if (points.Count == 2)
+                    //{
+                    //    edges.Add((0, 1));
+                    //}
+                    return edges;
+                }
+
                 double Score(int p0, int p1) => PathUtils.Dist2(points[p0], points[p1]);
 
-                // We need to assume your project has a C# Delaunator port. 
-                // e.g. using DelaunatorSharp;
-                var delaunay = new Delaunator(points.Select(p => (IPoint)new Point(p.X, p.Y)).ToArray());
+                Delaunator delaunay;
+                try
+                {
+                    delaunay = new Delaunator(points.Select(p => (IPoint)new Point(p.X, p.Y)).ToArray());
+                }
+                catch (Exception)
+                {
+                    // 2. Guard against Collinear points.
+                    // DelaunatorSharp throws "No seed triangle found" if points are on a straight line.
+                    // JS natively swallows this and produces 0 triangles. 
+                    // Returning an empty list maintains perfect JS parity.
+                    return edges;
+                }
+
                 var halfedges = delaunay.Halfedges;
                 var triangles = delaunay.Triangles;
                 int n = triangles.Length;
 
                 var removed = new byte[n];
-                var edges = new List<(int, int)>();
 
                 for (int e = 0; e < n; e += 3)
                 {
