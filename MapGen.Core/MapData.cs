@@ -240,6 +240,10 @@ namespace MapGen.Core
         public ushort FeatureId { get; set; }
         public bool IsCapital { get; set; }
         public bool IsPort => PortId > 0;
+        public CultureType Type { get; set; }
+        public BurgFeature Features { get; set; }
+        public BurgType Group { get; set; }
+        public MapCoA CoA { get; set; }
     }
 
     public class MapState

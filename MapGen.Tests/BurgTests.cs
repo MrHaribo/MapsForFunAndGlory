@@ -30,6 +30,25 @@ namespace MapGen.Tests
         public int Port { get; set; }
     }
 
+    public class RegressionBurgSpecData
+    {
+        public string Seed { get; set; }
+        public List<ExpectedBurgSpec> Burgs { get; set; }
+    }
+
+    public class ExpectedBurgSpec
+    {
+        public int Id { get; set; }
+        public double Population { get; set; }
+        public string Type { get; set; }
+        public string Group { get; set; }
+        public int Citadel { get; set; }
+        public int Plaza { get; set; }
+        public int Walls { get; set; }
+        public int Shanty { get; set; }
+        public int Temple { get; set; }
+    }
+
     public class BurgTests
     {
         [Theory]
@@ -96,6 +115,65 @@ namespace MapGen.Tests
             for (int i = 0; i < expected.BurgMap.Length; i++)
             {
                 Assert.Equal(expected.BurgMap[i], pack.Cells[i].BurgId);
+            }
+        }
+
+        [Fact]
+        public void TestBurgSpecification()
+        {
+            // 1. Load Expected Data
+            var json = File.ReadAllText($"data/regression_burgs_spec.json");
+            var expectedData = JsonConvert.DeserializeObject<RegressionBurgSpecData>(json);
+
+            // 2. Setup (Full Pipeline)
+            var mapData = TestMapData.TestData; // Use the seed from your JSON if needed
+            GridGenerator.Generate(mapData);
+            VoronoiGenerator.CalculateVoronoi(mapData);
+            HeightmapGenerator.Generate(mapData);
+            FeatureModule.MarkupGrid(mapData);
+            GlobeModule.DefineMapSize(mapData);
+            GlobeModule.CalculateMapCoordinates(mapData);
+            ClimateModule.CalculateTemperatures(mapData);
+            ClimateModule.GeneratePrecipitation(mapData);
+
+            var pack = PackModule.ReGraph(mapData);
+            FeatureModule.MarkupPack(pack);
+            RiverModule.Generate(pack);
+            BiomModule.Define(pack);
+            FeatureModule.DefineGroups(pack);
+            FeatureModule.RankCells(pack);
+            CultureModule.Generate(pack);
+            CultureModule.ExpandCultures(pack);
+
+            BurgModule.Generate(pack);
+            StateModule.Generate(pack);
+            RouteModule.Generate(pack);
+            ReligionModule.Generate(pack);
+
+            // 3. Execute
+            BurgModule.Specify(pack);
+
+            // 4. Assertions
+            Assert.NotNull(pack.Burgs);
+
+            foreach (var exp in expectedData.Burgs)
+            {
+                // Remember: The list is non-0-padded right now, so we use GetBurg (Id - 1)
+                var act = pack.GetBurg(exp.Id);
+
+                Assert.Equal(exp.Population, act.Population);
+
+                // Assert Enums mapping to strings
+                Assert.Equal(exp.Type.ToLowerInvariant(), act.Type.ToString().ToLowerInvariant());
+                // Strip underscores from the JS string before comparing it to the C# Enum string
+                Assert.Equal(exp.Group.Replace("_", "").ToLowerInvariant(), act.Group.ToString().ToLowerInvariant());
+
+                // Assert Bitwise Features
+                Assert.Equal(exp.Citadel, act.Features.HasFlag(BurgFeature.Citadel) ? 1 : 0);
+                Assert.Equal(exp.Plaza, act.Features.HasFlag(BurgFeature.Plaza) ? 1 : 0);
+                Assert.Equal(exp.Walls, act.Features.HasFlag(BurgFeature.Walls) ? 1 : 0);
+                Assert.Equal(exp.Shanty, act.Features.HasFlag(BurgFeature.Shanty) ? 1 : 0);
+                Assert.Equal(exp.Temple, act.Features.HasFlag(BurgFeature.Temple) ? 1 : 0);
             }
         }
     }

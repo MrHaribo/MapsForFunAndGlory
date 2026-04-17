@@ -70,4 +70,31 @@ namespace MapGen.Core
         Cult, 
         Heresy 
     }
+
+    public enum BurgType
+    {
+        Undefined,
+        Town, // IsDefault
+        Capital,
+        City,
+        Fort,
+        Monastery,
+        Caravanserai,
+        TradingPost,
+        Village,
+        Hamlet
+    }
+
+    [Flags]
+    public enum BurgFeature
+    {
+        None = 0,
+        Capital = 1 << 0,
+        Citadel = 1 << 1,
+        Walls = 1 << 2,
+        Plaza = 1 << 3,
+        Port = 1 << 4,
+        Temple = 1 << 5,
+        Shanty = 1 << 6
+    }
 }

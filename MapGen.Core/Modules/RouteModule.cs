@@ -24,6 +24,8 @@ namespace MapGen.Core.Modules
             public bool Merged { get; set; }
         }
 
+        #region Generation
+
         public static void Generate(MapPack pack, List<MapRoute> lockedRoutes = null)
         {
             lockedRoutes ??= new List<MapRoute>();
@@ -496,5 +498,91 @@ namespace MapGen.Core.Modules
                 return edges;
             }
         }
+
+        #endregion
+
+        #region Connectivity
+
+        public static bool IsConnected(MapPack pack, int cellId)
+        {
+            return pack.RouteLinks.TryGetValue(cellId, out var connections) && connections.Count > 0;
+        }
+
+        public static bool AreConnected(MapPack pack, int from, int to)
+        {
+            return pack.RouteLinks.TryGetValue(from, out var connections) && connections.ContainsKey(to);
+        }
+
+        public static MapRoute GetRoute(MapPack pack, int from, int to)
+        {
+            if (pack.RouteLinks.TryGetValue(from, out var connections) && connections.TryGetValue(to, out int routeId))
+            {
+                return pack.Routes.FirstOrDefault(r => r.Id == routeId);
+            }
+
+            return null;
+        }
+
+        public static bool HasRoad(MapPack pack, int cellId)
+        {
+            if (!pack.RouteLinks.TryGetValue(cellId, out var connections)) return false;
+
+            foreach (var routeId in connections.Values)
+            {
+                var route = pack.Routes.FirstOrDefault(r => r.Id == routeId);
+                if (route != null && route.Group == RouteType.Roads)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsCrossroad(MapPack pack, int cellId)
+        {
+            if (!pack.RouteLinks.TryGetValue(cellId, out var connections)) return false;
+
+            if (connections.Count > 3) return true;
+
+            int roadConnections = 0;
+            foreach (var routeId in connections.Values)
+            {
+                var route = pack.Routes.FirstOrDefault(r => r.Id == routeId);
+                if (route != null && route.Group == RouteType.Roads)
+                {
+                    roadConnections++;
+                }
+            }
+
+            return roadConnections > 2;
+        }
+
+        public static double GetConnectivityRate(MapPack pack, int cellId)
+        {
+            if (!pack.RouteLinks.TryGetValue(cellId, out var connections)) return 0.0;
+
+            double connectivity = 0.8;
+
+            foreach (var routeId in connections.Values)
+            {
+                var route = pack.Routes.FirstOrDefault(r => r.Id == routeId);
+                if (route == null) continue;
+
+                double rate = route.Group switch
+                {
+                    RouteType.Roads => 0.2,
+                    RouteType.Trails => 0.1,
+                    RouteType.Searoutes => 0.2,
+                    _ => 0.1
+                };
+
+                connectivity += rate;
+            }
+
+            return connectivity;
+        }
+
+        #endregion
     }
 }

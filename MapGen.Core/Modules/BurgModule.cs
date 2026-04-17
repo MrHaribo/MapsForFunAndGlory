@@ -8,6 +8,8 @@ namespace MapGen.Core.Modules
 {
     public static class BurgModule
     {
+
+
         #region Generate Burgs
 
         public static void Generate(MapPack pack)
@@ -253,6 +255,220 @@ namespace MapGen.Core.Modules
             double y = NumberUtils.Round(c1.Point.Y + 0.95 * (yEdge - c1.Point.Y), 2);
 
             return (x, y);
+        }
+
+        #endregion
+
+        #region Specify Burgs
+
+
+        public static void Specify(MapPack pack)
+        {
+            // First Pass: Define Populations, Emblems, and Features
+            foreach (var burg in pack.Burgs)
+            {
+                if (burg.Id <= 0) continue;
+
+                DefinePopulation(pack, burg);
+                DefineEmblem(pack, burg);
+                DefineFeatures(pack, burg);
+            }
+
+            var populations = pack.Burgs
+                .Where(b => b.Id > 0)
+                .Select(b => b.Population)
+                .OrderBy(p => p) // ascending
+                .ToList();
+
+            var groups = GetDefaultGroups();
+
+            // Second Pass: Assign Groups
+            foreach (var burg in pack.Burgs)
+            {
+                if (burg.Id <= 0) continue;
+
+                DefineGroup(pack, burg, populations, groups);
+            }
+        }
+
+        private static void DefinePopulation(MapPack pack, MapBurg burg)
+        {
+            int cellId = burg.CellId;
+
+            // JS: let population = pack.cells.s[cellId] / 5;
+            double population = pack.Cells[cellId].Suitability / 5.0;
+
+            if (burg.IsCapital) population *= 1.5;
+
+            // Note: Assuming RouteModule handles this lookup. Replace with your actual implementation.
+            double connectivityRate = RouteModule.GetConnectivityRate(pack, cellId);
+            if (connectivityRate > 0) population *= connectivityRate;
+
+            population *= pack.Rng.Gauss(1, 1, 0.25, 4, 5); // randomize
+            population += ((burg.Id % 100) - (cellId % 100)) / 1000.0; // unround
+
+            burg.Population = Math.Round(Math.Max(population, 0.01), 3);
+        }
+
+        private static void DefineEmblem(MapPack pack, MapBurg burg)
+        {
+            burg.Type = GetType(pack, burg.CellId, burg.IsPort); // burg.Type is CultureType
+
+            var state = pack.States[burg.StateId]; // Direct 0-padded array lookup
+            var stateCOA = state?.CoA;
+
+            double kinship = 0.25;
+            if (burg.IsCapital) kinship += 0.1;
+            else if (burg.IsPort) kinship -= 0.1;
+
+            if (state != null && burg.CultureId != state.CultureId) kinship -= 0.25;
+
+            // NO MAGIC STRINGS: We pull the exact names from the BurgType and CultureType enums
+            string type = (burg.IsCapital && pack.Rng.P(0.2))
+                ? BurgType.Capital.ToString()
+                : (burg.Type == CultureType.Generic ? BurgType.City.ToString() : burg.Type.ToString());
+
+            // Placeholder for now. Eventually this will be: 
+            // burg.CoA = CoaModule.Generate(pack.Rng, stateCOA, kinship, null, type);
+            burg.CoA = new MapCoA { Type = CultureType.Undefined };
+        }
+
+        private static CultureType GetType(MapPack pack, int cellId, bool port)
+        {
+            var cells = pack.Cells;
+
+            if (port) return CultureType.Naval;
+
+            int haven = cells[cellId].Haven;
+            if (haven > 0)
+            {
+                int featureId = cells[haven].FeatureId;
+                if (featureId > 0)
+                {
+                    // Strict usage of your defined GetFeature method
+                    var feature = pack.GetFeature(featureId);
+                    if (feature != null && feature.Type == FeatureType.Lake) return CultureType.Lake;
+                }
+            }
+
+            if (cells[cellId].Height > 60) return CultureType.Highland;
+
+            if (cells[cellId].RiverId > 0 && cells[cellId].Flux >= 100) return CultureType.River;
+
+            int biome = cells[cellId].BiomeId;
+            double population = cells[cellId].Population; // Cell population
+
+            if (cells[cellId].BurgId == 0 || population <= 5)
+            {
+                if (population < 5 && biome >= 1 && biome <= 4) return CultureType.Nomadic;
+                if (biome > 4 && biome < 10) return CultureType.Hunting;
+            }
+
+            return CultureType.Generic;
+        }
+
+        private static void DefineFeatures(MapPack pack, MapBurg burg)
+        {
+            double pop = burg.Population;
+            var rng = pack.Rng;
+
+            BurgFeature features = BurgFeature.None;
+
+            if (burg.IsCapital) features |= BurgFeature.Capital;
+            if (burg.IsPort) features |= BurgFeature.Port;
+
+            if (burg.IsCapital || (pop > 50 && rng.P(0.75)) || (pop > 15 && rng.P(0.5)) || rng.P(0.1))
+                features |= BurgFeature.Citadel;
+
+            // Note: Assuming RouteModule handles these lookups.
+            if (RouteModule.IsCrossroad(pack, burg.CellId) || (RouteModule.HasRoad(pack, burg.CellId) && rng.P(0.7)) || pop > 20 || (pop > 10 && rng.P(0.8)))
+                features |= BurgFeature.Plaza;
+
+            if (burg.IsCapital || pop > 30 || (pop > 20 && rng.P(0.75)) || (pop > 10 && rng.P(0.5)) || rng.P(0.1))
+                features |= BurgFeature.Walls;
+
+            if (pop > 60 || (pop > 40 && rng.P(0.75)) || (pop > 20 && features.HasFlag(BurgFeature.Walls) && rng.P(0.4)))
+                features |= BurgFeature.Shanty;
+
+            int religionId = pack.Cells[burg.CellId].ReligionId;
+            var state = pack.States[burg.StateId];
+            bool theocracy = state != null && state.Form == StateForm.Theocracy;
+
+            if ((religionId > 0 && theocracy && rng.P(0.5)) || pop > 50 || (pop > 35 && rng.P(0.75)) || (pop > 20 && rng.P(0.5)))
+                features |= BurgFeature.Temple;
+
+            burg.Features = features;
+        }
+
+        private static void DefineGroup(MapPack pack, MapBurg burg, List<double> populations, List<BurgGroup> groups)
+        {
+            var defaultGroup = groups.FirstOrDefault(g => g.IsDefault);
+            if (defaultGroup == null) return;
+
+            // 2. Assign default using Enum
+            burg.Group = defaultGroup.Type;
+
+            foreach (var group in groups)
+            {
+                if (!group.Active) continue;
+
+                if (group.Min > 0 && burg.Population < group.Min) continue;
+                if (group.Max > 0 && burg.Population > group.Max) continue;
+
+                // Fast bitwise flag matching
+                if ((burg.Features & group.RequiredFeatures) != group.RequiredFeatures) continue;
+                if ((burg.Features & group.ForbiddenFeatures) != 0) continue;
+
+                if (group.Biomes != null && group.Biomes.Count > 0)
+                {
+                    if (!group.Biomes.Contains(pack.Cells[burg.CellId].BiomeId)) continue;
+                }
+
+                if (group.Percentile > 0)
+                {
+                    int index = populations.IndexOf(burg.Population);
+                    bool isFit = index >= Math.Floor((populations.Count * group.Percentile) / 100.0);
+                    if (!isFit) continue;
+                }
+
+                // 3. Apply fitting enum type
+                burg.Group = group.Type;
+                return;
+            }
+        }
+
+        // Mirrors JS's getDefaultGroups() array using the new bitwise flags
+        private static List<BurgGroup> GetDefaultGroups()
+        {
+            return new List<BurgGroup>
+            {
+                new BurgGroup { Type = BurgType.Capital, Name = "capital", Active = true, Order = 9, RequiredFeatures = BurgFeature.Capital },
+                new BurgGroup { Type = BurgType.City, Name = "city", Active = true, Order = 8, Percentile = 90, Min = 5 },
+                new BurgGroup { Type = BurgType.Fort, Name = "fort", Active = true, Order = 6, Max = 1, RequiredFeatures = BurgFeature.Citadel, ForbiddenFeatures = BurgFeature.Walls | BurgFeature.Plaza | BurgFeature.Port },
+                new BurgGroup { Type = BurgType.Monastery, Name = "monastery", Active = true, Order = 5, Max = 0.8, RequiredFeatures = BurgFeature.Temple, ForbiddenFeatures = BurgFeature.Walls | BurgFeature.Plaza | BurgFeature.Port },
+                new BurgGroup { Type = BurgType.Caravanserai, Name = "caravanserai", Active = true, Order = 4, Max = 0.8, RequiredFeatures = BurgFeature.Plaza, ForbiddenFeatures = BurgFeature.Port, Biomes = new List<int> { 1, 2, 3 } },
+                new BurgGroup { Type = BurgType.TradingPost, Name = "trading_post", Active = true, Order = 3, Max = 0.8, RequiredFeatures = BurgFeature.Plaza, Biomes = new List<int> { 5, 6, 7, 8, 9, 10, 11, 12 } },
+                new BurgGroup { Type = BurgType.Village, Name = "village", Active = true, Order = 2, Min = 0.1, Max = 2 },
+                new BurgGroup { Type = BurgType.Hamlet, Name = "hamlet", Active = true, Order = 1, Max = 0.1, ForbiddenFeatures = BurgFeature.Plaza },
+                new BurgGroup { Type = BurgType.Town, Name = "town", Active = true, Order = 7, IsDefault = true }
+            };
+        }
+
+        private class BurgGroup
+        {
+            public BurgType Type { get; set; }
+            public string Name { get; set; }
+            public bool Active { get; set; } = true;
+            public int Order { get; set; }
+            public bool IsDefault { get; set; }
+            public double Min { get; set; }
+            public double Max { get; set; }
+            public int Percentile { get; set; }
+            public List<int> Biomes { get; set; }
+
+            // Enum Flags for rapid bitwise evaluation
+            public BurgFeature RequiredFeatures { get; set; }
+            public BurgFeature ForbiddenFeatures { get; set; }
         }
 
         #endregion
