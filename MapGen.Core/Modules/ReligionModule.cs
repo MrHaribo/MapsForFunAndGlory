@@ -1,4 +1,5 @@
-﻿using MapGen.Core.Helpers;
+﻿using D3Sharp.QuadTree;
+using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -120,8 +121,6 @@ namespace MapGen.Core.Modules
 
         #endregion
 
-        #region Generation
-
         public static void Generate(MapPack pack)
         {
             var folkReligions = GenerateFolkReligions(pack);
@@ -145,6 +144,8 @@ namespace MapGen.Core.Modules
             // JS: checkCenters();
             CheckCenters(pack);
         }
+
+        #region Generation
 
         private static List<MapReligion> GenerateFolkReligions(MapPack pack)
         {
@@ -177,8 +178,8 @@ namespace MapGen.Core.Modules
             var religionCores = PlaceReligions();
 
             // JS rand(min, max) is inclusive. C# Random.Next(min, max) is exclusive on the upper bound.
-            int cultsCount = (int)Math.Floor((pack.Rng.Next(1, 5) / 10.0) * religionCores.Count);    // 10-40%
-            int heresiesCount = (int)Math.Floor((pack.Rng.Next(0, 4) / 10.0) * religionCores.Count); // 0-30%
+            int cultsCount = (int)Math.Floor((pack.Rng.Next(1, 4) / 10.0) * religionCores.Count);    // 10-40%
+            int heresiesCount = (int)Math.Floor((pack.Rng.Next(0, 3) / 10.0) * religionCores.Count); // 0-30%
             int organizedCount = religionCores.Count - cultsCount - heresiesCount;
 
             // JS: const getType = index => { ... }
@@ -219,7 +220,7 @@ namespace MapGen.Core.Modules
                 var religionCells = new List<int>();
 
                 // JS: const religionsTree = d3.quadtree();
-                var religionsTree = new D3Sharp.QuadTree.QuadTree<QuadPoint, D3Sharp.QuadTree.QuadNode<QuadPoint>>();
+                var religionsTree = new QuadTree<QuadPoint, QuadNode<QuadPoint>>();
 
                 // Min distance between religion inceptions
                 double spacing = (pack.Width + pack.Height) / 2.0 / desiredReligionNumber;
