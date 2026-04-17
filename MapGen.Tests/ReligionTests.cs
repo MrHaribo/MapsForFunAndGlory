@@ -91,27 +91,8 @@ namespace MapGen.Tests
                 Assert.Equal(exp.form, act.Form);
                 Assert.Equal(exp.deity, act.Deity);
                 Assert.Equal(exp.expansion, act.Expansion);
-                //Assert.Equal(exp.centerCell, act.CenterCell);
+                Assert.Equal(exp.centerCell, act.CenterCell);
                 Assert.Equal(exp.code, act.Code);
-
-
-
-
-                // Inside your TestReligions_MatchesRegression assertion loop:
-                if (exp.cellsCount == 0 && exp.group == "Folk")
-                {
-                    // Extinct Folk Religions fall back to Culture Centers.
-                    // Allow a drift margin here since Culture Centers drifted upstream.
-                    Assert.True(Math.Abs(exp.centerCell - act.CenterCell) < 100,
-                        $"Extinct center drift exceeded on {act.Name}");
-                }
-                else
-                {
-                    // Strict bitwise check for all active religions and organized cores
-                    Assert.Equal(exp.centerCell, act.CenterCell);
-                }
-
-
 
                 // Floats from Gaussian distributions/mixes might drift slightly, so use tolerance
                 Assert.Equal(exp.expansionism, act.Expansionism, 2);

@@ -2,6 +2,7 @@
 using MapGen.Core.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace MapGen.Core.Modules
@@ -355,7 +356,7 @@ namespace MapGen.Core.Modules
                 {
                     int burgId = cells[center].BurgId;
                     int stateId = cells[center].StateId;
-                    string baseName = burgId > 0 ? pack.Burgs[burgId].Name : (stateId > 0 ? pack.States[stateId].Name : cultureName);
+                    string baseName = burgId > 0 ? pack.GetBurg(burgId).Name : pack.States[stateId].Name;
                     string placeName = LanguageUtils.TrimVowels(baseName.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)[0]);
 
                     // NOTE: Ensure your LanguageUtils.GetAdjective does NOT consume rng (pack.Rng). 
