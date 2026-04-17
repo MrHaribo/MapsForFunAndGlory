@@ -95,13 +95,13 @@ namespace MapGen.Tests
                 Assert.Equal(exp.code, act.Code);
 
                 // Floats from Gaussian distributions/mixes might drift slightly, so use tolerance
-                Assert.Equal(exp.expansionism, act.Expansionism, 2);
+                Assert.Equal(exp.expansionism, act.Expansionism);
 
                 // Stats (Often 0 at this stage of generation, but good to assert)
                 Assert.Equal(exp.cellsCount, act.CellsCount);
-                Assert.Equal(exp.totalArea, act.TotalArea, 2);
-                Assert.Equal(exp.ruralPopulation, act.RuralPopulation, 2);
-                Assert.Equal(exp.urbanPopulation, act.UrbanPopulation, 2);
+                Assert.Equal(exp.totalArea, act.TotalArea);
+                Assert.Equal(exp.ruralPopulation, act.RuralPopulation);
+                Assert.Equal(exp.urbanPopulation, act.UrbanPopulation);
 
                 // Assert Origins
                 Assert.NotNull(act.Origins);
